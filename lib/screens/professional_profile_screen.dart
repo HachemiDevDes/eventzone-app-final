@@ -1315,23 +1315,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                         ],
                         const SizedBox(height: 16),
 
-                          // 4. Contact Info List Rows
-                          if (_email.isNotEmpty) ...[
-                            _buildContactRow(LucideIcons.mail, _email, "Work"),
-                            const SizedBox(height: 12),
-                          ],
-                          if (_phone.isNotEmpty) ...[
-                            _buildContactRow(LucideIcons.phone, _phone, "Cell"),
-                            const SizedBox(height: 12),
-                          ],
-                          if (_website.isNotEmpty) ...[
-                            _buildContactRow(LucideIcons.globe, _website, "Website"),
-                            const SizedBox(height: 12),
-                          ],
-                          if (_address.isNotEmpty) ...[
-                            _buildContactRow(LucideIcons.mapPin, _address, "Address"),
-                            const SizedBox(height: 12),
-                          ],
+
                           
                           // Render dynamic social links (LinkedIn, WhatsApp, GitHub, etc.)
                           ..._socialLinks

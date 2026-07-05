@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -209,33 +210,73 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                                 ],
                               ),
                             ),
-                            // Streak Badge
-                            Container(
-                              margin: const EdgeInsets.only(top: 24),
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(30),
-                                border: Border.all(color: Colors.orange.withOpacity(0.3), width: 1.5),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.orange.withOpacity(0.1),
-                                    blurRadius: 10,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
+                            // Actions Row
+                            Padding(
+                              padding: const EdgeInsets.only(top: 24),
                               child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Text("🔥", style: TextStyle(fontSize: 22)),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    "$_dailyStreak Day Streak",
-                                    style: const TextStyle(
-                                      color: Colors.orangeAccent, 
-                                      fontWeight: FontWeight.bold, 
-                                      fontSize: 16,
+                                  // Corporate Streak Badge
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(LucideIcons.flame, size: 16, color: Colors.white70),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          "$_dailyStreak Day Streak",
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  
+                                  // Share Card Button
+                                  InkWell(
+                                    onTap: () {
+                                      Clipboard.setData(ClipboardData(text: userData));
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text("Profile link copied to clipboard!", style: TextStyle(fontWeight: FontWeight.bold)),
+                                          backgroundColor: EventzoneTheme.primaryAction,
+                                          behavior: SnackBarBehavior.floating,
+                                        ),
+                                      );
+                                    },
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: EventzoneTheme.primaryAction.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: EventzoneTheme.primaryAction.withOpacity(0.3)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(LucideIcons.share2, size: 16, color: EventzoneTheme.primaryAction),
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            "Share Card",
+                                            style: TextStyle(
+                                              color: EventzoneTheme.primaryAction,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ],
