@@ -1,143 +1,292 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/status_pill.dart';
+import '../models/session_model.dart';
+import '../providers/session_providers.dart';
+import 'schedule_screen.dart';
+import 'session_detail_screen.dart';
 
-class EventSessionsScreen extends StatelessWidget {
-  const EventSessionsScreen({super.key});
+class EventSessionsScreen extends ConsumerStatefulWidget {
+  final String eventId;
+  const EventSessionsScreen({super.key, required this.eventId});
+
+  @override
+  ConsumerState<EventSessionsScreen> createState() => _EventSessionsScreenState();
+}
+
+class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
+  String? _selectedDay;
 
   @override
   Widget build(BuildContext context) {
+    final sessionsAsync = ref.watch(sessionsProvider(widget.eventId));
+    final favoritesAsync = ref.watch(sessionFavoritesProvider);
+
     return Scaffold(
       body: EventzoneTheme.buildPlayfulBackground(
         child: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 48),
+              const SizedBox(height: 72),
+              
+              // Header
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "SCHEDULE",
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: EventzoneTheme.primaryAction,
-                            letterSpacing: 2,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "Sessions & Agenda",
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 28,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              // Day Selector
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildDayChip("Day 1", isSelected: true),
-                    _buildDayChip("Day 2"),
-                    _buildDayChip("Day 3"),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "SCHEDULE",
+                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                color: EventzoneTheme.primaryAction,
+                                letterSpacing: 2,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Sessions & Agenda",
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 28,
+                              ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(LucideIcons.calendarClock, color: Colors.white, size: 24),
+                      tooltip: "My Meetings",
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const MyMeetingsScreen()),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  itemCount: 6,
-                  itemBuilder: (context, index) {
-                    final times = ["09:00 AM", "10:30 AM", "12:00 PM", "01:30 PM", "03:00 PM", "04:30 PM"];
-                    final titles = [
-                      "Opening Keynote",
-                      "Future of AI & Robotics",
-                      "Networking Lunch",
-                      "Cloud Infrastructure 2.0",
-                      "Cybersecurity Deep Dive",
-                      "Closing Remarks"
-                    ];
-                    final isLive = index == 1;
 
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: GlassContainer(
-                        padding: const EdgeInsets.all(20),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Column(
-                              children: [
-                                Text(
-                                  times[index],
-                                  style: TextStyle(
-                                    color: isLive ? EventzoneTheme.primaryAction : Colors.white38,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+              // Async State Builder
+              Expanded(
+                child: sessionsAsync.when(
+                  loading: () => const Center(
+                    child: CircularProgressIndicator(color: EventzoneTheme.primaryAction),
+                  ),
+                  error: (err, stack) => Center(
+                    child: Text(
+                      "Error loading sessions: $err",
+                      style: const TextStyle(color: Colors.white54),
+                    ),
+                  ),
+                  data: (sessions) {
+                    if (sessions.isEmpty) {
+                      return const Center(
+                        child: Text("No sessions scheduled for this event.", style: TextStyle(color: Colors.white38)),
+                      );
+                    }
+
+                    // Extract unique day tags dynamically
+                    final days = sessions.map((s) => s.date ?? "Day 1").toSet().toList();
+                    days.sort((a, b) => a.compareTo(b));
+
+                    // Default selection
+                    _selectedDay ??= days.isNotEmpty ? days.first : 'Day 1';
+
+                    // Filter sessions for selected day
+                    final filteredSessions = sessions.where((s) => (s.date ?? "Day 1") == _selectedDay).toList();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Day Selector Tabs
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          child: Row(
+                            children: days.map((day) {
+                              final isSelected = _selectedDay == day;
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedDay = day;
+                                  });
+                                },
+                                child: Container(
+                                  margin: const EdgeInsets.only(right: 12),
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? EventzoneTheme.primaryAction : Colors.white.withOpacity(0.05),
+                                    borderRadius: BorderRadius.circular(30),
+                                    border: Border.all(color: isSelected ? Colors.transparent : Colors.white10),
                                   ),
-                                ),
-                                if (isLive) ...[
-                                  const SizedBox(height: 8),
-                                  const StatusPill(label: "LIVE", isLive: true),
-                                ]
-                              ],
-                            ),
-                            const SizedBox(width: 20),
-                            Container(width: 1, height: 60, color: Colors.white10),
-                            const SizedBox(width: 20),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    titles[index],
-                                    style: const TextStyle(
+                                  child: Text(
+                                    day,
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.white : Colors.white60,
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: Colors.white,
+                                      fontSize: 13,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Icon(LucideIcons.mapPin, size: 12, color: Colors.white38),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        index % 2 == 0 ? "Main Hall" : "Room 402",
-                                        style: const TextStyle(fontSize: 12, color: Colors.white38),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      const CircleAvatar(
-                                        radius: 10,
-                                        backgroundImage: NetworkImage("https://i.pravatar.cc/150?u=a"),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      const Text(
-                                        "Sarah Chen +2",
-                                        style: TextStyle(fontSize: 11, color: Colors.white70),
-                                      ),
-                                      const Spacer(),
-                                      const Icon(LucideIcons.plusCircle, size: 18, color: EventzoneTheme.primaryAction),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
-                      ),
+
+                        // Sessions List
+                        Expanded(
+                          child: filteredSessions.isEmpty
+                              ? const Center(
+                                  child: Text("No sessions on this day.", style: TextStyle(color: Colors.white38)),
+                                )
+                              : ListView.builder(
+                                  physics: const BouncingScrollPhysics(),
+                                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                                  itemCount: filteredSessions.length,
+                                  itemBuilder: (context, index) {
+                                    final session = filteredSessions[index];
+                                    final favList = favoritesAsync.value ?? [];
+                                    final isFav = favList.contains(session.id);
+
+                                    final startTimeStr = _formatTime(session.startTime);
+                                    final isLive = _isSessionLive(session.startTime, session.endTime);
+
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 16),
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => SessionDetailScreen(session: session),
+                                            ),
+                                          ).then((_) {
+                                            // Refresh favorites count / list in parent on pop
+                                            ref.invalidate(sessionFavoritesProvider);
+                                          });
+                                        },
+                                        child: GlassContainer(
+                                          padding: const EdgeInsets.all(20),
+                                          child: Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              // Time slot column
+                                              SizedBox(
+                                                width: 80,
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      startTimeStr,
+                                                      style: TextStyle(
+                                                        color: isLive ? EventzoneTheme.primaryAction : Colors.white38,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                    if (isLive) ...[
+                                                      const SizedBox(height: 8),
+                                                      const StatusPill(label: "LIVE", isLive: true),
+                                                    ]
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Container(width: 1, height: 64, color: Colors.white10),
+                                              const SizedBox(width: 16),
+                                              
+                                              // Content column
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      session.title,
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 15,
+                                                        color: Colors.white,
+                                                        height: 1.25,
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    Row(
+                                                      children: [
+                                                        const Icon(LucideIcons.mapPin, size: 12, color: Colors.white38),
+                                                        const SizedBox(width: 4),
+                                                        Expanded(
+                                                          child: Text(
+                                                            session.location ?? "TBA",
+                                                            style: const TextStyle(fontSize: 12, color: Colors.white38),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    Row(
+                                                      children: [
+                                                        // Speakers avatar stack / indicator
+                                                        if (session.speakers.isNotEmpty) ...[
+                                                          CircleAvatar(
+                                                            radius: 9,
+                                                            backgroundImage: session.speakers.first.avatarUrl.isNotEmpty
+                                                                ? NetworkImage(session.speakers.first.avatarUrl)
+                                                                : null,
+                                                            child: session.speakers.first.avatarUrl.isEmpty
+                                                                ? const Icon(LucideIcons.user, size: 8, color: Colors.white)
+                                                                : null,
+                                                          ),
+                                                          const SizedBox(width: 8),
+                                                          Expanded(
+                                                            child: Text(
+                                                              session.speakers.first.name +
+                                                                  (session.speakers.length > 1
+                                                                      ? " +${session.speakers.length - 1}"
+                                                                      : ""),
+                                                              style: const TextStyle(fontSize: 11, color: Colors.white70),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
+                                                          ),
+                                                        ] else
+                                                          const Spacer(),
+                                                          
+                                                        // Agenda quick-favorite toggle button
+                                                        GestureDetector(
+                                                          onTap: () {
+                                                            ref.read(sessionFavoritesProvider.notifier).toggleFavorite(session.id);
+                                                          },
+                                                          child: Icon(
+                                                            isFav ? LucideIcons.bookmarkCheck : LucideIcons.bookmarkPlus,
+                                                            size: 20,
+                                                            color: isFav ? EventzoneTheme.accentSuccess : EventzoneTheme.primaryAction,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -149,23 +298,19 @@ class EventSessionsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDayChip(String label, {bool isSelected = false}) {
-    return Container(
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-      decoration: BoxDecoration(
-        color: isSelected ? EventzoneTheme.primaryAction : Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: isSelected ? Colors.transparent : Colors.white10),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.white60,
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-        ),
-      ),
-    );
+  // Format Start Time
+  String _formatTime(DateTime dateTime) {
+    final localTime = dateTime.toLocal();
+    final hour = localTime.hour;
+    final min = localTime.minute.toString().padLeft(2, '0');
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final formattedHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    return "$formattedHour:$min $period";
+  }
+
+  // Determine if the session is currently happening
+  bool _isSessionLive(DateTime start, DateTime end) {
+    final now = DateTime.now();
+    return now.isAfter(start) && now.isBefore(end);
   }
 }

@@ -14,7 +14,7 @@ class EventSpeakersScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 48),
+              const SizedBox(height: 72),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
                 child: Column(

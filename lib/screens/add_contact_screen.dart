@@ -1,9 +1,14 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:image_picker/image_picker.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import 'my_network_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/supabase_service.dart';
 
 class AddContactScreen extends StatefulWidget {
   const AddContactScreen({super.key});
@@ -27,6 +32,29 @@ class _AddContactScreenState extends State<AddContactScreen> {
   bool _showLink = false;
   bool _showJobTitle = false;
   bool _showAddress = false;
+  
+  String? _base64Avatar;
+
+  Future<void> _pickAvatar() async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 300,
+        maxHeight: 300,
+        imageQuality: 70,
+      );
+
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _base64Avatar = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        });
+      }
+    } catch (e) {
+      debugPrint("Error picking image: $e");
+    }
+  }
 
   void _createAndEnrich() {
     final firstName = _firstNameController.text.trim();
@@ -63,20 +91,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
 
     final addressVal = _showAddress ? _addressController.text.trim() : "";
 
-    // Add to MyNetworkScreen's custom connections
-    MyNetworkScreen.customConnections.add({
-      "name": fullName,
-      "title": "$jobTitle at $companyName",
-      "avatarUrl": "https://i.pravatar.cc/150?u=m${MyNetworkScreen.customConnections.length}",
-      "source": "Manual Entry",
-      "isNew": "true",
-      "email": _showEmail ? _emailController.text.trim() : "",
-      "phone": _showPhone ? _phoneController.text.trim() : "",
-      "website": _showLink ? _linkController.text.trim() : "",
-      "address": addressVal,
-      "company": companyName,
-    });
-
     // Save to Supabase connections table
     _saveToSupabase(fullName, "$jobTitle at $companyName", addressVal);
 
@@ -94,12 +108,29 @@ class _AddContactScreenState extends State<AddContactScreen> {
   Future<void> _saveToSupabase(String name, String title, String address) async {
     try {
       final currentUser = Supabase.instance.client.auth.currentUser;
-      final currentUserId = currentUser?.id ?? "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
+      final currentUserId = currentUser?.id;
+      if (currentUserId == null) return;
+      
+      // Check subscription
+      final service = SupabaseService();
+      final hasSub = await service.hasActiveSubscription(currentUserId);
+      if (!hasSub) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("An active subscription is required to add connections!"),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        return;
+      }
+
       await Supabase.instance.client.from('connections').insert({
         'user_id': currentUserId,
         'name': name,
         'title': title,
-        'avatar_url': "https://i.pravatar.cc/150?u=m${name.hashCode}",
+        'avatar_url': _base64Avatar,
         'source': 'Manual Entry',
         'is_new': true,
         'email': _showEmail ? _emailController.text.trim() : "",
@@ -109,7 +140,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
         'company': _companyController.text.trim(),
       });
     } catch (e) {
-      print("Error saving manual connection to Supabase: $e");
+      debugPrint("Error saving manual connection to Supabase: $e");
     }
   }
 
@@ -215,8 +246,31 @@ class _AddContactScreenState extends State<AddContactScreen> {
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.all(24.0),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      // Avatar Picker
+                      GestureDetector(
+                        onTap: _pickAvatar,
+                        child: CircleAvatar(
+                          radius: 50,
+                          backgroundColor: Colors.white.withOpacity(0.05),
+                          backgroundImage: _base64Avatar != null
+                              ? MemoryImage(base64Decode(_base64Avatar!.split(',').last))
+                              : null,
+                          child: _base64Avatar == null
+                              ? const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(LucideIcons.camera, color: Colors.white38, size: 28),
+                                    SizedBox(height: 4),
+                                    Text("Add photo", style: TextStyle(color: Colors.white38, fontSize: 10)),
+                                  ],
+                                )
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      
                       // Name Row
                       Row(
                         children: [
@@ -273,37 +327,43 @@ class _AddContactScreenState extends State<AddContactScreen> {
                         ),
 
                       const SizedBox(height: 16),
-                      const Text(
-                        "Add more details",
-                        style: TextStyle(
-                          color: Colors.white38,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          "Add more details",
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
 
                       // Chips row (Wrap layout)
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 10,
-                        children: [
-                          _buildDetailChip("Phone", _showPhone, () {
-                            setState(() => _showPhone = true);
-                          }),
-                          _buildDetailChip("Email", _showEmail, () {
-                            setState(() => _showEmail = true);
-                          }),
-                          _buildDetailChip("Link", _showLink, () {
-                            setState(() => _showLink = true);
-                          }),
-                          _buildDetailChip("Job Title", _showJobTitle, () {
-                            setState(() => _showJobTitle = true);
-                          }),
-                          _buildDetailChip("Address", _showAddress, () {
-                            setState(() => _showAddress = true);
-                          }),
-                        ],
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 10,
+                          children: [
+                            _buildDetailChip("Phone", _showPhone, () {
+                              setState(() => _showPhone = true);
+                            }),
+                            _buildDetailChip("Email", _showEmail, () {
+                              setState(() => _showEmail = true);
+                            }),
+                            _buildDetailChip("Link", _showLink, () {
+                              setState(() => _showLink = true);
+                            }),
+                            _buildDetailChip("Job Title", _showJobTitle, () {
+                              setState(() => _showJobTitle = true);
+                            }),
+                            _buildDetailChip("Address", _showAddress, () {
+                              setState(() => _showAddress = true);
+                            }),
+                          ],
+                        ),
                       ),
                     ],
                   ),

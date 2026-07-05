@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "860424948464",
+    "project_id": "eventzone-app-f4984",
+    "storage_bucket": "eventzone-app-f4984.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:860424948464:android:4906676337b87f57015035",
+        "android_client_info": {
+          "package_name": "com.eventzone.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDoGlXIQvs_FtRXbompbAteX3gVpjEqOzE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

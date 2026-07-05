@@ -1,4 +1,4 @@
-package com.example.eventzone_app
+package com.eventzone.app
 
 import io.flutter.embedding.android.FlutterActivity
 

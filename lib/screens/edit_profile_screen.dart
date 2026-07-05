@@ -1,107 +1,214 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:country_code_picker/country_code_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import '../services/supabase_service.dart';
+import 'schedule_screen.dart';
+import 'my_network_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/auth_providers.dart';
 
-class EditProfileScreen extends StatefulWidget {
+class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
-  final _nameController = TextEditingController(text: "Hachemi Mohamed");
-  final _jobController = TextEditingController(text: "Product Lead");
-  final _companyController = TextEditingController(text: "TechFlow");
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
+  final _nameController = TextEditingController();
+  final _jobController = TextEditingController();
+  final _companyController = TextEditingController();
   final _addressController = TextEditingController();
+  final _bioController = TextEditingController();
+  final ExpansionTileController _bioExpansionController = ExpansionTileController();
+
+  final List<String> _lookingForOptions = ['Investors', 'Clients', 'Partners', 'Talent', 'Opportunities', 'Mentorship', 'Networking', 'Co-founders', 'Freelancers', 'Knowledge Sharing', 'Distributors', 'Sponsors', 'Job Opportunities', 'Internships', 'Venture Capital', 'Dev Partners', 'Brand Ambassadors', 'Content Creators', 'Influencers'];
+  List<String> _selectedLookingFor = [];
+
+  final List<String> _predefinedIndustries = [
+    'Artificial Intelligence', 'Blockchain & Web3', 'Cybersecurity', 'FinTech',
+    'HealthTech', 'EdTech', 'CleanTech & Energy', 'E-Commerce', 'SaaS',
+    'Venture Capital', 'Angel Investing', 'Product Management', 'Software Engineering',
+    'UX/UI Design', 'Digital Marketing', 'Sales & Business Dev', 'Cloud Computing',
+    'Data Science', 'Mobile Development', 'AR/VR', 'IoT (Internet of Things)',
+    'Game Development', 'Robotics', 'Aerospace', 'HR & Recruiting', 'Legal Tech',
+    'PropTech', 'InsurTech', 'Media & Entertainment', 'BioTech', 'Devops & SRE', 'ClimateTech'
+  ];
+  String _industrySearchQuery = "";
+  List<String> _selectedIndustries = [];
+  List<String> _selectedInterests = [];
 
   final _supabaseService = SupabaseService();
-  static const String _profileId = "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
-  bool _isLoading = false;
-  String _avatarUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop";
+  String _avatarUrl = "";
 
   List<Map<String, dynamic>> _socialLinks = [];
+
+  bool _isAutoSaving = false;
+  String? _syncError;
+  bool _isLoaded = false;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    _nameController.addListener(_onFieldChanged);
+    _jobController.addListener(_onFieldChanged);
+    _companyController.addListener(_onFieldChanged);
+    _addressController.addListener(_onFieldChanged);
+    _bioController.addListener(_onFieldChanged);
   }
 
-  Future<void> _loadProfile() async {
-    setState(() => _isLoading = true);
-    final data = await _supabaseService.fetchProfile(_profileId);
-    if (data != null) {
-      setState(() {
-        _nameController.text = data['full_name'] ?? '';
-        _jobController.text = data['job_title'] ?? '';
-        _companyController.text = data['company_name'] ?? '';
-        _addressController.text = data['address'] ?? '';
-        _avatarUrl = data['avatar_url'] ?? "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&crop";
-        
-        final metadata = data['metadata'] as Map<String, dynamic>?;
-        if (metadata != null && metadata['socials'] != null) {
-          _socialLinks = List<Map<String, dynamic>>.from(
-            (metadata['socials'] as List).map((e) => Map<String, dynamic>.from(e))
-          );
-        } else {
-          _socialLinks = [
-            {"platform": "Email", "value": "contact@eventzone.pro", "label": "Work"},
-            {"platform": "LinkedIn", "value": "linkedin.com/in/hachemimohamed", "label": "LinkedIn"}
-          ];
-        }
-      });
+  @override
+  void dispose() {
+    _nameController.removeListener(_onFieldChanged);
+    _jobController.removeListener(_onFieldChanged);
+    _companyController.removeListener(_onFieldChanged);
+    _addressController.removeListener(_onFieldChanged);
+    _bioController.removeListener(_onFieldChanged);
+    _debounceTimer?.cancel();
+    _nameController.dispose();
+    _jobController.dispose();
+    _companyController.dispose();
+    _addressController.dispose();
+    _bioController.dispose();
+    super.dispose();
+  }
+
+  void _onFieldChanged() {
+    if (!_isLoaded) return;
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 750), () {
+      _autoSaveProfile();
+    });
+  }
+
+  Future<void> _autoSaveProfile() async {
+    if (!mounted) return;
+    setState(() {
+      _isAutoSaving = true;
+      _syncError = null;
+    });
+
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentUserId == null) {
+      if (mounted) {
+        setState(() {
+          _isAutoSaving = false;
+          _syncError = "User not authenticated";
+        });
+      }
+      return;
     }
-    setState(() => _isLoading = false);
-  }
-
-  Future<void> _saveProfile() async {
-    setState(() => _isLoading = true);
-    final success = await _supabaseService.updateProfile(
-      _profileId,
+    final errorMsg = await _supabaseService.updateProfile(
+      currentUserId,
       fullName: _nameController.text,
       jobTitle: _jobController.text,
       companyName: _companyController.text,
       avatarUrl: _avatarUrl,
       address: _addressController.text,
+      bio: _bioController.text,
+      whatImLookingFor: _selectedLookingFor.join(', '),
+      industries: _selectedIndustries,
+      interests: _selectedInterests,
       metadata: {
         "socials": _socialLinks,
       },
     );
-    setState(() => _isLoading = false);
+    
+    // Update local cache so returning to other screens instantly shows changes
+    if (errorMsg == null && mounted) {
+      ref.read(currentUserProvider.notifier).updateLocalProfile({
+        'full_name': _nameController.text,
+        'job_title': _jobController.text,
+        'company_name': _companyController.text,
+        'avatar_url': _avatarUrl,
+        'address': _addressController.text,
+        'bio': _bioController.text,
+        'what_im_looking_for': _selectedLookingFor.join(', '),
+        'industries': _selectedIndustries,
+        'interests': _selectedInterests,
+        'metadata': {
+          "socials": _socialLinks,
+        },
+      });
+    }
 
-    if (success) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile saved successfully!')),
-        );
-        if (Navigator.canPop(context)) {
-          Navigator.pop(context, true);
-        }
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save profile')),
-        );
-      }
+    if (mounted) {
+      setState(() {
+        _isAutoSaving = false;
+        _syncError = errorMsg;
+      });
     }
   }
+
+  Future<void> _loadProfile() async {
+    final cachedData = ref.read(currentUserProvider).value;
+    if (cachedData != null) {
+      _populateData(cachedData);
+      return;
+    }
+    
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentUserId == null) return;
+    final data = await _supabaseService.fetchProfile(currentUserId);
+    if (data != null) {
+      _populateData(data);
+    }
+  }
+
+  void _populateData(Map<String, dynamic> data) {
+    if (!mounted) return;
+    setState(() {
+      _nameController.text = data['full_name'] ?? '';
+      _jobController.text = data['job_title'] ?? '';
+      _companyController.text = data['company_name'] ?? '';
+      _addressController.text = data['address'] ?? '';
+      _bioController.text = data['bio'] ?? '';
+      
+      final lookingForStr = data['what_im_looking_for'] as String?;
+      if (lookingForStr != null && lookingForStr.isNotEmpty) {
+        _selectedLookingFor = lookingForStr.split(',').map((e) => e.trim()).toList();
+      } else {
+        _selectedLookingFor = [];
+      }
+      
+      _selectedIndustries = (data['industries'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+      _selectedInterests = (data['interests'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+      
+      _avatarUrl = data['avatar_url'] ?? "";
+      
+      final metadata = data['metadata'] as Map<String, dynamic>?;
+      if (metadata != null && metadata['socials'] != null) {
+        _socialLinks = List<Map<String, dynamic>>.from(
+          (metadata['socials'] as List).map((e) => Map<String, dynamic>.from(e))
+        );
+      } else {
+        _socialLinks = [];
+      }
+      _isLoaded = true;
+    });
+  }
+
+
 
   Future<void> _pickImage() async {
     try {
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 300,
-        maxHeight: 300,
-        imageQuality: 70,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
       );
 
       if (pickedFile != null) {
@@ -110,6 +217,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         setState(() {
           _avatarUrl = "data:image/jpeg;base64,$base64String";
         });
+        _autoSaveProfile();
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -179,122 +287,202 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void _showAddEditSocialDialog({Map<String, dynamic>? existingLink, int? index, String? platformName}) {
     final isEditing = existingLink != null;
     final platform = isEditing ? existingLink['platform'] as String : (platformName ?? 'LinkedIn');
-    final valueController = TextEditingController(text: isEditing ? existingLink['value'] as String : '');
-    final labelController = TextEditingController(text: isEditing ? existingLink['label'] as String : (platform == 'Email' ? 'Work' : platform == 'Phone' ? 'Mobile' : platform));
+    final isPhoneOrWhatsApp = platform == 'Phone Number' || platform == 'WhatsApp';
+    
+    String selectedCode = '+1';
+    String initialValue = isEditing ? existingLink['value'] as String : '';
+    
+    if (isEditing && isPhoneOrWhatsApp) {
+      final parts = initialValue.split(' ');
+      if (parts.length > 1 && parts[0].startsWith('+')) {
+        selectedCode = parts[0];
+        initialValue = parts.sublist(1).join(' ');
+      } else if (initialValue.startsWith('+')) {
+        // Fallback if not separated by space
+        selectedCode = '+1'; 
+      }
+    }
 
-    showDialog(
+    final valueController = TextEditingController(text: initialValue);
+    final labelController = TextEditingController(text: isEditing ? existingLink['label'] as String : (platform == 'Email' ? 'Work' : platform == 'Phone Number' ? 'Mobile' : platform));
+
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF141927),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-        contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        title: Text(
-          isEditing ? "Edit $platform Link" : "Add $platform Link",
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("Value / URL", style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              child: TextField(
-                controller: valueController,
-                style: const TextStyle(color: Colors.white, fontSize: 15),
-                decoration: InputDecoration(
-                  hintText: platform == 'Email' ? 'example@email.com' : platform == 'Phone' ? '+123456789' : 'https://...',
-                  hintStyle: const TextStyle(color: Colors.white24),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: GlassContainer(
+                borderRadius: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    Center(
+                      child: Text(
+                        isEditing ? "Edit $platform" : "Add $platform",
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 24,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    Text(isPhoneOrWhatsApp ? "Phone Number" : "Value / URL", style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                      ),
+                      child: TextField(
+                        controller: valueController,
+                        style: const TextStyle(color: Colors.white, fontSize: 15),
+                        keyboardType: isPhoneOrWhatsApp ? TextInputType.phone : TextInputType.url,
+                        decoration: InputDecoration(
+                          prefixIcon: isPhoneOrWhatsApp 
+                            ? Padding(
+                                padding: const EdgeInsets.only(left: 16.0, right: 8.0),
+                                child: CountryCodePicker(
+                                  onChanged: (countryCode) {
+                                    if (countryCode.dialCode != null) {
+                                      setModalState(() => selectedCode = countryCode.dialCode!);
+                                    }
+                                  },
+                                  initialSelection: selectedCode,
+                                  favorite: const ['+1', '+44'],
+                                  showCountryOnly: false,
+                                  showOnlyCountryWhenClosed: false,
+                                  alignLeft: false,
+                                  padding: EdgeInsets.zero,
+                                  textStyle: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                                  dialogTextStyle: const TextStyle(color: Colors.white),
+                                  dialogBackgroundColor: const Color(0xFF141927),
+                                  searchStyle: const TextStyle(color: Colors.white),
+                                  searchDecoration: const InputDecoration(
+                                    hintText: "Search country",
+                                    hintStyle: TextStyle(color: Colors.white54),
+                                    prefixIcon: Icon(Icons.search, color: Colors.white54),
+                                  ),
+                                  closeIcon: const Icon(Icons.close, color: Colors.white),
+                                ),
+                              )
+                            : null,
+                          hintText: platform == 'Email' ? 'example@email.com' : isPhoneOrWhatsApp ? '555-5555' : 'https://...',
+                          hintStyle: const TextStyle(color: Colors.white24),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: isPhoneOrWhatsApp ? 0 : 16, vertical: 16),
+                        ),
+                        autofocus: true,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text("Label", style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withOpacity(0.05)),
+                      ),
+                      child: TextField(
+                        controller: labelController,
+                        style: const TextStyle(color: Colors.white, fontSize: 15),
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. Work, Personal, Mobile',
+                          hintStyle: TextStyle(color: Colors.white24),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    Row(
+                      children: [
+                        if (isEditing)
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _socialLinks.removeAt(index!);
+                                });
+                                _autoSaveProfile();
+                                Navigator.pop(context);
+                              },
+                              child: const Text("Delete", style: TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        if (!isEditing)
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text("Cancel", style: TextStyle(color: Colors.white38, fontSize: 16)),
+                            ),
+                          ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (valueController.text.isNotEmpty) {
+                                final finalValue = isPhoneOrWhatsApp ? '$selectedCode ${valueController.text.trim()}' : valueController.text.trim();
+                                setState(() {
+                                  if (isEditing) {
+                                    _socialLinks[index!] = {
+                                      "platform": platform,
+                                      "value": finalValue,
+                                      "label": labelController.text,
+                                    };
+                                  } else {
+                                    _socialLinks.add({
+                                      "platform": platform,
+                                      "value": finalValue,
+                                      "label": labelController.text,
+                                    });
+                                  }
+                                });
+                                _autoSaveProfile();
+                              }
+                              Navigator.pop(context);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: EventzoneTheme.primaryAction,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                            child: Text(
+                              isEditing ? "Save" : "Add", 
+                              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            const Text("Label", style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
-              ),
-              child: TextField(
-                controller: labelController,
-                style: const TextStyle(color: Colors.white, fontSize: 15),
-                decoration: const InputDecoration(
-                  hintText: 'e.g. Work, Personal, Mobile',
-                  hintStyle: TextStyle(color: Colors.white24),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          Row(
-            children: [
-              if (isEditing)
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _socialLinks.removeAt(index!);
-                    });
-                    Navigator.pop(context);
-                  },
-                  child: const Text("Delete", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                ),
-              const Spacer(),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Cancel", style: TextStyle(color: Colors.white54)),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () {
-                  if (valueController.text.isNotEmpty) {
-                    setState(() {
-                      if (isEditing) {
-                        _socialLinks[index!] = {
-                          "platform": platform,
-                          "value": valueController.text,
-                          "label": labelController.text,
-                        };
-                      } else {
-                        _socialLinks.add({
-                          "platform": platform,
-                          "value": valueController.text,
-                          "label": labelController.text,
-                        });
-                      }
-                    });
-                  }
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: EventzoneTheme.primaryAction,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text(
-                  isEditing ? "Save" : "Add",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -306,29 +494,44 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: Navigator.canPop(context)
-            ? TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Cancel", style: TextStyle(color: Colors.white70)),
+            ? IconButton(
+                icon: const Icon(LucideIcons.arrowLeft, color: Colors.white70),
+                onPressed: () => Navigator.pop(context, true),
               )
             : null,
         title: const Text("Edit Profile", style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
-          _isLoading
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: EventzoneTheme.primaryAction),
-                    ),
-                  ),
-                )
-              : TextButton(
-                  onPressed: _saveProfile,
-                  child: const Text("Save", style: TextStyle(color: EventzoneTheme.primaryAction, fontWeight: FontWeight.bold)),
+          if (_isAutoSaving)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: EventzoneTheme.primaryAction),
                 ),
+              ),
+            )
+          else if (_syncError != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Tooltip(
+                message: _syncError!,
+                child: const Icon(LucideIcons.alertTriangle, color: Colors.redAccent, size: 20),
+              ),
+            )
+          else if (_isLoaded)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Icon(LucideIcons.cloudCheck, color: Colors.white24, size: 18),
+                  SizedBox(width: 4),
+                  Text("Saved", style: TextStyle(color: Colors.white24, fontSize: 12)),
+                ],
+              ),
+            ),
         ],
       ),
       body: EventzoneTheme.buildPlayfulBackground(
@@ -356,12 +559,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                         ),
                         child: ClipOval(
-                          child: Image(
-                            image: _getAvatarProvider(_avatarUrl),
-                            fit: BoxFit.cover,
-                            width: 100,
-                            height: 100,
-                          ),
+                          child: _avatarUrl.isEmpty
+                              ? const CircleAvatar(
+                                  backgroundColor: Colors.white10,
+                                  child: Icon(Icons.person, size: 50, color: Colors.white54),
+                                )
+                              : Image(
+                                  image: _getAvatarProvider(_avatarUrl),
+                                  fit: BoxFit.cover,
+                                  width: 100,
+                                  height: 100,
+                                ),
                         ),
                       ),
                       Container(
@@ -376,8 +584,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                 ),
               ),
-              
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
               _buildSectionTitle("Personal Details"),
               _buildTextField("Full Name", _nameController),
               _buildTextField("Job Title", _jobController),
@@ -385,11 +592,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               _buildTextField("Address", _addressController),
               
               const SizedBox(height: 32),
+              _buildSectionTitle("About Me"),
+              const SizedBox(height: 8),
+              _buildCollapsibleBio(),
+              _buildCollapsibleLookingFor(),
+              _buildCollapsibleIndustriesAndInterests(),
+              
+              const SizedBox(height: 32),
               _buildSectionTitle("Social Links"),
-              
-
-              
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
               
               Container(
                 width: double.infinity,
@@ -463,9 +674,85 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   },
                 ),
               
-              const SizedBox(height: 200),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _showSignOutDialog,
+                  icon: const Icon(LucideIcons.logOut, size: 18),
+                  label: const Text("Sign Out", style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent.withOpacity(0.1),
+                    foregroundColor: Colors.redAccent,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: const BorderSide(color: Colors.redAccent, width: 1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 100),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showSignOutDialog() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => GlassContainer(
+        borderRadius: 24,
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              "Sign Out",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "Are you sure you want to sign out? Your session will be ended.",
+              style: TextStyle(color: Colors.white70, fontSize: 15),
+            ),
+            const SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Cancel", style: TextStyle(color: Colors.white70)),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(context); // Close dialog
+                      await Supabase.instance.client.auth.signOut();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    child: const Text("Sign Out", style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16), // SafeArea padding
+          ],
         ),
       ),
     );
@@ -484,7 +771,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller) {
+  Widget _buildTextField(String label, TextEditingController controller, {int maxLines = 1}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -493,6 +780,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           Text(label, style: const TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold)),
           TextField(
             controller: controller,
+            maxLines: maxLines,
             style: const TextStyle(color: Colors.white, fontSize: 16),
             decoration: const InputDecoration(
               enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
@@ -578,6 +866,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   setState(() {
                     _socialLinks.removeAt(index);
                   });
+                  _autoSaveProfile();
                 },
                 child: Container(
                   padding: const EdgeInsets.all(4),
@@ -587,6 +876,241 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+  Widget _buildCollapsibleBio() {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: ExpansionTile(
+          controller: _bioExpansionController,
+          title: const Text("Professional Bio", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          iconColor: Colors.white70,
+          collapsedIconColor: Colors.white70,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+          children: [
+            TextFormField(
+              controller: _bioController,
+              maxLines: 4,
+              maxLength: 300,
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: "Briefly tell us about your experience and background...",
+                hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
+                fillColor: const Color(0xFF1A1E2E),
+                filled: true,
+                contentPadding: const EdgeInsets.all(16),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () {
+                  FocusScope.of(context).unfocus();
+                  _bioExpansionController.collapse();
+                  _onFieldChanged();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Bio saved!", style: TextStyle(fontWeight: FontWeight.bold)),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                icon: const Icon(LucideIcons.checkCircle2, color: EventzoneTheme.primaryAction, size: 16),
+                label: const Text("Save Bio", style: TextStyle(color: EventzoneTheme.primaryAction, fontWeight: FontWeight.bold)),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  backgroundColor: EventzoneTheme.primaryAction.withOpacity(0.1),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCollapsibleLookingFor() {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: ExpansionTile(
+          title: const Text("What I'm Looking For", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          iconColor: Colors.white70,
+          collapsedIconColor: Colors.white70,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+          children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: _lookingForOptions.map((option) {
+                final isSelected = _selectedLookingFor.contains(option);
+                return FilterChip(
+                  label: Text(option),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedLookingFor.add(option);
+                      } else {
+                        _selectedLookingFor.remove(option);
+                      }
+                    });
+                    _onFieldChanged();
+                  },
+                  backgroundColor: const Color(0xFF1A1E2E),
+                  selectedColor: EventzoneTheme.primaryAction,
+                  checkmarkColor: Colors.white,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white70,
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide.none),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _buildCollapsibleIndustriesAndInterests() {
+    final filteredOptions = _predefinedIndustries
+        .where((opt) => opt.toLowerCase().contains(_industrySearchQuery.toLowerCase()))
+        .toList();
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: ExpansionTile(
+          title: const Text("Industries & Interests", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          iconColor: Colors.white70,
+          collapsedIconColor: Colors.white70,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+          children: [
+          TextField(
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: "Search areas...",
+              hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
+              prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
+              fillColor: const Color(0xFF1A1E2E),
+              filled: true,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+            onChanged: (val) {
+              setState(() {
+                _industrySearchQuery = val;
+              });
+            },
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: filteredOptions.map((option) {
+                final isSelected = _selectedIndustries.contains(option);
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (isSelected) {
+                        _selectedIndustries.remove(option);
+                        _selectedInterests.remove(option);
+                      } else {
+                        if (_selectedIndustries.length >= 5) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("You can select up to 5 tags maximum."),
+                              backgroundColor: Colors.amber,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
+                        _selectedIndustries.add(option);
+                        _selectedInterests.add(option);
+                      }
+                    });
+                    _onFieldChanged();
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected 
+                          ? EventzoneTheme.primaryAction.withOpacity(0.2) 
+                          : const Color(0xFF1A1E2E),
+                      border: Border.all(
+                        color: isSelected 
+                            ? EventzoneTheme.primaryAction 
+                            : Colors.white10,
+                        width: 1.5,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isSelected) ...[
+                          const Icon(Icons.check, size: 14, color: Colors.white),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          option,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
       ),
     );
   }

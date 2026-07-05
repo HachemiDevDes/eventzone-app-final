@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -8,16 +9,103 @@ import 'my_network_screen.dart';
 import 'add_contact_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:google_mlkit_entity_extraction/google_mlkit_entity_extraction.dart';
+import 'package:google_mlkit_language_id/google_mlkit_language_id.dart';
 import 'package:image_picker/image_picker.dart';
 import 'review_contact_screen.dart';
-import 'package:camera/camera.dart';
+import 'package:camerawesome/camerawesome_plugin.dart';
+import 'package:camerawesome/pigeon.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math' as math;
 import 'package:image/image.dart' as img;
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'professional_profile_screen.dart';
+
+// Top-level function for Isolate to prevent UI freezing during heavy image manipulation
+Future<Map<String, dynamic>> _processImageInIsolate(Map<String, dynamic> args) async {
+  final String path = args['path'];
+  final bool isCameraCapture = args['isCameraCapture'];
+  final double screenWidth = args['screenWidth'];
+  final double screenHeight = args['screenHeight'];
+  final double frameW = args['frameW'];
+  final double frameH = args['frameH'];
+
+  final Uint8List imageBytes = await File(path).readAsBytes();
+  img.Image? fullImage = img.decodeImage(imageBytes);
+  if (fullImage == null) throw Exception("Failed to decode image");
+  
+  String ocrImagePath = path;
+  int imageWidth = fullImage.width;
+  int imageHeight = fullImage.height;
+  int cropWidth = imageWidth;
+  int cropHeight = imageHeight;
+
+  if (!isCameraCapture) {
+    if (fullImage.width > 1200) {
+      fullImage = img.copyResize(fullImage, width: 1200);
+    }
+    img.grayscale(fullImage);
+    img.adjustColor(fullImage, contrast: 1.2);
+    
+    final String enhancedPath = '${path}_enhanced.jpg';
+    await File(enhancedPath).writeAsBytes(img.encodeJpg(fullImage, quality: 95));
+    ocrImagePath = enhancedPath;
+  } else {
+    final double frameLeft = (screenWidth - frameW) / 2;
+    final double frameTop = (screenHeight - frameH) / 2 - 50;
+
+    final double scale = math.max(
+      screenWidth / imageWidth,
+      screenHeight / imageHeight,
+    );
+    final double dx = (screenWidth - imageWidth * scale) / 2;
+    final double dy = (screenHeight - imageHeight * scale) / 2;
+
+    final double rawLeft = (frameLeft - dx) / scale;
+    final double rawTop = (frameTop - dy) / scale;
+    final double rawRight = (frameLeft + frameW - dx) / scale;
+    final double rawBottom = (frameTop + frameH - dy) / scale;
+    final double padX = (rawRight - rawLeft) * 0.15;
+    final double padY = (rawBottom - rawTop) * 0.15;
+
+    final int cropX = (rawLeft - padX).clamp(0, imageWidth - 1).toInt();
+    final int cropY = (rawTop - padY).clamp(0, imageHeight - 1).toInt();
+    cropWidth = ((rawRight - rawLeft) + padX * 2).clamp(1, imageWidth - cropX).toInt();
+    cropHeight = ((rawBottom - rawTop) + padY * 2).clamp(1, imageHeight - cropY).toInt();
+
+    final img.Image cropped = img.copyCrop(
+      fullImage,
+      x: cropX,
+      y: cropY,
+      width: cropWidth,
+      height: cropHeight,
+    );
+
+    final String croppedPath = '${path}_cropped.jpg';
+    final img.Image gray = img.grayscale(cropped);
+    img.adjustColor(gray, contrast: 1.4, brightness: 1.05);
+    await File(croppedPath).writeAsBytes(img.encodeJpg(gray, quality: 100));
+    ocrImagePath = croppedPath;
+  }
+
+  return {
+    'ocrImagePath': ocrImagePath,
+    'cropWidth': cropWidth,
+    'cropHeight': cropHeight,
+    'imageWidth': imageWidth,
+    'imageHeight': imageHeight,
+  };
+}
 
 class ScanQRScreen extends StatefulWidget {
-  const ScanQRScreen({super.key});
+  final Map<String, dynamic>? previousScanData;
+
+  const ScanQRScreen({
+    super.key,
+    this.previousScanData,
+  });
 
   @override
   State<ScanQRScreen> createState() => _ScanQRScreenState();
@@ -25,7 +113,7 @@ class ScanQRScreen extends StatefulWidget {
 
 class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderStateMixin {
   bool _isConnecting = false;
-  String _scanType = "QR Code"; // "QR Code", "Business Card", "Event Badge"
+  late String _scanType; // "QR Code", "Business Card", "Event Badge"
   final MobileScannerController _controller = MobileScannerController();
   bool _isFlashOn = false;
   
@@ -33,80 +121,26 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
   String _ocrStatus = "";
   double _ocrProgress = 0.0;
   DateTime? _lastErrorTime;
+  Rect? _lastTargetRect;
 
-  CameraController? _cameraController;
-  List<CameraDescription> _cameras = [];
-  bool _isCameraInitialized = false;
+  CameraState? _cameraAwesomeState;
+  bool _isCameraInitialized = true;
 
   @override
   void initState() {
     super.initState();
+    _scanType = widget.previousScanData != null ? "Business Card" : "QR Code";
     _laserController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     );
-    _initCameras();
-  }
-
-  Future<void> _initCameras() async {
-    try {
-      _cameras = await availableCameras();
-      if (_scanType != "QR Code") {
-        await _initializeCameraController();
-      }
-    } catch (e) {
-      print("Error listing cameras: $e");
-    }
-  }
-
-  Future<void> _initializeCameraController() async {
-    if (_cameras.isEmpty) return;
-    
-    try {
-      await _controller.stop();
-    } catch (_) {}
-
-    final camera = _cameras.first;
-    _cameraController = CameraController(
-      camera,
-      ResolutionPreset.max,
-      enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.jpeg,
-    );
-
-    try {
-      await _cameraController!.initialize();
-      // Lock autofocus for sharper card captures
-      try {
-        await _cameraController!.setFocusMode(FocusMode.auto);
-      } catch (_) {}
-      if (mounted) {
-        setState(() {
-          _isCameraInitialized = true;
-        });
-      }
-    } catch (e) {
-      print("Error initializing camera: $e");
-    }
-  }
-
-  Future<void> _disposeCameraController() async {
-    if (_cameraController != null) {
-      await _cameraController!.dispose();
-      _cameraController = null;
-      if (mounted) {
-        setState(() {
-          _isCameraInitialized = false;
-        });
-      }
-    }
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _laserController.dispose();
-    _cameraController?.dispose();
+
     super.dispose();
   }
 
@@ -165,6 +199,12 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
     String name = "";
     String title = "";
     String avatarUrl = "";
+    String? email;
+    String? phone;
+    String? website;
+    String? company;
+    String? department;
+    Map<String, dynamic>? scannedProfile;
     
     final uuid = _extractUuid(data);
     
@@ -183,13 +223,76 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
             .maybeSingle();
             
         if (profile != null) {
+          scannedProfile = profile;
+          final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+          
+          if (currentUserId == uuid) {
+            _laserController.stop();
+            setState(() => _isConnecting = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("You cannot connect with yourself!"),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+            return;
+          }
+          
+          if (currentUserId != null) {
+            final existingConn = await Supabase.instance.client
+                .from('connections')
+                .select('id')
+                .eq('user_id', currentUserId)
+                .eq('linked_profile_id', uuid)
+                .maybeSingle();
+                
+            if (existingConn != null) {
+              _laserController.stop();
+              setState(() => _isConnecting = false);
+              final String existingName = profile["full_name"] ?? "this user";
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("You are already connected with $existingName!"),
+                  backgroundColor: const Color(0xFFEAB308), // Yellow warning
+                ),
+              );
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfessionalProfileScreen(
+                    name: profile["full_name"] ?? "Eventzone User",
+                    title: profile["job_title"] ?? "",
+                    avatarUrl: profile["avatar_url"] ?? "",
+                    source: "QR Code",
+                    isNew: "false",
+                    email: profile["email"],
+                    phone: profile["phone"],
+                    website: profile["website"],
+                    company: profile["company_name"],
+                    department: profile["department"],
+                    address: profile["address"],
+                    targetUserId: uuid,
+                    connectionId: existingConn['id'] as String?,
+                    socialLinks: profile['metadata']?['socials'],
+                  ),
+                ),
+              );
+              return;
+            }
+          }
+
           name = profile["full_name"] ?? "Eventzone User";
           final String job = profile["job_title"] ?? "";
-          final String company = profile["company_name"] ?? "";
+          final String comp = profile["company_name"] ?? "";
           title = job.isNotEmpty 
-              ? (company.isNotEmpty ? "$job at $company" : job)
-              : (company.isNotEmpty ? "Professional at $company" : "Attendee");
-          avatarUrl = profile["avatar_url"] ?? "https://i.pravatar.cc/150?u=$uuid";
+              ? (comp.isNotEmpty ? "$job at $comp" : job)
+              : (comp.isNotEmpty ? "Professional at $comp" : "Attendee");
+          avatarUrl = profile["avatar_url"] ?? "";
+          email = profile["email"];
+          phone = profile["phone"];
+          website = profile["website"];
+          company = comp;
+          department = profile["department"];
         } else {
           _laserController.stop();
           setState(() => _isConnecting = false);
@@ -202,7 +305,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
           return;
         }
       } catch (e) {
-        print("Error fetching profile: $e");
+        debugPrint("Error fetching profile: $e");
         _laserController.stop();
         setState(() => _isConnecting = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -236,26 +339,29 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
       });
       
       // Step 3: 600ms - Final verification
-      Future.delayed(const Duration(milliseconds: 600), () {
+      Future.delayed(const Duration(milliseconds: 600), () async {
         if (!mounted) return;
         setState(() {
           _ocrStatus = "Verification successful!";
           _ocrProgress = 1.0;
         });
         
-        // Add to customConnections list
-        MyNetworkScreen.customConnections.add({
-          "name": name,
-          "title": title,
-          "avatarUrl": avatarUrl,
-          "source": _scanType,
-          "isNew": "true",
-        });
 
-        // Insert into Supabase connections table
-        _saveToSupabase(name, title, avatarUrl);
-        
-        Future.delayed(const Duration(milliseconds: 500), () {
+
+        // Insert into Supabase connections table (and deduct point)
+        try {
+          final connectionId = await _saveToSupabase(
+            name, 
+            title, 
+            avatarUrl,
+            email: email,
+            phone: phone,
+            website: website,
+            company: company,
+            department: department,
+            targetUserId: uuid,
+          );
+          
           if (mounted) {
             _laserController.stop();
             ScaffoldMessenger.of(context).showSnackBar(
@@ -264,9 +370,46 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
                 backgroundColor: EventzoneTheme.accentSuccess,
               ),
             );
-            Navigator.pop(context);
+            if (uuid != null || _scanType != "QR Code") {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfessionalProfileScreen(
+                    name: name,
+                    title: title,
+                    avatarUrl: avatarUrl,
+                    source: _scanType,
+                    isNew: "true",
+                    email: email,
+                    phone: phone,
+                    website: website,
+                    company: company,
+                    department: department,
+                    address: scannedProfile?["address"],
+                    targetUserId: uuid,
+                    connectionId: connectionId,
+                    socialLinks: scannedProfile?['metadata']?['socials'],
+                    createdAt: DateTime.now().toIso8601String(),
+                  ),
+                ),
+              );
+            } else {
+              Navigator.pop(context);
+            }
           }
-        });
+        } catch (e) {
+          if (mounted) {
+            _laserController.stop();
+            setState(() => _isConnecting = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(e.toString().replaceAll('Exception: ', '')),
+                backgroundColor: Colors.redAccent,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
       });
     });
   }
@@ -274,7 +417,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
   Map<String, String> _parseContactData(String data) {
     String name = "";
     String title = "";
-    String avatarUrl = "https://i.pravatar.cc/150?u=${data.hashCode}";
+    String avatarUrl = "";
 
     final trimmed = data.trim();
 
@@ -350,7 +493,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
     if (_isConnecting) return;
     if (_scanType == "QR Code") return;
     
-    if (_cameraController == null || !_isCameraInitialized) {
+    if (_cameraAwesomeState == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Camera not initialized yet.")),
       );
@@ -364,10 +507,21 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
         _ocrProgress = 0.05;
       });
       
-      final XFile imageFile = await _cameraController!.takePicture();
-      await _processImageFile(imageFile.path, isCameraCapture: true);
+      _cameraAwesomeState!.when(
+        onPhotoMode: (pm) async {
+          final request = await pm.takePhoto();
+          if (request.path != null) {
+             await _processImageFile(request.path!, isCameraCapture: true);
+          } else {
+            setState(() => _isConnecting = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Capture failed: Path is null"), backgroundColor: Colors.redAccent),
+            );
+          }
+        },
+      );
     } catch (e) {
-      print("Capture error: $e");
+      debugPrint("Capture error: $e");
       setState(() => _isConnecting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Capture failed: $e"), backgroundColor: Colors.redAccent),
@@ -389,122 +543,97 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
   Future<void> _processImageFile(String path, {bool isCameraCapture = false}) async {
     setState(() {
       _isConnecting = true;
-      _ocrStatus = "Initializing text detector...";
+      _ocrStatus = isCameraCapture 
+          ? "Image captured! You can move your phone." 
+          : "Analyzing image...";
       _ocrProgress = 0.1;
     });
     
     _laserController.repeat(reverse: true);
     
     try {
-      // ── Step 0: Decode the full image ──
-      final Uint8List imageBytes = await File(path).readAsBytes();
-      final img.Image? fullImage = img.decodeImage(imageBytes);
-      if (fullImage == null) {
-        throw Exception("Failed to decode image");
+      // Setup args for the isolate to prevent UI freezing
+      final double screenWidth = MediaQuery.of(context).size.width;
+      final double screenHeight = MediaQuery.of(context).size.height;
+      double frameW = 280;
+      double frameH = 280;
+      if (_scanType == "Business Card") {
+        frameW = 340;
+        frameH = 200;
+      } else if (_scanType == "Event Badge") {
+        frameW = 280;
+        frameH = 420;
       }
-      final int imageWidth = fullImage.width;
-      final int imageHeight = fullImage.height;
 
-      setState(() {
-        _ocrStatus = "Preparing image for recognition...";
-        _ocrProgress = 0.2;
-      });
+      final isolateArgs = {
+        'path': path,
+        'isCameraCapture': isCameraCapture,
+        'screenWidth': screenWidth,
+        'screenHeight': screenHeight,
+        'frameW': frameW,
+        'frameH': frameH,
+      };
 
-      // ── Step 1: Physically crop the image to viewfinder bounds (camera only) ──
-      // This is the single biggest quality improvement: ML Kit performs MUCH better
-      // when it only sees the card, not the surrounding desk/screen/noise.
-      String ocrImagePath = path;
-      int cropWidth = imageWidth;
-      int cropHeight = imageHeight;
+      // Run heavy image decoding and cropping in background isolate
+      final isolateResult = await compute(_processImageInIsolate, isolateArgs);
+      
+      String ocrImagePath = isolateResult['ocrImagePath'];
+      int cropWidth = isolateResult['cropWidth'];
+      int cropHeight = isolateResult['cropHeight'];
+      int imageWidth = isolateResult['imageWidth'];
+      int imageHeight = isolateResult['imageHeight'];
 
       if (isCameraCapture && mounted) {
-        final double screenWidth = MediaQuery.of(context).size.width;
-        final double screenHeight = MediaQuery.of(context).size.height;
-
-        // Viewfinder frame dimensions on screen
-        double frameW = 280;
-        double frameH = 280;
-        if (_scanType == "Business Card") {
-          frameW = 340;
-          frameH = 200;
-        } else if (_scanType == "Event Badge") {
-          frameW = 280;
-          frameH = 420;
-        }
-        final double frameLeft = (screenWidth - frameW) / 2;
-        final double frameTop = (screenHeight - frameH) / 2 - 50;
-
-        // BoxFit.cover inverse mapping: screen coords → photo pixel coords
-        final double scale = math.max(
-          screenWidth / imageWidth,
-          screenHeight / imageHeight,
-        );
-        final double dx = (screenWidth - imageWidth * scale) / 2;
-        final double dy = (screenHeight - imageHeight * scale) / 2;
-
-        // Map viewfinder bounds to photo pixels with 15% padding
-        final double rawLeft = (frameLeft - dx) / scale;
-        final double rawTop = (frameTop - dy) / scale;
-        final double rawRight = (frameLeft + frameW - dx) / scale;
-        final double rawBottom = (frameTop + frameH - dy) / scale;
-        final double padX = (rawRight - rawLeft) * 0.15;
-        final double padY = (rawBottom - rawTop) * 0.15;
-
-        // Clamp to image bounds
-        final int cropX = (rawLeft - padX).clamp(0, imageWidth - 1).toInt();
-        final int cropY = (rawTop - padY).clamp(0, imageHeight - 1).toInt();
-        cropWidth = ((rawRight - rawLeft) + padX * 2).clamp(1, imageWidth - cropX).toInt();
-        cropHeight = ((rawBottom - rawTop) + padY * 2).clamp(1, imageHeight - cropY).toInt();
-
-        // Physically crop and save to a temporary file
-        final img.Image cropped = img.copyCrop(
-          fullImage,
-          x: cropX,
-          y: cropY,
-          width: cropWidth,
-          height: cropHeight,
-        );
-
-        // Enhance contrast for better OCR on complex card designs
-        img.adjustColor(cropped, contrast: 1.3);
-
-        final String croppedPath = '${path}_cropped.jpg';
-        await File(croppedPath).writeAsBytes(img.encodeJpg(cropped, quality: 95));
-        ocrImagePath = croppedPath;
+        // Compress the cropped image on the main isolate using the plugin (since plugins often need main isolate)
+        try {
+          final resultBytes = await FlutterImageCompress.compressWithFile(
+            ocrImagePath,
+            quality: 85,
+          );
+          if (resultBytes != null) {
+             await File(ocrImagePath).writeAsBytes(resultBytes);
+          }
+        } catch (_) {}
 
         setState(() {
-          _ocrStatus = "Card isolated — running text recognition...";
-          _ocrProgress = 0.35;
+          _ocrStatus = "Processing text recognition...";
+          _ocrProgress = 0.4;
         });
       }
 
       // ── Step 2: Primary OCR pass on the cropped/focused image ──
       final inputImage = InputImage.fromFilePath(ocrImagePath);
       final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+      
+      final recognizedText = await textRecognizer.processImage(inputImage);
 
       // Collect all lines with bounding-box metadata
-      // When we used a cropped image, coordinates are relative to the CROP, not the full photo.
-      // So normalizedTop is relative to cropHeight (the card itself) — much more accurate.
       List<Map<String, dynamic>> rawLinesWithMeta = [];
       List<String> allDetectedLines = [];
       final int refHeight = isCameraCapture ? cropHeight : imageHeight;
 
-      for (TextBlock block in recognizedText.blocks) {
-        for (TextLine line in block.lines) {
-          final String text = line.text.trim();
-          if (text.isEmpty) continue;
-          allDetectedLines.add(text);
-          rawLinesWithMeta.add({
-            'text': text,
-            'height': line.boundingBox.height.toDouble(),
-            'normalizedTop': line.boundingBox.top / refHeight,
-          });
+      // Helper to process blocks and avoid exact duplicates
+      void processBlocks(RecognizedText result) {
+        for (TextBlock block in result.blocks) {
+          for (TextLine line in block.lines) {
+            final String text = line.text.trim();
+            if (text.isEmpty) continue;
+            // Prevent exact duplicate lines from both models
+            if (!allDetectedLines.contains(text)) {
+              allDetectedLines.add(text);
+              rawLinesWithMeta.add({
+                'text': text,
+                'height': line.boundingBox.height.toDouble(),
+                'normalizedTop': line.boundingBox.top / refHeight,
+              });
+            }
+          }
         }
       }
 
+      processBlocks(recognizedText);
+
       // ── Step 3: Fallback second pass on full image if cropped pass found very little ──
-      // This catches text that was partially outside the viewfinder or in unusual positions.
       if (isCameraCapture && rawLinesWithMeta.length < 3) {
         setState(() {
           _ocrStatus = "Running enhanced secondary scan...";
@@ -512,21 +641,25 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
         });
         final fullInput = InputImage.fromFilePath(path);
         final fullResult = await textRecognizer.processImage(fullInput);
-        for (TextBlock block in fullResult.blocks) {
-          for (TextLine line in block.lines) {
-            final String text = line.text.trim();
-            if (text.isEmpty) continue;
-            // Only add lines we haven't already captured
-            if (!allDetectedLines.contains(text)) {
-              allDetectedLines.add(text);
-              rawLinesWithMeta.add({
-                'text': text,
-                'height': line.boundingBox.height.toDouble(),
-                'normalizedTop': line.boundingBox.top / imageHeight,
-              });
+        
+        void processFullBlocks(RecognizedText result) {
+          for (TextBlock block in result.blocks) {
+            for (TextLine line in block.lines) {
+              final String text = line.text.trim();
+              if (text.isEmpty) continue;
+              if (!allDetectedLines.contains(text)) {
+                allDetectedLines.add(text);
+                rawLinesWithMeta.add({
+                  'text': text,
+                  'height': line.boundingBox.height.toDouble(),
+                  'normalizedTop': line.boundingBox.top / imageHeight,
+                });
+              }
             }
           }
         }
+        
+        processFullBlocks(fullResult);
       }
 
       await textRecognizer.close();
@@ -558,437 +691,483 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
       final finalLinesMeta = rawLinesWithMeta;
 
       // ──────────────────────────────────────────────────────────────────────
-      // INTELLIGENT CONTACT PARSING ENGINE v2
-      // Uses multi-signal weighted scoring instead of naive keyword matching.
+      // INTELLIGENT CONTACT PARSING ENGINE v3
+      // Rule-based Multi-Pass Extraction with Confidence Scoring
       // ──────────────────────────────────────────────────────────────────────
 
-      // Use cropped lines for structured data extraction (emails/phones can come from all lines)
-      final List<String> croppedTexts = finalLinesMeta.map<String>((m) => m['text'] as String).toList();
+      // Pre-processing: Clean texts and fix OCR confusions
+      List<String> rawTexts = finalLinesMeta.map<String>((m) => m['text'] as String).toList();
+      final List<String> croppedTexts = rawTexts; // We fallback to rawTexts as croppedTexts was removed previously in the pipeline
+      List<String> cleanedLines = [];
+      
+      for (final line in allDetectedLines) {
+        // Fix typical ML Kit mistakes for business cards
+        String clean = line.replaceAll('(a)', '@').replaceAll('.corn', '.com');
+        // If it looks like a phone number but has letters 'o' or 'l', fix them
+        if (RegExp(r'[0-9]').hasMatch(clean) && !clean.contains('@') && !RegExp(r'[a-zA-Z]{4,}').hasMatch(clean)) {
+          clean = clean.replaceAll(RegExp(r'[oO]'), '0').replaceAll(RegExp(r'[lI]'), '1');
+        }
+        
+        // Split combined lines (e.g. "CEO | Tech Corp")
+        final parts = clean.split(RegExp(r'[\s]*[|/•·\\][\s]*|\s+[-—]\s+'));
+        for (var p in parts) {
+          final t = p.trim();
+          if (t.length > 2) cleanedLines.add(t);
+        }
+      }
 
-      // ── Step 1: Extract structured fields (email, phone, website, address) ──
-      final emailRegExp = RegExp(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', caseSensitive: false);
-      final phoneRegExpAlg = RegExp(r'(?:\+213|0)(?:5|6|7)[0-9\s.\-]{8,12}');
-      final phoneRegExpGen = RegExp(r'\+?[0-9]{1,4}[\-.\s]?\(?[0-9]{1,4}\)?[\-.\s]?[0-9]{2,4}[\-.\s]?[0-9]{2,4}[\-.\s]?[0-9]{2,4}');
-      final webRegExp = RegExp(r'(https?://)?(www\.)?[a-zA-Z0-9\-]+\.[a-zA-Z]{2,6}(\S*)');
+      // Add unique cropped lines as well to ensure spatial ones aren't missed
+      for (final line in croppedTexts) {
+        String clean = line.replaceAll('(a)', '@').replaceAll('.corn', '.com');
+        final parts = clean.split(RegExp(r'[\s]*[|/•·\\][\s]*|\s+[-—]\s+'));
+        for (var p in parts) {
+          final t = p.trim();
+          if (t.length > 2 && !cleanedLines.contains(t)) {
+            cleanedLines.add(t);
+          }
+        }
+      }
 
       String? email;
       String? phone;
       String? website;
-      String address = "";
+      String? name;
+      String? title;
+      String? company;
+      List<String> addressParts = [];
+      
+      // ── Step 0.5: ML Kit Language ID & Entity Extraction ──
+      final String fullTextContext = cleanedLines.join('\n');
+      
+      final languageIdentifier = LanguageIdentifier(confidenceThreshold: 0.5);
+      String detectedLanguage = 'en';
+      try {
+        detectedLanguage = await languageIdentifier.identifyLanguage(fullTextContext);
+        debugPrint("Detected language: $detectedLanguage");
+      } catch (_) {} finally {
+        languageIdentifier.close();
+      }
 
-      // Collect from ALL detected lines (not just cropped) for structured fields
-      final List<String> allTexts = allDetectedLines;
-      for (final line in allTexts) {
+      // Entity extraction seeds — these give us a head start but regex can override
+      String? entityEmail;
+      String? entityPhone;
+      List<String> entityAddresses = [];
+      
+      final entityExtractor = EntityExtractor(
+        language: (detectedLanguage == 'fr') 
+            ? EntityExtractorLanguage.french 
+            : (detectedLanguage == 'ar')
+                ? EntityExtractorLanguage.arabic
+                : EntityExtractorLanguage.english
+      );
+      
+      try {
+        final List<EntityAnnotation> annotations = await entityExtractor.annotateText(fullTextContext);
+        for (final annotation in annotations) {
+          for (final entity in annotation.entities) {
+             if (entity.type == EntityType.email && entityEmail == null) {
+                entityEmail = annotation.text;
+             } else if (entity.type == EntityType.phone && entityPhone == null) {
+                entityPhone = annotation.text;
+             } else if (entity.type == EntityType.address) {
+                entityAddresses.add(annotation.text);
+             }
+          }
+        }
+      } catch (_) {} finally {
+        entityExtractor.close();
+      }
+
+      // ── Step 1: Extract High Confidence fields (Email, Phone, Web, Address) ──
+      
+      // Robust Email Regex
+      final emailRegExp = RegExp(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', caseSensitive: false);
+      // Phone: very permissive — any sequence of 7+ digits with optional separators and country code
+      final phoneRegExpAlg = RegExp(r'(?:\+213|00213|0)[\s\-\.\/]?(?:5|6|7)[\s\-\.\/]?[0-9]{2}[\s\-\.\/]?[0-9]{2}[\s\-\.\/]?[0-9]{2}[\s\-\.\/]?[0-9]{2}');
+      final phoneRegExpGen = RegExp(r'(?:\+?[\d]{1,4}[\s\-\.\/]?)?(?:\(?\d{1,5}\)?[\s\-\.\/]?)?(?:\d[\s\-\.\/]?){6,14}\d');
+      // Website Regex
+      final webRegExp = RegExp(r'(https?://)?(?:www\.)?[a-zA-Z0-9\-]+\.[a-zA-Z]{2,6}(/\S*)?', caseSensitive: false);
+      
+      // Expanded address keywords (French, Arabic transliterated, English)
+      final addressKeywords = [
+        'street', 'road', 'avenue', 'ave', 'boulevard', 'blvd', 'route', 'drive', 'lane', 'place', 'square',
+        'cité', 'cite', 'bp ', 'b.p.', 'p.o.', 'p.o', 'boite postale', 'box',
+        'rue', 'ruelle', 'impasse', 'passage', 'chemin', 'allée', 'allee', 'quartier', 'lot',
+        'hai', 'hay', 'حي', 'شارع', 'طريق', 'زنقة',
+        'wilaya', 'daira', 'daïra', 'commune',
+        'floor', 'suite', 'building', 'bldg', 'tower', 'étage', 'etage', 'bât', 'bat', 'immeuble',
+        'alger', 'algiers', 'oran', 'constantine', 'annaba', 'blida', 'setif', 'sétif', 'tlemcen',
+        'batna', 'djelfa', 'sidi', 'bel', 'ain', 'bordj', 'el ', 'tizi', 'bechar', 'biskra',
+      ];
+      
+      // Lines consumed by high-confidence extraction (tracked by index)
+      Set<int> consumedIndices = {};
+
+      for (int i = 0; i < cleanedLines.length; i++) {
+        final line = cleanedLines[i];
+        bool matchedHighConfidence = false;
+        final lower = line.toLowerCase().trim();
+
+        // Check Email
         if (email == null) {
           final m = emailRegExp.firstMatch(line);
-          if (m != null) email = m.group(0);
+          if (m != null) {
+            email = m.group(0);
+            matchedHighConfidence = true;
+          }
         }
-        if (phone == null && !line.contains('@')) {
+
+        // Check Phone — don't skip lines already matched as email
+        if (!matchedHighConfidence && phone == null && !line.contains('@')) {
           final algM = phoneRegExpAlg.firstMatch(line);
           if (algM != null) {
             phone = algM.group(0);
+            matchedHighConfidence = true;
           } else {
             final genM = phoneRegExpGen.firstMatch(line);
-            if (genM != null && genM.group(0)!.replaceAll(RegExp(r'[^\d+]'), '').length >= 7) {
-              phone = genM.group(0);
+            if (genM != null) {
+              final digitsCount = genM.group(0)!.replaceAll(RegExp(r'[^\d]'), '').length;
+              if (digitsCount >= 7 && digitsCount <= 15) {
+                phone = genM.group(0);
+                matchedHighConfidence = true;
+              }
             }
           }
         }
-        if (website == null && !line.contains('@')) {
-          final wm = webRegExp.firstMatch(line.toLowerCase());
-          if (wm != null) website = wm.group(0);
+        
+        // Check for phone-like lines: lines that are mostly digits (label + number)
+        if (!matchedHighConfidence && phone == null) {
+          final stripped = line.replaceAll(RegExp(r'[\s\-\.\(\)\+/:]'), '');
+          final digitCount = stripped.replaceAll(RegExp(r'[^\d]'), '').length;
+          final letterCount = stripped.replaceAll(RegExp(r'[^a-zA-Z]'), '').length;
+          if (digitCount >= 7 && letterCount <= 5) {
+            // Extract just the number part
+            final numMatch = RegExp(r'[\+\d][\d\s\-\.\(\)/]{6,}').firstMatch(line);
+            if (numMatch != null) {
+              phone = numMatch.group(0)!.trim();
+              matchedHighConfidence = true;
+            }
+          }
+        }
+
+        // Check Website/LinkedIn
+        if (!matchedHighConfidence && website == null && !line.contains('@')) {
+          if (lower.contains('linkedin.com') || lower.contains('github.com') || lower.contains('twitter.com') || lower.contains('facebook.com') || lower.contains('instagram.com')) {
+            website = line;
+            matchedHighConfidence = true;
+          } else {
+            final wm = webRegExp.firstMatch(lower);
+            if (wm != null && lower.contains('.')) {
+              final ext = wm.group(0)!.split('.').last.replaceAll(RegExp(r'[^a-z]'), '');
+              if (['com', 'org', 'net', 'io', 'dz', 'fr', 'co', 'me', 'info', 'biz', 'edu', 'gov', 'ly', 'ma', 'tn', 'uk', 'de'].contains(ext)) {
+                website = wm.group(0);
+                matchedHighConfidence = true;
+              }
+            }
+          }
+        }
+        
+        // Address: accumulate ALL lines that look like address parts
+        if (!matchedHighConfidence) {
+          bool isAddress = false;
+          // Keyword check
+          if (addressKeywords.any((kw) => lower.contains(kw))) {
+            isAddress = true;
+          }
+          // Postal code patterns: 5-digit, or digit+space+digit patterns
+          if (!isAddress && RegExp(r'\b\d{4,6}\b').hasMatch(line) && line.length < 60) {
+            // Line has a postal code and isn't too long (rules out serial numbers)
+            final hasLetters = RegExp(r'[a-zA-ZÀ-ÿ]').hasMatch(line);
+            if (hasLetters) isAddress = true;
+          }
+          // Pattern: "number + words" like "12 Avenue de la Liberté"
+          if (!isAddress && RegExp(r'^\d{1,5}\s*[,.]?\s+[a-zA-ZÀ-ÿ]').hasMatch(line)) {
+            isAddress = true;
+          }
+          
+          if (isAddress) {
+            addressParts.add(line);
+            matchedHighConfidence = true;
+          }
+        }
+
+        if (matchedHighConfidence) {
+          consumedIndices.add(i);
+        }
+      }
+      
+      // Use entity extraction as fallback for phone
+      if (phone == null && entityPhone != null) {
+        phone = entityPhone;
+      }
+      // Use entity extraction as fallback for email
+      if (email == null && entityEmail != null) {
+        email = entityEmail;
+      }
+      // Merge entity addresses into our address parts
+      for (final ea in entityAddresses) {
+        if (!addressParts.any((p) => p.toLowerCase().contains(ea.toLowerCase()))) {
+          addressParts.add(ea);
         }
       }
 
-      // Address extraction from cropped lines
-      final addressKeywords = [
-        'street', 'road', 'ave', 'avenue', 'boulevard', 'blvd', 'st.',
-        'floor', 'building', 'route', 'zone', 'cite', 'cité', 'bp ',
-        'p.o.', 'po box', 'suite', 'apt', 'block', 'tower',
-        'dz', 'alger', 'algeria', 'oran', 'constantine',
-        'rue', 'quartier', 'lot', 'résidence', 'residence',
-      ];
-      for (final l in croppedTexts) {
-        final lower = l.toLowerCase();
-        if (addressKeywords.any((kw) => lower.contains(kw))) {
-          address = l;
-          break;
+      // Build remaining lines (not consumed by high-confidence)
+      List<String> remainingLines = [];
+      for (int i = 0; i < cleanedLines.length; i++) {
+        if (!consumedIndices.contains(i)) {
+          final line = cleanedLines[i];
+          final lower = line.toLowerCase();
+          // Remove noise lines
+          if (lower.replaceAll(RegExp(r'[^a-zà-ÿ]'), '').length < 3) continue;
+          if (['tel:', 'fax:', 'mob:', 'phone:', 'email:', 'e-mail:', 'website:', 'web:', 'tél:', 'tél', 'tel', 'fax', 'mob', 'gsm'].contains(lower.trim().replaceAll(':', '').toLowerCase())) continue;
+          remainingLines.add(line);
         }
       }
 
-      // ── Step 2: Build candidate lines for name/title/company ──
-      // Filter out lines that are clearly NOT name/title/company
-      List<Map<String, dynamic>> candidates = [];
-      for (final item in finalLinesMeta) {
-        final String text = item['text'] as String;
-        final String lower = text.toLowerCase();
+      // ── Step 2: Extract Medium Confidence fields (Job Title, Company) ──
 
-        // Skip if it matches email, phone, website, or address
-        if (emailRegExp.hasMatch(text)) continue;
-        if (text.replaceAll(RegExp(r'[^\d]'), '').length >= 7) continue;
-        if (webRegExp.hasMatch(lower) && lower.contains('.')) continue;
-        if (text == address) continue;
-        if (text.length < 2) continue;
-
-        // Skip lines that are mostly digits or symbols
-        final int alphaCount = text.replaceAll(RegExp(r'[^a-zA-ZÀ-ÿ]'), '').length;
-        if (alphaCount < text.length * 0.4) continue;
-
-        // Skip common non-contact noise words
-        final noisePatterns = [
-          'tel:', 'fax:', 'mob:', 'phone:', 'email:', 'e-mail:',
-          'website:', 'web:', 'www.', 'http', '.com', '.net', '.org', '.dz',
-        ];
-        if (noisePatterns.any((p) => lower.startsWith(p) || lower == p)) continue;
-
-        candidates.add(item);
-      }
-
-      // ── Step 3: Score each candidate line for NAME, TITLE, COMPANY ──
-
-      // -- Job title indicators (extensive, multilingual) --
       final jobTitleWords = <String>{
-        // English
-        'ceo', 'cfo', 'cto', 'coo', 'cmo', 'cio', 'vp',
-        'president', 'director', 'manager', 'supervisor',
-        'founder', 'co-founder', 'cofounder', 'partner',
-        'lead', 'head', 'chief', 'officer',
-        'developer', 'engineer', 'architect', 'designer',
-        'analyst', 'consultant', 'specialist', 'advisor',
-        'coordinator', 'administrator', 'assistant',
-        'representative', 'executive', 'associate',
-        'intern', 'trainee', 'fellow',
-        'professor', 'teacher', 'lecturer', 'instructor',
-        'doctor', 'physician', 'surgeon', 'nurse',
-        'lawyer', 'attorney', 'counsel', 'advocate',
-        'accountant', 'auditor', 'controller',
-        'editor', 'writer', 'journalist', 'reporter',
-        'marketing', 'sales', 'commercial', 'business',
-        'operations', 'logistics', 'procurement', 'supply',
-        'senior', 'junior', 'principal', 'staff',
+        'ceo', 'cfo', 'cto', 'coo', 'cmo', 'cio', 'vp', 'president', 'vice-president',
+        'director', 'manager', 'supervisor', 'coordinator',
+        'founder', 'co-founder', 'cofounder', 'partner', 'lead', 'head', 'chief', 'officer',
+        'developer', 'engineer', 'architect', 'designer', 'analyst', 'consultant', 'specialist', 'advisor',
+        'professor', 'lecturer', 'researcher', 'scientist', 'doctor', 'dr', 'pharmacist',
+        'secretary', 'assistant', 'associate', 'intern', 'trainee', 'executive',
+        'accountant', 'auditor', 'lawyer', 'attorney', 'advocate', 'notary', 'judge',
+        'nurse', 'surgeon', 'dentist', 'veterinarian',
         // French
-        'directeur', 'directrice', 'gérant', 'gérante', 'gerant', 'gerante',
-        'responsable', 'chef', 'fondateur', 'fondatrice',
-        'conseiller', 'conseillère', 'chargé', 'chargée', 'charge',
-        'ingénieur', 'ingenieur', 'technicien', 'technicienne',
-        'médecin', 'medecin', 'avocat', 'avocate',
-        'comptable', 'auditeur', 'analyste',
-        'développeur', 'developpeur', 'concepteur',
-        'specialiste', 'spécialiste', 'expert',
-        'attaché', 'attache', 'adjoint', 'adjointe',
-        'président', 'vice-président',
+        'directeur', 'directrice', 'gérant', 'gérante', 'responsable', 'chef', 'fondateur', 'fondatrice',
+        'ingénieur', 'technicien', 'technicienne', 'médecin', 'professeur', 'enseignant',
+        'développeur', 'spécialiste', 'expert', 'attaché', 'adjoint', 'conseiller', 'conseillère',
+        'secrétaire', 'comptable', 'avocat', 'avocate', 'notaire', 'juge',
+        'infirmier', 'infirmière', 'chirurgien', 'dentiste', 'pharmacien', 'pharmacienne',
+        'chargé', 'chargée', 'maître', 'maitre',
+        // Arabic transliterated
+        'moudir', 'mohandes', 'tabib', 'mohandis', 'mudir', 'rais',
       };
 
       final companyIndicators = <String>{
-        // Suffixes and keywords indicating an organization
-        'ltd', 'corp', 'corporation', 'inc', 'incorporated',
-        'llc', 'llp', 'plc', 'gmbh', 'ag', 'sa', 'sarl', 'sas',
-        'eurl', 'spa', 'spa.', 's.p.a',
-        'group', 'groupe', 'holding',
-        'solutions', 'technologies', 'technology', 'tech',
-        'systems', 'services', 'consulting',
-        'partners', 'enterprises', 'industries',
-        'global', 'international', 'worldwide',
-        'digital', 'media', 'creative',
-        'studio', 'studios', 'agency', 'agence',
-        'hub', 'labs', 'lab', 'laboratory',
-        'ventures', 'capital', 'investments',
-        'foundation', 'fondation', 'association',
-        'university', 'université', 'institute', 'institut',
-        'hospital', 'hôpital', 'clinic', 'clinique',
-        'bank', 'banque', 'insurance', 'assurance',
-        'company', 'compagnie', 'société', 'societe', 'entreprise',
+        'ltd', 'corp', 'corporation', 'inc', 'incorporated', 'llc', 'plc', 'gmbh', 'ag', 'sa', 'sarl', 'sas',
+        'eurl', 'spa', 'group', 'groupe', 'holding', 'solutions', 'technologies', 'technology', 'tech',
+        'systems', 'services', 'consulting', 'partners', 'enterprises', 'industries', 'global',
+        'digital', 'media', 'creative', 'studio', 'agency', 'agence', 'hub', 'labs', 'ventures',
+        'company', 'compagnie', 'société', 'societe', 'entreprise', 'institute', 'institut',
+        'university', 'université', 'universite', 'school', 'école', 'ecole', 'lycée', 'lycee', 'college',
+        'hospital', 'hôpital', 'hopital', 'clinic', 'clinique', 'cabinet', 'pharmacie', 'laboratoire',
+        'association', 'foundation', 'fondation', 'organization', 'organisation',
+        'ministry', 'ministère', 'ministere', 'department', 'département',
+        'syndicate', 'bureau', 'center', 'centre', 'office',
+        'bank', 'banque', 'assurance', 'insurance',
+        'factory', 'usine', 'atelier', 'workshop',
       };
 
-      // Department indicators
-      final deptIndicators = <String>{
-        'department', 'dept', 'division', 'unit', 'section',
-        'service', 'direction', 'bureau', 'office', 'team',
-      };
+      List<String> remainingForName = [];
 
-      String name = "";
-      String title = "";
-      String company = "";
-      String department = "";
+      for (final line in remainingLines) {
+        bool matchedMedium = false;
+        final lowerWords = line.toLowerCase().split(RegExp(r'\s+'));
+        
+        // Check Job Title
+        if (title == null) {
+          if (jobTitleWords.any((kw) => lowerWords.contains(kw))) {
+            title = line;
+            matchedMedium = true;
+          } else {
+             // Partial match with word boundaries and length limit
+             if (line.length < 50) {
+               for (final kw in jobTitleWords) {
+                 if (kw.length >= 4 && RegExp(r'\b' + RegExp.escape(kw) + r'\b', caseSensitive: false).hasMatch(line.toLowerCase())) {
+                   title = line;
+                   matchedMedium = true;
+                   break;
+                 }
+               }
+             }
+          }
+        }
+        
+        // Check Company
+        if (!matchedMedium && company == null) {
+          if (companyIndicators.any((kw) => lowerWords.contains(kw))) {
+            company = line;
+            matchedMedium = true;
+          }
+        }
 
-      double bestNameScore = -9999;
-      double bestTitleScore = -9999;
-      double bestCompanyScore = -9999;
-      int bestNameIdx = -1;
-      int bestTitleIdx = -1;
-      int bestCompanyIdx = -1;
-
-      // Compute average bounding height for relative comparison
-      double avgHeight = 0;
-      if (candidates.isNotEmpty) {
-        avgHeight = candidates.fold<double>(0, (sum, c) => sum + (c['height'] as double)) / candidates.length;
+        if (!matchedMedium) {
+          remainingForName.add(line);
+        }
       }
 
-      for (int i = 0; i < candidates.length; i++) {
-        final String text = candidates[i]['text'] as String;
-        final String lower = text.toLowerCase();
-        final double height = candidates[i]['height'] as double;
-        final double normalizedTop = candidates[i]['normalizedTop'] as double;
-        final List<String> words = text.split(RegExp(r'\s+'));
-
-        // ──── NAME SCORING ────
-        double nameScore = 0;
-
-        // Font size: names are usually the largest text on a card
-        if (avgHeight > 0) {
-          nameScore += ((height - avgHeight) / avgHeight) * 40; // relative size bonus
+      // ── Step 3: Extract Name — Font-size + position weighted scoring ──
+      // The name is almost always the LARGEST text on the card and near the TOP.
+      // We score ALL remaining lines, not just leftover unmatched ones.
+      
+      double maxHeight = 0.0;
+      for (final meta in finalLinesMeta) {
+        if (meta['height'] != null && (meta['height'] as double) > maxHeight) {
+          maxHeight = meta['height'] as double;
         }
-
-        // Word count: names are typically 2-4 words
-        if (words.length >= 2 && words.length <= 4) nameScore += 25;
-        else if (words.length == 1 && words[0].length >= 3) nameScore += 5;
-        else if (words.length > 4) nameScore -= 15;
-
-        // Capitalization: Each word starts with uppercase (typical for names)
-        final capitalizedWords = words.where((w) => w.isNotEmpty && w[0] == w[0].toUpperCase() && w[0] != w[0].toLowerCase()).length;
-        if (capitalizedWords == words.length && words.length >= 2) nameScore += 20;
-
-        // All-caps bonus (many business cards print names in all-caps)
-        if (words.length >= 2 && words.every((w) => w == w.toUpperCase() && w.length > 1)) nameScore += 10;
-
-        // Position: names tend to appear in the top half of the card
-        if (normalizedTop < 0.35) nameScore += 15;
-        else if (normalizedTop < 0.50) nameScore += 8;
-
-        // Penalty: contains digits (names don't have numbers)
-        if (text.contains(RegExp(r'[0-9]'))) nameScore -= 60;
-
-        // Penalty: contains special characters common in non-name fields
-        if (text.contains('@') || text.contains('www') || text.contains('http')) nameScore -= 100;
-        if (RegExp(r'[|/\\{}#]').hasMatch(text)) nameScore -= 30;
-
-        // Penalty: if it matches job title keywords, it's probably not a name
-        if (jobTitleWords.any((kw) => lower.split(RegExp(r'\s+')).contains(kw))) nameScore -= 35;
-
-        // Penalty: if it matches company keywords
-        if (companyIndicators.any((kw) => lower.split(RegExp(r'\s+')).contains(kw))) nameScore -= 35;
-
-        // Penalty: very long lines are unlikely to be names
-        if (text.length > 40) nameScore -= 20;
-
-        // Bonus: pure alphabetic words with spaces (strong name signal)
-        if (RegExp(r'^[a-zA-ZÀ-ÿ\s\-\.]+$').hasMatch(text) && words.length >= 2) nameScore += 15;
-
-        if (nameScore > bestNameScore) {
-          bestNameScore = nameScore;
-          bestNameIdx = i;
+      }
+      
+      int bestNameScore = -1;
+      
+      for (final line in remainingForName) {
+        // Hard skip: lines with digits, email-like lines, very short lines
+        if (line.contains(RegExp(r'[0-9]'))) continue;
+        if (line.contains('@') || line.contains('www') || line.contains('http')) continue;
+        if (line.length < 3) continue;
+        
+        int score = 0;
+        final words = line.split(RegExp(r'\s+'));
+        
+        // Word count scoring: 2-3 words is ideal for names, 1 word is okay, 4 is acceptable
+        if (words.length >= 2 && words.length <= 3) score += 15;
+        else if (words.length == 1 && line.length >= 3) score += 5;
+        else if (words.length == 4) score += 8;
+        else if (words.length > 5) score -= 10; // Probably a sentence, not a name
+        
+        // Capitalization scoring
+        final capitalized = words.where((w) => w.isNotEmpty && w[0] == w[0].toUpperCase()).length;
+        if (capitalized == words.length) score += 10;
+        
+        // All-caps scoring (common on business cards)
+        if (words.every((w) => w == w.toUpperCase() && w.length > 1)) score += 5;
+        
+        // Only letters, spaces, hyphens, dots, apostrophes (name-like characters)
+        if (RegExp(r"^[a-zA-ZÀ-ÿ\u0600-\u06FF\s\-\.'\u200C]+$").hasMatch(line)) score += 8;
+        
+        // Bounding box height boost — THE MOST IMPORTANT SIGNAL
+        if (maxHeight > 0) {
+          final metaMatch = finalLinesMeta.where((m) {
+            final metaText = (m['text'] as String).toLowerCase();
+            return metaText.contains(line.toLowerCase()) || line.toLowerCase().contains(metaText);
+          }).toList();
+          if (metaMatch.isNotEmpty) {
+            final double height = metaMatch.first['height'] as double;
+            final double heightRatio = height / maxHeight;
+            if (heightRatio > 0.85) score += 30;      // Largest text — almost certainly the name
+            else if (heightRatio > 0.65) score += 15;
+            else if (heightRatio > 0.5) score += 5;
+          }
         }
-
-        // ──── TITLE SCORING ────
-        double titleScore = 0;
-
-        // Keyword match: strong signal
-        final lowerWords = lower.split(RegExp(r'\s+'));
-        final matchedJobWords = lowerWords.where((w) => jobTitleWords.contains(w)).length;
-        titleScore += matchedJobWords * 40;
-
-        // Partial keyword match (e.g., "développeur web" where "développeur" is a keyword)
-        if (matchedJobWords == 0) {
-          for (final kw in jobTitleWords) {
-            if (lower.contains(kw) && kw.length >= 4) {
-              titleScore += 25;
+        
+        // Position boost — names are typically in the top third of the card
+        final posMatch = finalLinesMeta.where((m) {
+          final metaText = (m['text'] as String).toLowerCase();
+          return metaText.contains(line.toLowerCase()) || line.toLowerCase().contains(metaText);
+        }).toList();
+        if (posMatch.isNotEmpty) {
+          final double normalizedTop = posMatch.first['normalizedTop'] as double;
+          if (normalizedTop < 0.3) score += 8;   // Top third
+          else if (normalizedTop < 0.5) score += 3;   // Top half
+        }
+        
+        if (score > bestNameScore) {
+          bestNameScore = score;
+          name = line;
+        }
+      }
+      
+      // If we still don't have a name, look at consumed lines too — 
+      // sometimes the name line also contained an address keyword spuriously
+      if (name == null || bestNameScore < 10) {
+        for (final meta in finalLinesMeta) {
+          final line = meta['text'] as String;
+          if (line.contains(RegExp(r'[0-9]')) || line.contains('@')) continue;
+          if (line.length < 3 || line.length > 40) continue;
+          final words = line.split(RegExp(r'\s+'));
+          if (words.length > 4) continue;
+          
+          final double height = (meta['height'] as double?) ?? 0;
+          if (maxHeight > 0 && height / maxHeight > 0.8) {
+            // This is the largest text and looks name-like
+            if (RegExp(r"^[a-zA-ZÀ-ÿ\u0600-\u06FF\s\-\.'\u200C]+$").hasMatch(line)) {
+              name = line;
               break;
             }
           }
         }
-
-        // Position: titles usually appear just below the name (upper-middle area)
-        if (normalizedTop >= 0.20 && normalizedTop <= 0.55) titleScore += 10;
-
-        // Font size: titles are usually smaller than names but not tiny
-        if (avgHeight > 0 && height < avgHeight * 1.1 && height > avgHeight * 0.5) titleScore += 5;
-
-        // Penalty: has digits
-        if (text.contains(RegExp(r'[0-9]'))) titleScore -= 20;
-
-        // Penalty: very short or single word (unless it's a known keyword)
-        if (words.length == 1 && matchedJobWords == 0) titleScore -= 10;
-
-        // Penalty: matches company indicators
-        if (companyIndicators.any((kw) => lowerWords.contains(kw))) titleScore -= 20;
-
-        if (titleScore > bestTitleScore) {
-          bestTitleScore = titleScore;
-          bestTitleIdx = i;
-        }
-
-        // ──── COMPANY SCORING ────
-        double companyScore = 0;
-
-        final matchedCompanyWords = lowerWords.where((w) => companyIndicators.contains(w)).length;
-        companyScore += matchedCompanyWords * 40;
-
-        // Partial match for company indicators
-        if (matchedCompanyWords == 0) {
-          for (final kw in companyIndicators) {
-            if (lower.contains(kw) && kw.length >= 4) {
-              companyScore += 25;
-              break;
-            }
-          }
-        }
-
-        // Department check (we'll note this separately)
-        final matchedDeptWords = lowerWords.where((w) => deptIndicators.contains(w)).length;
-
-        // Position: company names can appear anywhere but often near the bottom
-        if (normalizedTop >= 0.45) companyScore += 5;
-
-        // Font size: company names are often medium-sized
-        if (avgHeight > 0 && height >= avgHeight * 0.7) companyScore += 5;
-
-        // Penalty: has many digits
-        if (text.replaceAll(RegExp(r'[^\d]'), '').length > 2) companyScore -= 20;
-
-        // Penalty: matches job title keywords heavily
-        if (matchedJobWords > 0) companyScore -= 15;
-
-        if (matchedDeptWords > 0) {
-          // This line is a department, not a company
-          department = text;
-        } else if (companyScore > bestCompanyScore) {
-          bestCompanyScore = companyScore;
-          bestCompanyIdx = i;
-        }
       }
+      
+      // Combine address parts into a single string
+      String? address = addressParts.isNotEmpty ? addressParts.join(', ') : "";
 
-      // ── Step 4: Resolve conflicts (same line picked for multiple fields) ──
-      // Priority: title keyword > company keyword > name (by font size)
-
-      // If title and name picked the same line, reassign
-      if (bestTitleIdx == bestNameIdx && bestTitleScore > 10) {
-        // Title wins this line; find next best name
-        bestNameScore = -9999;
-        bestNameIdx = -1;
-        for (int i = 0; i < candidates.length; i++) {
-          if (i == bestTitleIdx || i == bestCompanyIdx) continue;
-          final String text = candidates[i]['text'] as String;
-          final double height = candidates[i]['height'] as double;
-          final List<String> words = text.split(RegExp(r'\s+'));
-          double score = height;
-          if (words.length >= 2 && words.length <= 4) score += 25;
-          if (words.every((w) => w.isNotEmpty && w[0] == w[0].toUpperCase())) score += 15;
-          if (text.contains(RegExp(r'[0-9]'))) score -= 60;
-          if (RegExp(r'^[a-zA-ZÀ-ÿ\s\-\.]+$').hasMatch(text)) score += 10;
-          if (score > bestNameScore) {
-            bestNameScore = score;
-            bestNameIdx = i;
-          }
-        }
-      }
-
-      // If company and name picked the same line, company wins if it has keywords
-      if (bestCompanyIdx == bestNameIdx && bestCompanyScore > 10) {
-        bestNameScore = -9999;
-        bestNameIdx = -1;
-        for (int i = 0; i < candidates.length; i++) {
-          if (i == bestTitleIdx || i == bestCompanyIdx) continue;
-          final String text = candidates[i]['text'] as String;
-          final double height = candidates[i]['height'] as double;
-          final List<String> words = text.split(RegExp(r'\s+'));
-          double score = height;
-          if (words.length >= 2 && words.length <= 4) score += 25;
-          if (text.contains(RegExp(r'[0-9]'))) score -= 60;
-          if (RegExp(r'^[a-zA-ZÀ-ÿ\s\-\.]+$').hasMatch(text)) score += 10;
-          if (score > bestNameScore) {
-            bestNameScore = score;
-            bestNameIdx = i;
-          }
-        }
-      }
-
-      // ── Step 5: Assign final values ──
-      if (bestNameIdx >= 0) name = candidates[bestNameIdx]['text'] as String;
-      if (bestTitleIdx >= 0 && bestTitleIdx != bestNameIdx && bestTitleScore > 5) {
-        title = candidates[bestTitleIdx]['text'] as String;
-      }
-      if (bestCompanyIdx >= 0 && bestCompanyIdx != bestNameIdx && bestCompanyIdx != bestTitleIdx && bestCompanyScore > 5) {
-        company = candidates[bestCompanyIdx]['text'] as String;
-      }
-
-      // ── Step 6: Smart fallbacks using spatial proximity ──
-      // If no title was found by keywords, look at the line immediately after the name
-      if (title.isEmpty && bestNameIdx >= 0 && bestNameIdx + 1 < candidates.length) {
-        final nextLine = candidates[bestNameIdx + 1]['text'] as String;
-        // Only use it if it's not already assigned and doesn't look like noise
-        if (nextLine != company && nextLine != address && !nextLine.contains('@') &&
-            nextLine.replaceAll(RegExp(r'[^\d]'), '').length < 4 &&
-            nextLine.length >= 3) {
-          title = nextLine;
-        }
-      }
-
-      // If no company was found by keywords, try email domain
-      if (company.isEmpty && email != null) {
+      // Fallback: If no company found, use email domain
+      if (company == null && email != null) {
         final parts = email.split('@');
         if (parts.length > 1) {
           final domainPart = parts[1].split('.')[0];
-          final freeEmailDomains = {'gmail', 'yahoo', 'hotmail', 'outlook', 'icloud', 'live', 'aol', 'mail', 'protonmail', 'yandex'};
-          if (!freeEmailDomains.contains(domainPart.toLowerCase())) {
+          final freeDomains = {'gmail', 'yahoo', 'hotmail', 'outlook', 'icloud', 'live', 'aol', 'protonmail', 'zoho'};
+          if (!freeDomains.contains(domainPart.toLowerCase())) {
             company = domainPart[0].toUpperCase() + domainPart.substring(1);
           }
         }
       }
 
-      // Post-processing Sanitation
-      final String cleanName = _sanitizeField(name);
-      final String cleanTitle = _sanitizeField(title);
-      final String cleanCompany = _sanitizeField(company);
-      final String cleanDept = _sanitizeField(department);
+      // ── Step 4: Merge with Previous Scan Data (Rescan Logic) ──
+      final prevData = widget.previousScanData;
+      if (prevData != null) {
+        // Only override if the new pass didn't find it or if we explicitly want to merge.
+        // The simplest merge is: prefer the non-empty value. If both exist, keep the old one 
+        // if user had already edited it, but here we just prefer non-empty.
+        name = name ?? prevData['name'] as String?;
+        title = title ?? prevData['title'] as String?;
+        company = company ?? prevData['company'] as String?;
+        email = email ?? prevData['email'] as String?;
+        phone = phone ?? prevData['phone'] as String?;
+        website = website ?? prevData['website'] as String?;
+        address = (address.isEmpty) ? (prevData['address'] as String? ?? "") : address;
+      }
 
-      // Step 2: visual parsing delay
+      // Post-processing Sanitation
+      final String cleanName = _sanitizeField(name ?? "");
+      final String cleanTitle = _sanitizeField(title ?? "");
+      final String cleanCompany = _sanitizeField(company ?? "");
+      final String cleanDept = "";
+
       setState(() {
         _ocrStatus = "Extracting contact metadata...";
-        _ocrProgress = 0.6;
+        _ocrProgress = 0.8;
       });
       
-      Future.delayed(const Duration(milliseconds: 1200), () {
-        if (!mounted) return;
-        setState(() {
-          _ocrStatus = "Processing profile...";
-          _ocrProgress = 0.9;
-        });
-        
-        Future.delayed(const Duration(milliseconds: 1200), () {
-          if (!mounted) return;
-          setState(() {
-            _ocrStatus = "Verification successful!";
-            _ocrProgress = 1.0;
-          });
-          
-          Future.delayed(const Duration(milliseconds: 600), () {
-            if (mounted) {
-              _laserController.stop();
-              setState(() => _isConnecting = false);
-              
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ReviewContactScreen(
-                    initialName: cleanName,
-                    initialTitle: cleanTitle,
-                    initialEmail: email ?? "",
-                    initialPhone: phone ?? "",
-                    initialWebsite: website ?? "",
-                    initialCompany: cleanCompany,
-                    initialDepartment: cleanDept,
-                    initialAddress: address,
-                    source: _scanType,
-                  ),
-                ),
-              );
-            }
-          });
-        });
+      // Allow the 0.8 progress animation to play slightly so the user sees something is happening
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _ocrStatus = "Scan successful!";
+        _ocrProgress = 1.0;
       });
+      
+      // Give the success checkmark animation exactly enough time to play (600ms) before navigating
+      await Future.delayed(const Duration(milliseconds: 600));
+      
+      if (mounted) {
+        _laserController.stop();
+        setState(() => _isConnecting = false);
+        
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ReviewContactScreen(
+              initialName: cleanName,
+              initialTitle: cleanTitle,
+              initialEmail: email ?? "",
+              initialPhone: phone ?? "",
+              initialWebsite: website ?? "",
+              initialCompany: cleanCompany,
+              initialDepartment: cleanDept,
+              initialAddress: address ?? "",
+              source: _scanType,
+            ),
+          ),
+        );
+      }
       
     } catch (e) {
-      print("OCR Error: $e");
+      debugPrint("OCR Error: $e");
       _laserController.stop();
       setState(() => _isConnecting = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1000,7 +1179,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
     }
   }
 
-  Future<void> _saveToSupabase(
+  Future<String?> _saveToSupabase(
     String name,
     String title,
     String avatarUrl, {
@@ -1009,12 +1188,47 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
     String? website,
     String? company,
     String? department,
+    String? targetUserId,
   }) async {
     try {
       final currentUser = Supabase.instance.client.auth.currentUser;
-      final currentUserId = currentUser?.id ?? "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
-      await Supabase.instance.client.from('connections').insert({
+      final currentUserId = currentUser?.id;
+      if (currentUserId == null) return null;
+      // 0. Fetch target profile if we have targetUserId to get their tags
+      Map<String, dynamic>? targetProfile;
+      if (targetUserId != null) {
+        targetProfile = await Supabase.instance.client
+            .from('profiles')
+            .select()
+            .eq('id', targetUserId)
+            .maybeSingle();
+      }
+
+      // 0.5 Check subscription or trial status before proceeding
+      final profileRes = await Supabase.instance.client.from('profiles').select('created_at, subscription_end_date').eq('id', currentUserId).single();
+      
+      final now = DateTime.now();
+      bool isActive = false;
+      
+      if (profileRes['subscription_end_date'] != null) {
+        final subEnd = DateTime.parse(profileRes['subscription_end_date']);
+        if (subEnd.isAfter(now)) isActive = true;
+      }
+      
+      if (!isActive && profileRes['created_at'] != null) {
+        final createdAt = DateTime.parse(profileRes['created_at']);
+        final trialEnd = createdAt.add(const Duration(days: 15));
+        if (trialEnd.isAfter(now)) isActive = true;
+      }
+
+      if (!isActive) {
+        throw Exception("Your trial/subscription has expired. Please upgrade to save connections.");
+      }
+
+      // 1. Save connection for the current user
+      final newConn = await Supabase.instance.client.from('connections').insert({
         'user_id': currentUserId,
+        'linked_profile_id': targetUserId,
         'name': name,
         'title': title,
         'avatar_url': avatarUrl,
@@ -1025,9 +1239,48 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
         'website': website,
         'company': company,
         'department': department,
-      });
+        'tags': targetProfile?['interests'] ?? [],
+      }).select('id').maybeSingle();
+      
+      final connectionId = newConn?['id'] as String?;
+
+      // 3. Save mutual connection for the scanned user (two-way link)
+      if (targetUserId != null && currentUser != null) {
+        final myProfile = await Supabase.instance.client
+            .from('profiles')
+            .select()
+            .eq('id', currentUserId)
+            .maybeSingle();
+
+        if (myProfile != null) {
+          final String myJob = myProfile['job_title'] ?? '';
+          final String myComp = myProfile['company_name'] ?? '';
+          final String myTitle = myJob.isNotEmpty
+              ? (myComp.isNotEmpty ? "$myJob at $myComp" : myJob)
+              : (myComp.isNotEmpty ? "Professional at $myComp" : "Attendee");
+
+          await Supabase.instance.client.from('connections').insert({
+            'user_id': targetUserId, // Scanned user ID
+            'linked_profile_id': currentUserId, // Mutual link back to scanner
+            'name': myProfile['full_name'] ?? 'Eventzone User',
+            'title': myTitle,
+            'avatar_url': myProfile['avatar_url'] ?? '',
+            'source': 'QR Code',
+            'is_new': true,
+            'email': myProfile['email'],
+            'phone': myProfile['phone'],
+            'website': myProfile['website'],
+            'company': myComp,
+            'department': myProfile['department'],
+            'tags': myProfile['interests'] ?? [],
+          });
+        }
+      }
+      
+      return connectionId;
     } catch (e) {
-      print("Error saving connection to Supabase: $e");
+      debugPrint("Error saving to Supabase: $e");
+      return null;
     }
   }
 
@@ -1039,19 +1292,18 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
           _isFlashOn = !_isFlashOn;
         });
       } catch (e) {
-        print("Error toggling mobile_scanner torch: $e");
+        debugPrint("Error toggling mobile_scanner torch: $e");
       }
-    } else if (_cameraController != null && _isCameraInitialized) {
+    } else if (_cameraAwesomeState != null) {
       try {
-        final newFlashState = !_isFlashOn;
-        await _cameraController!.setFlashMode(
-          newFlashState ? FlashMode.torch : FlashMode.off,
+        _isFlashOn = !_isFlashOn;
+        // With CameraAwesome, sensor config manages the flash
+        _cameraAwesomeState!.sensorConfig.setFlashMode(
+          _isFlashOn ? FlashMode.always : FlashMode.none
         );
-        setState(() {
-          _isFlashOn = newFlashState;
-        });
+        setState(() {});
       } catch (e) {
-        print("Error toggling camera torch: $e");
+        debugPrint("Error toggling camera flash: $e");
       }
     }
   }
@@ -1062,14 +1314,16 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
       onTap: () async {
         if (_scanType == type) return;
         
+        final bool isOcrModeBefore = _scanType != "QR Code";
+
         // Turn off torch/flash when switching modes
         if (_scanType == "QR Code") {
           try {
             await _controller.toggleTorch();
           } catch (_) {}
-        } else if (_cameraController != null && _isCameraInitialized) {
+        } else if (_cameraAwesomeState != null) {
           try {
-            await _cameraController!.setFlashMode(FlashMode.off);
+            _cameraAwesomeState!.sensorConfig.setFlashMode(FlashMode.none);
           } catch (_) {}
         }
         
@@ -1079,12 +1333,13 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
         });
         
         if (type == "QR Code") {
-          await _disposeCameraController();
-          try {
-            await _controller.start();
-          } catch (_) {}
+          // Run hardware switch asynchronously to avoid tap freeze
+          _controller.start().catchError((_) {});
         } else {
-          await _initializeCameraController();
+          // If we were already in an OCR mode, reuse the initialized CameraController
+          if (!isOcrModeBefore || _cameraAwesomeState == null) {
+            // CameraAwesome handles initialization automatically when rebuilt
+          }
         }
       },
       child: AnimatedContainer(
@@ -1151,31 +1406,31 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
                     controller: _controller,
                     onDetect: _handleCapture,
                   )
-                : (_isCameraInitialized && _cameraController != null
-                    ? FittedBox(
-                        fit: BoxFit.cover,
-                        child: SizedBox(
-                          width: _cameraController!.value.previewSize!.height,
-                          height: _cameraController!.value.previewSize!.width,
-                          child: CameraPreview(_cameraController!),
-                        ),
-                      )
-                    : const Center(
-                        child: CircularProgressIndicator(
-                          color: EventzoneTheme.primaryAction,
-                        ),
-                      )),
+                : CameraAwesomeBuilder.custom(
+                    saveConfig: SaveConfig.photo(
+                      pathBuilder: (sensors) async {
+                        final Directory extDir = await getTemporaryDirectory();
+                        final testDir = await Directory('${extDir.path}/camerawesome').create(recursive: true);
+                        return SingleCaptureRequest('${testDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg', sensors.first);
+                      },
+                    ),
+                    builder: (cameraState, preview) {
+                      _cameraAwesomeState = cameraState;
+                      return const SizedBox.shrink(); // Transparent background so the stack shows our custom UI
+                    },
+                  ),
           ),
           
           // 2. Smoothly animated mask and corner overlays
           TweenAnimationBuilder<Rect?>(
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeOutCubic,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOutCubic,
             tween: RectTween(
-              begin: targetRect,
+              begin: _lastTargetRect ?? targetRect,
               end: targetRect,
             ),
             builder: (context, animRect, child) {
+              _lastTargetRect = targetRect;
               final Rect rect = animRect ?? targetRect;
               return Stack(
                 children: [
@@ -1187,108 +1442,101 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
                     ),
                   ),
 
-                  // Clear cutout corner stroke (sharp corners)
-                  Positioned.fromRect(
-                    rect: rect,
-                    child: CustomPaint(
-                      painter: ScannerCornersPainter(
-                        color: Colors.white,
-                        strokeWidth: 3.5,
-                        cornerLength: 24.0,
-                      ),
+                  // Hide camera view completely while processing
+                  IgnorePointer(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      color: _isConnecting ? EventzoneTheme.backgroundEnd.withOpacity(0.98) : Colors.transparent,
                     ),
                   ),
 
-                  // Overlay indicators inside the rect
-                  if (_isConnecting) ...[
-                    // Sweeping laser line
-                    AnimatedBuilder(
-                      animation: _laserController,
-                      builder: (context, child) {
-                        final double verticalOffset = rect.height * _laserController.value;
-                        return Positioned(
-                          left: rect.left,
-                          top: rect.top + verticalOffset,
-                          child: Container(
-                            width: rect.width,
-                            height: 3,
-                            decoration: BoxDecoration(
-                              color: EventzoneTheme.primaryAction,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: EventzoneTheme.primaryAction.withOpacity(0.8),
-                                  blurRadius: 8,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+                  // Clear cutout corner stroke (sharp corners)
+                  if (!_isConnecting)
+                    Positioned.fromRect(
+                      rect: rect,
+                      child: CustomPaint(
+                        painter: ScannerCornersPainter(
+                          color: Colors.white,
+                          strokeWidth: 3.5,
+                          cornerLength: 24.0,
+                        ),
+                      ),
                     ),
 
-                    // Draw green simulated text bounding boxes for non-QR
-                    if (_scanType != "QR Code" && _ocrProgress > 0.2) ...[
-                      Positioned(
-                        left: rect.left + 24,
-                        top: rect.top + 32,
-                        width: 160,
-                        height: 20,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.greenAccent, width: 1.5),
-                            color: Colors.greenAccent.withOpacity(0.08),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: rect.left + 24,
-                        top: rect.top + 64,
-                        width: 220,
-                        height: 18,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.greenAccent, width: 1.5),
-                            color: Colors.greenAccent.withOpacity(0.08),
-                          ),
-                        ),
-                      ),
-                    ],
+                  // Overlay indicators inside the rect
+                  if (_isConnecting) ...[
 
-                    // OCR progress status box
-                    Positioned.fill(
-                      child: Align(
-                        alignment: Alignment.center,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF06080F).withOpacity(0.95),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white10),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  valueColor: AlwaysStoppedAnimation<Color>(EventzoneTheme.primaryAction),
-                                ),
+                    // OCR progress status box centered in the viewfinder
+                    Positioned.fromRect(
+                      rect: rect,
+                      child: Center(
+                        child: TweenAnimationBuilder<double>(
+                          key: ValueKey(_ocrProgress == 1.0),
+                          tween: Tween<double>(begin: 0.8, end: 1.0),
+                          duration: const Duration(milliseconds: 600),
+                          curve: Curves.elasticOut,
+                          builder: (context, val, child) {
+                            return Transform.scale(
+                              scale: val,
+                              child: Opacity(
+                                opacity: ((val - 0.8) / 0.2).clamp(0.0, 1.0),
+                                child: child,
                               ),
-                              const SizedBox(height: 12),
-                              Text(
-                                _ocrStatus,
-                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                textAlign: TextAlign.center,
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                            child: GlassContainer(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                              borderRadius: 30,
+                              child: Row(
+                                children: [
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 300),
+                                    transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
+                                    child: _ocrProgress == 1.0
+                                        ? const Icon(LucideIcons.checkCircle, color: EventzoneTheme.accentSuccess, size: 32, key: ValueKey('success'))
+                                        : const PremiumSpinner(size: 28, key: ValueKey('spinner')),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _ocrStatus,
+                                          style: TextStyle(
+                                            color: _ocrProgress == 1.0 ? EventzoneTheme.accentSuccess : Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(4),
+                                          child: TweenAnimationBuilder<double>(
+                                            tween: Tween<double>(begin: 0, end: _ocrProgress),
+                                            duration: const Duration(milliseconds: 400),
+                                            curve: Curves.easeOutCubic,
+                                            builder: (context, val, child) {
+                                              return LinearProgressIndicator(
+                                                value: val,
+                                                backgroundColor: Colors.white10,
+                                                minHeight: 4,
+                                                valueColor: AlwaysStoppedAnimation<Color>(
+                                                  _ocrProgress == 1.0 ? EventzoneTheme.accentSuccess : EventzoneTheme.primaryAction,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                "${(_ocrProgress * 100).toInt()}% completed",
-                                style: const TextStyle(color: Colors.white54, fontSize: 10),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -1348,26 +1596,20 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
                         _buildTypeTab("QR Code", LucideIcons.qrCode),
                         const SizedBox(width: 8),
                         _buildTypeTab("Business Card", LucideIcons.contact),
-                        const SizedBox(width: 8),
-                        _buildTypeTab("Event Badge", LucideIcons.milestone),
                       ],
                     ),
                   ),
                 ),
                 
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(40, 12, 40, 40),
-                  child: GlassContainer(
-                    padding: const EdgeInsets.all(24),
-                    borderRadius: 24,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_isConnecting) ...[
-                          const CircularProgressIndicator(color: EventzoneTheme.primaryAction),
-                          const SizedBox(height: 16),
-                          Text("Scanning $_scanType...", style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ] else ...[
+                if (!_isConnecting)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(40, 12, 40, 40),
+                    child: GlassContainer(
+                      padding: const EdgeInsets.all(24),
+                      borderRadius: 24,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                           Text(
                             "Position the $_scanType within the frame",
                             textAlign: TextAlign.center,
@@ -1424,10 +1666,9 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
                             ],
                           ),
                         ],
-                      ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -1550,3 +1791,55 @@ class ScannerCornersPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
+class PremiumSpinner extends StatefulWidget {
+  final double size;
+  final Color color;
+  const PremiumSpinner({super.key, this.size = 32, this.color = EventzoneTheme.primaryAction});
+
+  @override
+  State<PremiumSpinner> createState() => _PremiumSpinnerState();
+}
+
+class _PremiumSpinnerState extends State<PremiumSpinner> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RotationTransition(
+      turns: _controller,
+      child: ShaderMask(
+        shaderCallback: (rect) {
+          return SweepGradient(
+            colors: [widget.color.withOpacity(0.0), widget.color],
+            stops: const [0.0, 1.0],
+          ).createShader(rect);
+        },
+        child: Container(
+          width: widget.size,
+          height: widget.size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 3),
+          ),
+        ),
+      ),
+    );
+  }
+}
+

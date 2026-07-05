@@ -18,6 +18,7 @@ class EventzoneTheme {
     final baseTheme = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      fontFamily: GoogleFonts.spaceGrotesk().fontFamily,
     );
 
     return baseTheme.copyWith(
@@ -70,6 +71,8 @@ class EventzoneTheme {
 
   static Widget buildPlayfulBackground({required Widget child}) {
     return Container(
+      width: double.infinity,
+      height: double.infinity,
       decoration: const BoxDecoration(color: backgroundStart),
       child: Stack(
         children: [
@@ -98,6 +101,8 @@ class EventzoneTheme {
             ),
           ),
           Container(
+            width: double.infinity,
+            height: double.infinity,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,

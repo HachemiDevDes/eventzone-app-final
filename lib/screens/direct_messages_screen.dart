@@ -1,10 +1,11 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import 'chat_detail_screen.dart';
+import '../utils/avatar_helper.dart';
 
 class DirectMessagesScreen extends StatefulWidget {
   const DirectMessagesScreen({super.key});
@@ -29,7 +30,11 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
 
   Future<void> _loadConversations() async {
     final currentUser = _supabase.auth.currentUser;
-    final currentUserId = currentUser?.id ?? "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
+    final currentUserId = currentUser?.id;
+    if (currentUserId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
 
     try {
       // 1. Fetch all messages involving the current user
@@ -41,7 +46,10 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
 
       final List<Map<String, dynamic>> messagesList = List<Map<String, dynamic>>.from(messagesResponse);
 
-      // 2. Identify the unique conversation partner user IDs
+      // 2. Identify the unique conversation partner user IDs and build chat map.
+      // Messages are ordered ascending, so we iterate all of them:
+      // - Always overwrite lastMsg/time/timestamp with the current message (gives us the LATEST message)
+      // - Accumulate unread count only for incoming (not-me) unread messages
       final Map<String, Map<String, dynamic>> chatMap = {};
       final List<String> partnerIds = [];
 
@@ -56,15 +64,27 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
           partnerIds.add(partnerId);
         }
 
-        // Cache the latest message info
         final bool isMe = senderId == currentUserId;
-        chatMap[partnerId] = {
-          "id": partnerId,
-          "lastMsg": msg['content'] ?? '',
-          "time": _formatMessageTime(msg['created_at']),
-          "unread": (!isMe && msg['is_read'] == false) ? 1 : 0,
-          "timestamp": DateTime.tryParse(msg['created_at'] ?? '') ?? DateTime.now(),
-        };
+        // A message is unread only if it was sent TO us and is not yet read
+        final bool isUnread = !isMe && (msg['is_read'] == false || msg['is_read'] == null);
+        
+        if (!chatMap.containsKey(partnerId)) {
+          chatMap[partnerId] = {
+            "id": partnerId,
+            "lastMsg": msg['content'] ?? '',
+            "time": _formatMessageTime(msg['created_at']),
+            "unread": isUnread ? 1 : 0,
+            "timestamp": DateTime.tryParse(msg['created_at'] ?? '') ?? DateTime.now(),
+          };
+        } else {
+          // Always update to the latest message details
+          chatMap[partnerId]!["lastMsg"] = msg['content'] ?? '';
+          chatMap[partnerId]!["time"] = _formatMessageTime(msg['created_at']);
+          chatMap[partnerId]!["timestamp"] = DateTime.tryParse(msg['created_at'] ?? '') ?? DateTime.now();
+          // Accumulate unread count
+          final int currentUnread = chatMap[partnerId]!["unread"] as int;
+          chatMap[partnerId]!["unread"] = currentUnread + (isUnread ? 1 : 0);
+        }
       }
 
       // 3. Fetch profile details for all active conversation partners
@@ -110,7 +130,7 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
               }
             }
           } catch (e) {
-            print("Error looking up connections for chat: $e");
+            debugPrint("Error looking up connections for chat: $e");
           }
         }
 
@@ -137,7 +157,7 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
         });
       }
     } catch (e) {
-      print("Error loading conversations: $e");
+      debugPrint("Error loading conversations: $e");
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -266,10 +286,8 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
                                   children: [
                                     CircleAvatar(
                                       radius: 24,
-                                      backgroundImage: avatar.isNotEmpty && avatar.startsWith('http')
-                                          ? NetworkImage(avatar)
-                                          : (avatar.isNotEmpty ? FileImage(File(avatar)) : null) as ImageProvider?,
-                                      child: avatar.isEmpty
+                                      backgroundImage: getAvatarProvider(avatar),
+                                      child: getAvatarProvider(avatar) == null
                                           ? const Icon(LucideIcons.user, size: 18, color: Colors.white70)
                                           : null,
                                     ),
@@ -334,14 +352,19 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
 
   Future<void> _showStartNewChatDialog(BuildContext context) async {
     final currentUser = _supabase.auth.currentUser;
-    final currentUserId = currentUser?.id ?? "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
+    final currentUserId = currentUser?.id;
+    if (currentUserId == null) return;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (modalContext) {
         return FutureBuilder<List<Map<String, dynamic>>>(
-          future: _supabase.from('connections').select().eq('user_id', currentUserId),
+          future: _supabase
+              .from('connections')
+              .select()
+              .eq('user_id', currentUserId)
+              .not('connected_user_id', 'is', null),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Container(
@@ -361,21 +384,33 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
               return name.isNotEmpty && !existingChatNames.contains(name);
             }).toList();
 
-            return Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFF111827),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    "Start Conversation",
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
+              child: GlassContainer(
+                borderRadius: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    Text(
+                      "Start Conversation",
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 24,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
                   Expanded(
                     child: untextedConnections.isEmpty
                         ? const Center(
@@ -405,6 +440,7 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
                                         contactName: name,
                                         avatarUrl: avatar,
                                         recipientEmail: email,
+                                        recipientId: connection['target_user_id'] ?? connection['linked_profile_id'],
                                       ),
                                     ),
                                   ).then((_) => _loadConversations());
@@ -419,10 +455,8 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
                                     children: [
                                       CircleAvatar(
                                         radius: 20,
-                                        backgroundImage: avatar.isNotEmpty && avatar.startsWith('http')
-                                            ? NetworkImage(avatar)
-                                            : (avatar.isNotEmpty ? FileImage(File(avatar)) : null) as ImageProvider?,
-                                        child: avatar.isEmpty
+                                        backgroundImage: getAvatarProvider(avatar),
+                                        child: getAvatarProvider(avatar) == null
                                             ? const Icon(LucideIcons.user, size: 14, color: Colors.white)
                                             : null,
                                       ),
@@ -446,7 +480,8 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
                   ),
                 ],
               ),
-            );
+            ),
+          );
           },
         );
       },

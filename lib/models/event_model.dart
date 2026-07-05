@@ -7,6 +7,8 @@ class EventModel {
   final String description;
   final String? stats;
   final String imageUrl;
+  final String startDate;
+  final String endDate;
   bool isJoined;
 
   EventModel({
@@ -16,6 +18,8 @@ class EventModel {
     required this.location,
     required this.category,
     required this.imageUrl,
+    this.startDate = "TBA",
+    this.endDate = "TBA",
     this.description = "Premium B2B networking event focused on industry-leading innovations and executive partnerships.",
     this.stats,
     this.isJoined = false,
@@ -31,6 +35,8 @@ final List<EventModel> dummyEvents = [
     category: "TECH",
     imageUrl: "https://images.unsplash.com/photo-1540575861501-7cf05a4b125a?w=800&q=80",
     stats: "487 Registered • 12 Hubs",
+    startDate: "Oct 12, 2024",
+    endDate: "Oct 14, 2024",
   ),
   EventModel(
     id: "7b55f6e8-2321-4f38-bc0d-7b2a0c4f8d62",
@@ -40,6 +46,8 @@ final List<EventModel> dummyEvents = [
     category: "AI",
     imageUrl: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&q=80",
     stats: "320 Registered • 5 Hubs",
+    startDate: "Nov 05, 2024",
+    endDate: "Nov 05, 2024",
   ),
   EventModel(
     id: "cc283c74-2ff4-436f-870a-4bf3f295b9c0",
@@ -49,5 +57,7 @@ final List<EventModel> dummyEvents = [
     category: "FINANCE",
     imageUrl: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&q=80",
     stats: "1.2k Registered • 20 Hubs",
+    startDate: "Dec 02, 2024",
+    endDate: "Dec 02, 2024",
   ),
 ];

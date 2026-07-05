@@ -41,8 +41,8 @@ void main() async {
   try {
     print('Inserting/upserting events...');
     final request = await client.postUrl(url);
-    request.headers.set('apikey', 'sb_publishable_MluMrwkWs5-YedITa6ggNw_imK2nv8z');
-    request.headers.set('Authorization', 'Bearer sb_publishable_MluMrwkWs5-YedITa6ggNw_imK2nv8z');
+    request.headers.set('apikey', 'sb_publishable_J1CFgtCFJGkKpdFqU6UFUg_fF7S_2Pc');
+    request.headers.set('Authorization', 'Bearer sb_publishable_J1CFgtCFJGkKpdFqU6UFUg_fF7S_2Pc');
     request.headers.set('Content-Type', 'application/json');
     request.headers.set('Prefer', 'resolution=merge-duplicates');
     

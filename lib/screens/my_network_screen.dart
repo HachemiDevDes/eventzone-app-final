@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:io';
 import '../theme/eventzone_theme.dart';
+import '../utils/avatar_helper.dart';
 import '../widgets/glass_container.dart';
 import 'direct_messages_screen.dart';
 import 'professional_profile_screen.dart';
@@ -11,32 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class MyNetworkScreen extends StatefulWidget {
   const MyNetworkScreen({super.key});
 
-  static final List<Map<String, String>> customConnections = [
-    {
-      "name": "Sarah Jenkins",
-      "title": "UI/UX Designer",
-      "avatarUrl": "https://i.pravatar.cc/150?u=c0",
-      "source": "QR Code",
-    },
-    {
-      "name": "Marcus Chen",
-      "title": "Flutter Developer",
-      "avatarUrl": "https://i.pravatar.cc/150?u=c1",
-      "source": "QR Code",
-    },
-    {
-      "name": "Elena Rostova",
-      "title": "Product Manager",
-      "avatarUrl": "https://i.pravatar.cc/150?u=c2",
-      "source": "Event Badge",
-    },
-    {
-      "name": "David Kross",
-      "title": "Tech Lead",
-      "avatarUrl": "https://i.pravatar.cc/150?u=c3",
-      "source": "Business Card",
-    },
-  ];
+
 
   @override
   State<MyNetworkScreen> createState() => _MyNetworkScreenState();
@@ -46,11 +25,75 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
   String _searchQuery = "";
   List<Map<String, dynamic>> _supabaseConnections = [];
   bool _isLoading = true;
+  RealtimeChannel? _connectionsChannel;
+  int _unreadCount = 0;
+  RealtimeChannel? _messagesChannel;
 
   @override
   void initState() {
     super.initState();
     _loadConnections();
+    _subscribeToConnections();
+    _subscribeToMessages();
+  }
+
+  void _subscribeToMessages() async {
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentUserId == null) return;
+    
+    // Initial fetch
+    _fetchUnreadCount(currentUserId);
+    
+    // Subscribe to new messages
+    _messagesChannel = Supabase.instance.client
+        .channel('public:messages:unread')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'messages',
+          callback: (_) {
+             _fetchUnreadCount(currentUserId);
+          },
+        )
+        .subscribe();
+  }
+  
+  void _fetchUnreadCount(String currentUserId) async {
+    try {
+      final data = await Supabase.instance.client
+          .from('messages')
+          .select('id')
+          .eq('recipient_id', currentUserId)
+          .eq('is_read', false);
+      if (mounted) {
+        setState(() {
+          _unreadCount = data.length;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching unread count: $e");
+    }
+  }
+
+  @override
+  void dispose() {
+    _connectionsChannel?.unsubscribe();
+    _messagesChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribeToConnections() {
+    _connectionsChannel = Supabase.instance.client
+        .channel('network_connections_updates')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'connections',
+          callback: (_) {
+            if (mounted) _loadConnections();
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _loadConnections() async {
@@ -67,32 +110,7 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
 
       List<Map<String, dynamic>> loaded = List<Map<String, dynamic>>.from(response);
 
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final bool hasSeeded = prefs.getBool('seeded_contacts_v1') ?? false;
 
-      if (loaded.isEmpty && !hasSeeded) {
-        // Seed the static mock connections into Supabase!
-        for (var mock in MyNetworkScreen.customConnections) {
-          await Supabase.instance.client.from('connections').insert({
-            'user_id': currentUserId,
-            'name': mock['name'],
-            'title': mock['title'],
-            'avatar_url': mock['avatarUrl'],
-            'source': mock['source'],
-            'is_new': mock['isNew'] == 'true',
-          });
-        }
-        await prefs.setBool('seeded_contacts_v1', true);
-        // Refetch after seeding
-        final seededResponse = await Supabase.instance.client
-            .from('connections')
-            .select()
-            .eq('user_id', currentUserId)
-            .order('created_at', ascending: false);
-        loaded = List<Map<String, dynamic>>.from(seededResponse);
-      } else if (loaded.isNotEmpty && !hasSeeded) {
-        await prefs.setBool('seeded_contacts_v1', true);
-      }
 
       if (mounted) {
         setState(() {
@@ -101,18 +119,11 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
         });
       }
     } catch (e) {
-      print("Error loading connections: $e");
-      // Fallback to static list
       if (mounted) {
         setState(() {
-          _supabaseConnections = MyNetworkScreen.customConnections.map((e) => {
-            'name': e['name'],
-            'title': e['title'],
-            'avatar_url': e['avatarUrl'],
-            'source': e['source'],
-            'is_new': e['isNew'] == 'true',
-          }).toList();
+          _supabaseConnections = [];
           _isLoading = false;
+          _searchQuery = "ERROR: $e";
         });
       }
     }
@@ -152,8 +163,7 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                         .eq('id', connection['id']);
                   }
                   
-                  // Also remove from static customConnections
-                  MyNetworkScreen.customConnections.removeWhere((c) => c['name'] == connection['name']);
+                  // (Removed static customConnections)
                   
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -228,30 +238,31 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                   clipBehavior: Clip.none,
                   children: [
                     const Icon(LucideIcons.messageCircle, color: Colors.white, size: 28),
-                    Positioned(
-                      right: -2,
-                      top: -2,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.redAccent,
-                          shape: BoxShape.circle,
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: const Text(
-                          "1",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
+                    if (_unreadCount > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
                           ),
-                          textAlign: TextAlign.center,
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            "$_unreadCount",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -361,6 +372,8 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                     tags: connection['tags'] != null ? List<String>.from(connection['tags']) : null,
                     address: connection['address'],
                     connectionId: connection['id'],
+                    createdAt: connection['created_at'],
+                    targetUserId: connection['linked_profile_id'] ?? connection['target_user_id'],
                   ),
                 ),
               ).then((_) => _loadConnections());
@@ -372,10 +385,8 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                   CircleAvatar(
                     radius: 26,
                     backgroundColor: Colors.white10,
-                    backgroundImage: (avatarUrl.isNotEmpty && avatarUrl.startsWith('http'))
-                        ? NetworkImage(avatarUrl)
-                        : (avatarUrl.isNotEmpty ? FileImage(File(avatarUrl)) : null) as ImageProvider?,
-                    child: avatarUrl.isEmpty
+                    backgroundImage: getAvatarProvider(avatarUrl),
+                    child: getAvatarProvider(avatarUrl) == null
                         ? const Icon(LucideIcons.user, size: 20, color: Colors.white54)
                         : null,
                   ),
@@ -417,13 +428,36 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                           title,
                           style: const TextStyle(color: Colors.white38, fontSize: 12),
                         ),
+                        if (connection['tags'] != null && (connection['tags'] as List).isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: (connection['tags'] as List).take(3).map((tag) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white12, width: 0.5),
+                              ),
+                              child: Text(
+                                tag.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            )).toList(),
+                          ),
+                        ],
                       ],
                     ),
                   ),
                 ],
               ),
             ),
-          );
+          ).animate(delay: (index * 20).ms).fade(duration: 150.ms).slideY(begin: 0.1, end: 0, duration: 150.ms, curve: Curves.easeOutQuad);
         },
       ),
     );

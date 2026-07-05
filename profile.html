@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eventzone Profile</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&display=swap');
+    
+    :root {
+      --bg-color: #0c0f1a;
+      --card-bg: rgba(255, 255, 255, 0.03);
+      --text-main: #ffffff;
+      --text-sub: rgba(255, 255, 255, 0.54);
+      --accent-blue: #1d7af2;
+      --border-color: rgba(255, 255, 255, 0.05);
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding-bottom: 100px; /* Space for fixed button */
+    }
+    
+    #profile-content {
+      display: none; /* Hide until loaded */
+    }
+    
+    .banner {
+      width: 100%;
+      height: 400px;
+      background-color: #1a1e29;
+      background-size: cover;
+      background-position: center;
+      position: relative;
+      /* Subtle fade at bottom to match app */
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%);
+      -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%);
+    }
+    
+    .profile-info {
+      padding: 0 24px;
+      margin-top: -60px; /* pull up slightly */
+      position: relative;
+      z-index: 10;
+    }
+    
+    .name {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    
+    .job-title {
+      font-size: 14px;
+      color: var(--text-sub);
+      font-weight: 400;
+      margin: 0;
+      margin-bottom: 4px;
+    }
+
+    .company {
+      font-size: 14px;
+      color: var(--text-sub);
+      font-weight: 400;
+      margin: 0;
+      margin-bottom: 24px;
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+    }
+
+    .scanned-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background-color: rgba(29, 122, 242, 0.1);
+      color: var(--accent-blue);
+      padding: 6px 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(29, 122, 242, 0.3);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .date-text {
+      color: var(--text-sub);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+    }
+
+    .contact-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .contact-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 16px;
+      text-decoration: none;
+      color: inherit;
+    }
+    
+    .icon-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.05);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: rgba(255, 255, 255, 0.5);
+      flex-shrink: 0;
+    }
+    
+    .contact-details {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .contact-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .contact-label {
+      font-size: 12px;
+      color: var(--text-sub);
+      font-weight: 500;
+    }
+    
+    .floating-btn-container {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 20px;
+      background: linear-gradient(transparent, var(--bg-color) 20%, var(--bg-color));
+      display: flex;
+      justify-content: center;
+      z-index: 100;
+    }
+    
+    .save-btn {
+      background-color: var(--accent-blue);
+      color: white;
+      text-decoration: none;
+      padding: 16px 0;
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    
+    .icon {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+    }
+    
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-sub);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="loading" class="loading">Loading profile...</div>
+
+  <div id="profile-content">
+    <div class="banner" id="banner-bg">
+    </div>
+    
+    <div class="profile-info">
+      <h1 id="profile-name" class="name"></h1>
+      <p id="profile-job" class="job-title"></p>
+      <p id="profile-company" class="company"></p>
+      
+      <div class="meta-row">
+        <div class="scanned-badge">
+          <svg class="icon" style="width: 14px; height: 14px;" viewBox="0 0 24 24"><path d="M4 4h6v6H4V4zm2 2v2h2V6H6zm-2 8h6v6H4v-6zm2 2v2h2v-2H6zm8-12h6v6h-6V4zm2 2v2h2V6h-2zm-2 8h2v2h-2v-2zm4 0h2v2h-2v-2zm-2 2h2v2h-2v-2zm2 2h2v2h-2v-2zm-4 0h2v2h-2v-2zm2-2h2v2h-2v-2z" fill="currentColor"/></svg>
+          Scanned via QR Code
+        </div>
+        <div class="date-text">
+          <svg class="icon" style="width: 14px; height: 14px;" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 002 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z" fill="currentColor"/></svg>
+          <span id="current-date"></span>
+        </div>
+      </div>
+      
+      <div id="contact-list" class="contact-list">
+        <!-- Dynamic contact items -->
+      </div>
+    </div>
+
+    <div class="floating-btn-container">
+      <div id="save-btn" class="save-btn">Save Contact</div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://awkreadldqmidcrrqukm.supabase.co';
+    const ANON_KEY = 'sb_publishable_MluMrwkWs5-YedITa6ggNw_imK2nv8z';
+    
+    // Set current date
+    const dateOptions = { day: '2-digit', month: 'long', year: 'numeric' };
+    const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+    const dateStr = new Date().toLocaleDateString('en-GB', dateOptions);
+    const timeStr = new Date().toLocaleTimeString('en-US', timeOptions);
+    document.getElementById('current-date').innerText = `${dateStr} ${timeStr}`;
+
+    let profileId = null;
+
+    async function loadProfile() {
+      const params = new URLSearchParams(window.location.search);
+      profileId = params.get('id');
+
+      if (!profileId) {
+        document.getElementById('loading').innerText = 'Invalid link: missing ID';
+        return;
+      }
+
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${profileId}&select=*`, {
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${ANON_KEY}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile');
+        }
+
+        const data = await response.json();
+        if (!data || data.length === 0) {
+          document.getElementById('loading').innerText = 'Profile not found';
+          return;
+        }
+
+        const profile = data[0];
+        renderProfile(profile);
+      } catch (error) {
+        console.error(error);
+        document.getElementById('loading').innerText = 'Error loading profile';
+      }
+    }
+
+    function renderProfile(profile) {
+      document.title = `${profile.full_name || 'Profile'} - Eventzone`;
+      document.getElementById('profile-name').innerText = profile.full_name || '';
+      
+      if (profile.job_title) {
+        document.getElementById('profile-job').innerText = profile.job_title;
+      } else {
+        document.getElementById('profile-job').style.display = 'none';
+      }
+      
+      if (profile.company_name) {
+        document.getElementById('profile-company').innerText = profile.company_name;
+      } else {
+        document.getElementById('profile-company').style.display = 'none';
+      }
+
+      if (profile.avatar_url) {
+        document.getElementById('banner-bg').style.backgroundImage = `url('${profile.avatar_url}')`;
+      }
+
+      const meta = profile.metadata || {};
+      const contactList = document.getElementById('contact-list');
+      
+      // Email from profile or metadata
+      const email = profile.email || meta.email;
+      if (email) {
+        contactList.appendChild(createContactItem(
+          `mailto:${email}`,
+          email,
+          'Work',
+          '<path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>'
+        ));
+      }
+
+      // Phone
+      const phone = profile.phone || meta.phone;
+      if (phone) {
+        contactList.appendChild(createContactItem(
+          `tel:${phone}`,
+          phone,
+          'Cell',
+          '<path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>'
+        ));
+      }
+
+      // Website
+      const website = profile.website || meta.website;
+      if (website) {
+        const href = website.startsWith('http') ? website : `https://${website}`;
+        contactList.appendChild(createContactItem(
+          href,
+          website,
+          'Website',
+          '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>',
+          true
+        ));
+      }
+
+      // Address
+      const address = profile.address || meta.address;
+      if (address) {
+        const href = `https://maps.google.com/?q=${encodeURIComponent(address)}`;
+        contactList.appendChild(createContactItem(
+          href,
+          address,
+          'Address',
+          '<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>',
+          true
+        ));
+      }
+
+      // Social Links
+      let socialLinks = [];
+      if (meta.socials) {
+        socialLinks = parseSocialLinks(meta.socials);
+      } else if (profile.social_links) {
+        socialLinks = parseSocialLinks(profile.social_links);
+      }
+
+      socialLinks.forEach(link => {
+        if (!link.value || !link.platform) return;
+        
+        let displayPlatform = link.platform.charAt(0).toUpperCase() + link.platform.slice(1);
+        let href = link.value;
+        if (!href.startsWith('http') && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
+            href = `https://${href}`; // simple fallback
+        }
+        
+        contactList.appendChild(createContactItem(
+          href,
+          link.value,
+          displayPlatform,
+          getPlatformIconPath(link.platform),
+          true
+        ));
+      });
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('profile-content').style.display = 'block';
+    }
+
+    function parseSocialLinks(raw) {
+      if (!raw) return [];
+      if (Array.isArray(raw)) {
+        return raw;
+      }
+      if (typeof raw === 'object') {
+        return Object.entries(raw).map(([key, value]) => ({
+          platform: key,
+          value: value,
+          label: value
+        }));
+      }
+      return [];
+    }
+
+    function getPlatformIconPath(platform) {
+      const p = platform.toLowerCase();
+      // Using generic link icon as fallback for all platforms (matches LucideIcons.link)
+      let path = '<path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>';
+      
+      if (p === 'linkedin') {
+         path = '<path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94V10.13H5.5v8.37h2.77z"/>';
+      } else if (p === 'instagram') {
+         path = '<path d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.61 18.39 4 16.4 4H7.6m9.65 1.5a1.25 1.25 0 0 1 1.25 1.25A1.25 1.25 0 0 1 17.25 8 1.25 1.25 0 0 1 16 6.75a1.25 1.25 0 0 1 1.25-1.25M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/>';
+      } else if (p === 'twitter' || p === 'x') {
+         path = '<path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5 5 9.2 5 9.2s1.5.8 2.8.8c-3.1-2-3.2-8.4-1-11 2.8 3.5 6.9 5.5 11.2 6 0 0-2.2-6.5 4-6.5 1.7 0 3.2.7 4 2 1.3-.3 2.5-1 2.5-1z"/>';
+      } else if (p === 'facebook') {
+         path = '<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>';
+      }
+      return path;
+    }
+
+    function createContactItem(href, value, label, svgPath, newTab = false) {
+      const a = document.createElement('a');
+      a.href = href;
+      a.className = 'contact-card';
+      if (newTab) {
+        a.target = '_blank';
+      }
+
+      a.innerHTML = `
+        <div class="icon-circle">
+          <svg class="icon" viewBox="0 0 24 24">${svgPath}</svg>
+        </div>
+        <div class="contact-details">
+          <span class="contact-value">${value}</span>
+          <span class="contact-label">${label}</span>
+        </div>
+      `;
+      return a;
+    }
+
+    // Deferred deep linking logic
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      if (!profileId) return;
+      
+      const appSchemeUrl = `eventzone://profile?id=${profileId}`;
+      const playStoreUrl = `https://play.google.com/store/apps/details?id=com.example.eventzone_app&referrer=profile_${profileId}`;
+      const appStoreUrl = `https://apps.apple.com/app/idYOUR_APP_ID`; // To be replaced
+
+      // Fallback logic for iOS deferred linking: copy to clipboard
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      if (isIOS) {
+        try {
+          await navigator.clipboard.writeText(`eventzone_profile_${profileId}`);
+        } catch (e) {
+          console.error("Clipboard copy failed", e);
+        }
+      }
+
+      // Try App Scheme First
+      window.location.href = appSchemeUrl;
+
+      // Fallback to Store after a short delay
+      setTimeout(() => {
+        if (isIOS) {
+          window.location.href = appStoreUrl;
+        } else {
+          window.location.href = playStoreUrl;
+        }
+      }, 2500);
+    });
+
+    // Start loading profile data immediately
+    loadProfile();
+  </script>
+</body>
+</html>

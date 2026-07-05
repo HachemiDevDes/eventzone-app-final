@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/eventzone_theme.dart';
@@ -15,12 +16,14 @@ class MyQRCodeScreen extends StatefulWidget {
 
 class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
   final _supabaseService = SupabaseService();
-  static const String _profileId = "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
   bool _isLoading = true;
-  String _fullName = "Hachemi Mohamed";
-  String _jobTitle = "Product Lead";
-  String _companyName = "TechFlow";
-  String _avatarUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop";
+  String _fullName = "Attendee";
+  String _jobTitle = "";
+  String _companyName = "";
+  String _avatarUrl = "";
+  int _dailyStreak = 0;
+
+  String _userId = "";
 
   @override
   void initState() {
@@ -29,13 +32,23 @@ class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final data = await _supabaseService.fetchProfile(_profileId);
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    if (currentUserId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+    setState(() {
+      _userId = currentUserId;
+    });
+    final data = await _supabaseService.fetchProfile(currentUserId);
     if (data != null) {
+      final streak = await _supabaseService.calculateDailyStreak(currentUserId);
       setState(() {
-        _fullName = data['full_name'] ?? 'Hachemi Mohamed';
+        _fullName = data['full_name'] ?? 'Attendee';
         _jobTitle = data['job_title'] ?? '';
         _companyName = data['company_name'] ?? '';
-        _avatarUrl = data['avatar_url'] ?? "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop";
+        _avatarUrl = data['avatar_url'] ?? "";
+        _dailyStreak = streak;
         _isLoading = false;
       });
     } else {
@@ -58,7 +71,7 @@ class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
   @override
   Widget build(BuildContext context) {
     // Unique data for the user
-    final String userData = "eventzone://user/$_profileId";
+    final String userData = "https://profile.eventzone.pro/?id=$_userId";
     final subtitle = _companyName.isNotEmpty 
         ? "$_jobTitle @ $_companyName"
         : _jobTitle;
@@ -90,7 +103,11 @@ class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
                           children: [
                             CircleAvatar(
                               radius: 35,
-                              backgroundImage: _getAvatarProvider(_avatarUrl),
+                              backgroundColor: Colors.white10,
+                              backgroundImage: _avatarUrl.isNotEmpty ? _getAvatarProvider(_avatarUrl) : null,
+                              child: _avatarUrl.isEmpty
+                                  ? const Icon(Icons.person, size: 35, color: Colors.white54)
+                                  : null,
                             ),
                             const SizedBox(height: 16),
                             Text(

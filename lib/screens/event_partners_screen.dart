@@ -16,7 +16,7 @@ class EventPartnersScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 48),
+              const SizedBox(height: 72),
               Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Column(

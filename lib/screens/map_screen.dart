@@ -20,7 +20,7 @@ class _MapScreenState extends State<MapScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 48),
+              const SizedBox(height: 72),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
                 child: Row(

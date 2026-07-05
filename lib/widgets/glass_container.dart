@@ -9,6 +9,8 @@ class GlassContainer extends StatelessWidget {
   final double? width;
   final double? height;
   final bool showBorder;
+  final Color? borderColor;
+  final double borderWidth;
 
   const GlassContainer({
     super.key,
@@ -18,6 +20,8 @@ class GlassContainer extends StatelessWidget {
     this.width,
     this.height,
     this.showBorder = true,
+    this.borderColor,
+    this.borderWidth = 1.0,
   });
 
   @override
@@ -35,8 +39,8 @@ class GlassContainer extends StatelessWidget {
             borderRadius: BorderRadius.circular(borderRadius),
             border: showBorder
                 ? Border.all(
-                    color: EventzoneTheme.glassBorder,
-                    width: 1,
+                    color: borderColor ?? EventzoneTheme.glassBorder,
+                    width: borderWidth,
                   )
                 : null,
             // Subtle internal gradient for depth

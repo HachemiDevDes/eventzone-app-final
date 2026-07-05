@@ -47,7 +47,7 @@ class QRActionSheet extends StatelessWidget {
                   "My QR Code",
                   "Show to others",
                   EventzoneTheme.primaryAction,
-                  const MyQRCodeScreen(),
+                  "my_qr",
                 ),
               ),
               const SizedBox(width: 16),
@@ -58,7 +58,7 @@ class QRActionSheet extends StatelessWidget {
                   "Scan QR",
                   "Connect directly",
                   EventzoneTheme.accentSuccess,
-                  const ScanQRScreen(),
+                  "scan",
                 ),
               ),
             ],
@@ -75,15 +75,11 @@ class QRActionSheet extends StatelessWidget {
     String title,
     String subtitle,
     Color color,
-    Widget targetScreen,
+    String action,
   ) {
     return GestureDetector(
       onTap: () {
-        Navigator.pop(context); // Close bottom sheet
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => targetScreen),
-        );
+        Navigator.pop(context, action); // Close bottom sheet and return action
       },
       child: Container(
         padding: const EdgeInsets.all(20),

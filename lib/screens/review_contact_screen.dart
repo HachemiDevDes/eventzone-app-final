@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -6,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import 'my_network_screen.dart';
+import 'scan_qr_screen.dart' as scan_qr;
 
 class ReviewContactScreen extends StatefulWidget {
   final String initialName;
@@ -97,7 +99,12 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
                 title: const Text("Take Photo", style: TextStyle(color: Colors.white)),
                 onTap: () async {
                   Navigator.pop(context);
-                  final file = await picker.pickImage(source: ImageSource.camera, imageQuality: 70);
+                  final file = await picker.pickImage(
+                    source: ImageSource.camera,
+                    maxWidth: 800,
+                    maxHeight: 800,
+                    imageQuality: 85,
+                  );
                   if (file != null) {
                     setState(() => _selectedImage = File(file.path));
                   }
@@ -108,7 +115,12 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
                 title: const Text("Choose from Gallery", style: TextStyle(color: Colors.white)),
                 onTap: () async {
                   Navigator.pop(context);
-                  final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+                  final file = await picker.pickImage(
+                    source: ImageSource.gallery,
+                    maxWidth: 800,
+                    maxHeight: 800,
+                    imageQuality: 85,
+                  );
                   if (file != null) {
                     setState(() => _selectedImage = File(file.path));
                   }
@@ -128,7 +140,41 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
 
     try {
       final currentUser = Supabase.instance.client.auth.currentUser;
-      final currentUserId = currentUser?.id ?? "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
+      final currentUserId = currentUser?.id;
+      if (currentUserId == null) {
+        setState(() => _isSaving = false);
+        return;
+      }
+
+      // Check subscription or trial status before proceeding
+      final profileRes = await Supabase.instance.client.from('profiles').select('created_at, subscription_end_date').eq('id', currentUserId).single();
+      
+      final now = DateTime.now();
+      bool isActive = false;
+      
+      if (profileRes['subscription_end_date'] != null) {
+        final subEnd = DateTime.parse(profileRes['subscription_end_date']);
+        if (subEnd.isAfter(now)) isActive = true;
+      }
+      
+      if (!isActive && profileRes['created_at'] != null) {
+        final createdAt = DateTime.parse(profileRes['created_at']);
+        final trialEnd = createdAt.add(const Duration(days: 15));
+        if (trialEnd.isAfter(now)) isActive = true;
+      }
+
+      if (!isActive) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Your trial/subscription has expired. Please upgrade to save contacts."),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+          setState(() => _isSaving = false);
+        }
+        return;
+      }
 
       String avatarUrl = "";
 
@@ -146,6 +192,16 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
         }
       }
 
+      String initialNotes = _notesController.text.trim();
+      if (initialNotes.isNotEmpty) {
+        initialNotes = jsonEncode([
+          {
+            "text": initialNotes,
+            "date": DateTime.now().toIso8601String()
+          }
+        ]);
+      }
+
       final newConnection = {
         'user_id': currentUserId,
         'name': _nameController.text.trim(),
@@ -156,7 +212,7 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
         'phone': _phoneController.text.trim(),
         'website': _websiteController.text.trim(),
         'address': _addressController.text.trim(),
-        'notes': _notesController.text.trim(),
+        'notes': initialNotes,
         'avatar_url': avatarUrl,
         'source': widget.source,
         'is_new': true,
@@ -164,20 +220,8 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
 
       await Supabase.instance.client.from('connections').insert(newConnection);
 
-      MyNetworkScreen.customConnections.add({
-        "name": _nameController.text.trim(),
-        "title": _titleController.text.trim(),
-        "avatarUrl": avatarUrl,
-        "source": widget.source,
-        "isNew": "true",
-        "email": _emailController.text.trim(),
-        "phone": _phoneController.text.trim(),
-        "website": _websiteController.text.trim(),
-        "address": _addressController.text.trim(),
-        "company": _companyController.text.trim(),
-        "department": _departmentController.text.trim(),
-      });
-
+      // Connection saved successfully
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -258,25 +302,25 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
 
                     _buildSectionHeader("Contact Info"),
                     const SizedBox(height: 8),
-                    _buildTextField("Full Name", _nameController, LucideIcons.user, validator: (v) {
+                    _buildTextField("Full Name", _nameController, LucideIcons.user, fieldKey: 'name', validator: (v) {
                       if (v == null || v.trim().isEmpty) return "Name is required";
                       return null;
                     }),
-                    _buildTextField("Job Title", _titleController, LucideIcons.briefcase, validator: (v) {
+                    _buildTextField("Job Title", _titleController, LucideIcons.briefcase, fieldKey: 'title', validator: (v) {
                       if (v == null || v.trim().isEmpty) return "Job title is required";
                       return null;
                     }),
-                    _buildTextField("Company", _companyController, LucideIcons.building2),
-                    _buildTextField("Department", _departmentController, LucideIcons.layers),
-                    _buildTextField("Email Address", _emailController, LucideIcons.mail, keyboardType: TextInputType.emailAddress),
-                    _buildTextField("Phone Number", _phoneController, LucideIcons.phone, keyboardType: TextInputType.phone),
-                    _buildTextField("Website", _websiteController, LucideIcons.globe, keyboardType: TextInputType.url),
-                    _buildTextField("Address", _addressController, LucideIcons.mapPin),
+                    _buildTextField("Company", _companyController, LucideIcons.building2, fieldKey: 'company'),
+                    _buildTextField("Department", _departmentController, LucideIcons.layers, fieldKey: 'department'),
+                    _buildTextField("Email Address", _emailController, LucideIcons.mail, fieldKey: 'email', keyboardType: TextInputType.emailAddress),
+                    _buildTextField("Phone Number", _phoneController, LucideIcons.phone, fieldKey: 'phone', keyboardType: TextInputType.phone),
+                    _buildTextField("Website", _websiteController, LucideIcons.globe, fieldKey: 'website', keyboardType: TextInputType.url),
+                    _buildTextField("Address", _addressController, LucideIcons.mapPin, fieldKey: 'address'),
                     
                     const SizedBox(height: 16),
                     _buildSectionHeader("Notes & Tags"),
                     const SizedBox(height: 8),
-                    _buildTextField("Reminder Notes", _notesController, LucideIcons.fileText, maxLines: 3),
+                    _buildTextField("Reminder Notes", _notesController, LucideIcons.fileText, fieldKey: 'notes', maxLines: 3),
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -303,7 +347,7 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
                       elevation: 4,
                     ),
                     child: _isSaving
-                        ? const CircularProgressIndicator(color: Colors.white)
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : const Text(
                             "Save Contact",
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
@@ -337,6 +381,7 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
     String label,
     TextEditingController controller,
     IconData icon, {
+    String? fieldKey,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,

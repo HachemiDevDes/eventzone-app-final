@@ -1,10 +1,11 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import 'professional_profile_screen.dart';
+import '../utils/avatar_helper.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String contactName;
@@ -74,7 +75,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           }
         }
       } catch (e) {
-        print("Error resolving profile: $e");
+        debugPrint("Error resolving profile: $e");
       }
     }
 
@@ -114,7 +115,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         }
       }
     } catch (e) {
-      print("Error resolving contact details for profile redirection: $e");
+      debugPrint("Error resolving contact details for profile redirection: $e");
     }
 
     setState(() {
@@ -166,7 +167,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Future<void> _loadMessages() async {
     if (_recipientId == null) return;
-    final currentUserId = _supabase.auth.currentUser?.id ?? "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
+    final currentUserId = _supabase.auth.currentUser?.id;
+    if (currentUserId == null) return;
     
     try {
       final response = await _supabase
@@ -175,23 +177,47 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           .or('and(sender_id.eq.$currentUserId,recipient_id.eq.$_recipientId),and(sender_id.eq.$_recipientId,recipient_id.eq.$currentUserId)')
           .order('created_at', ascending: true);
 
+      // Mark incoming messages as read FIRST (before setState) to avoid race condition
+      // where the realtime provider re-fetches before the DB update completes.
+      await _markMessagesAsRead(currentUserId);
+
       if (mounted) {
         setState(() {
           _messages = List<Map<String, dynamic>>.from(response);
           _isLoading = false;
         });
         _scrollToBottom();
-
-        // Mark incoming messages as read
-        await _supabase
-            .from('messages')
-            .update({'is_read': true})
-            .eq('recipient_id', currentUserId)
-            .eq('sender_id', _recipientId!)
-            .eq('is_read', false);
       }
     } catch (e) {
-      print("Error loading messages: $e");
+      debugPrint("Error loading messages: $e");
+    }
+  }
+
+  /// Marks all messages from [_recipientId] to the current user as read in the DB.
+  Future<void> _markMessagesAsRead(String currentUserId) async {
+    if (_recipientId == null) return;
+    try {
+      debugPrint('[MARK-READ] Marking messages as read: recipient=$currentUserId, sender=$_recipientId');
+      final result = await _supabase
+          .from('messages')
+          .update({'is_read': true})
+          .eq('recipient_id', currentUserId)
+          .eq('sender_id', _recipientId!)
+          .select();
+      debugPrint('[MARK-READ] Updated ${result.length} messages');
+
+      // Clear 'is_new' tag in connections if they open the chat
+      try {
+        await _supabase
+            .from('connections')
+            .update({'is_new': false})
+            .eq('user_id', currentUserId)
+            .eq('linked_profile_id', _recipientId!);
+      } catch (e) {
+        debugPrint("Error clearing is_new from chat: $e");
+      }
+    } catch (e) {
+      debugPrint('[MARK-READ] ERROR: $e');
     }
   }
 
@@ -206,11 +232,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             final newRecord = payload.newRecord;
             final String senderId = newRecord['sender_id'] ?? '';
             final String recipientId = newRecord['recipient_id'] ?? '';
-            final currentUserId = _supabase.auth.currentUser?.id ?? "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
+            final currentUserId = _supabase.auth.currentUser?.id;
+            if (currentUserId == null) return;
             
-            // Only add if it belongs to this active conversation
+            // Only process if it belongs to this active conversation
             if ((senderId == currentUserId && recipientId == _recipientId) ||
                 (senderId == _recipientId && recipientId == currentUserId)) {
+              // If the message is incoming (from the other person), mark as read immediately
+              // since the user is actively viewing this chat.
+              if (senderId == _recipientId && recipientId == currentUserId) {
+                _markMessagesAsRead(currentUserId);
+              }
               _loadMessages();
             }
           },
@@ -223,7 +255,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (text.isEmpty) return;
     _messageController.clear();
 
-    final currentUserId = _supabase.auth.currentUser?.id ?? "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
+    final currentUserId = _supabase.auth.currentUser?.id;
+    if (currentUserId == null) return;
 
     // Add locally immediately for instant UI feedback
     final Map<String, dynamic> localMsg = {
@@ -244,15 +277,145 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         'content': text,
       });
     } catch (e) {
-      print("Error sending message: $e");
+      debugPrint("Error sending message: $e");
       // Remove message on failure
       setState(() {
         _messages.remove(localMsg);
       });
+      String errorMsg = "Failed to send message.";
+      if (e is PostgrestException) {
+        errorMsg = "Database Error: ${e.message}";
+      } else if (e is AuthException) {
+        errorMsg = "Auth Error: ${e.message}";
+      } else {
+        errorMsg = "Error: ${e.toString()}";
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to send message."), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(errorMsg), backgroundColor: Colors.redAccent),
       );
     }
+  }
+
+  void _showDeleteDialog(String messageId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1F2937),
+        title: const Text("Delete Message", style: TextStyle(color: Colors.white)),
+        content: const Text("Are you sure you want to delete this message?", style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteMessage(messageId);
+            },
+            child: const Text("Delete", style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteMessage(String messageId) async {
+    try {
+      await _supabase.from('messages').delete().eq('id', messageId);
+      if (mounted) {
+        setState(() {
+          _messages.removeWhere((m) => m['id'] == messageId);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error deleting message: $e");
+    }
+  }
+
+  void _showDeleteChatDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: GlassContainer(
+            borderRadius: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  "Delete Chat",
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Are you sure you want to delete this conversation? This cannot be undone.",
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Cancel", style: TextStyle(color: Colors.white38, fontSize: 16)),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          final currentUserId = _supabase.auth.currentUser?.id;
+                          if (currentUserId != null && _recipientId != null) {
+                            try {
+                              await _supabase.from('messages').delete().or(
+                                  'and(sender_id.eq.$currentUserId,recipient_id.eq.$_recipientId),and(sender_id.eq.$_recipientId,recipient_id.eq.$currentUserId)');
+                              if (mounted) {
+                                setState(() {
+                                  _messages.clear();
+                                });
+                              }
+                            } catch (e) {
+                              debugPrint("Error deleting chat: $e");
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: const Text("Delete", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _scrollToBottom() {
@@ -279,7 +442,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = _supabase.auth.currentUser?.id ?? "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
+    final currentUserId = _supabase.auth.currentUser?.id ?? "";
 
     return Scaffold(
       appBar: AppBar(
@@ -293,10 +456,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             children: [
               CircleAvatar(
                 radius: 18,
-                backgroundImage: widget.avatarUrl.isNotEmpty && widget.avatarUrl.startsWith('http')
-                    ? NetworkImage(widget.avatarUrl)
-                    : (widget.avatarUrl.isNotEmpty ? FileImage(File(widget.avatarUrl)) : null) as ImageProvider?,
-                child: widget.avatarUrl.isEmpty
+                backgroundImage: getAvatarProvider(widget.avatarUrl),
+                child: getAvatarProvider(widget.avatarUrl) == null
                     ? const Icon(LucideIcons.user, size: 14, color: Colors.white)
                     : null,
               ),
@@ -324,6 +485,34 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          Theme(
+            data: Theme.of(context).copyWith(
+              cardColor: const Color(0xFF1F2937),
+            ),
+            child: PopupMenuButton<String>(
+              icon: const Icon(LucideIcons.moreVertical, color: Colors.white),
+              offset: const Offset(0, 45),
+              onSelected: (value) {
+                if (value == 'delete') {
+                  _showDeleteChatDialog();
+                }
+              },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                      SizedBox(width: 8),
+                      Text('Delete Chat', style: TextStyle(color: Colors.redAccent)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       body: EventzoneTheme.buildPlayfulBackground(
         child: Column(
@@ -378,42 +567,49 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                               );
                             }
 
-                            return Align(
-                              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 16),
-                                padding: const EdgeInsets.all(16),
-                                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                                decoration: BoxDecoration(
-                                  color: isMe 
-                                      ? EventzoneTheme.primaryAction 
-                                      : Colors.white.withOpacity(0.05),
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(16),
-                                    topRight: const Radius.circular(16),
-                                    bottomLeft: Radius.circular(isMe ? 16 : 0),
-                                    bottomRight: Radius.circular(isMe ? 0 : 16),
-                                  ),
-                                  border: Border.all(
-                                    color: isMe ? Colors.transparent : Colors.white12,
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      message['content'] ?? '', 
-                                      style: const TextStyle(color: Colors.white, fontSize: 14)
+                            return GestureDetector(
+                              onLongPress: () {
+                                if (message['id'] != null) {
+                                  _showDeleteDialog(message['id']);
+                                }
+                              },
+                              child: Align(
+                                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  padding: const EdgeInsets.all(16),
+                                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                                  decoration: BoxDecoration(
+                                    color: isMe 
+                                        ? EventzoneTheme.primaryAction 
+                                        : Colors.white.withOpacity(0.05),
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(16),
+                                      topRight: const Radius.circular(16),
+                                      bottomLeft: Radius.circular(isMe ? 16 : 0),
+                                      bottomRight: Radius.circular(isMe ? 0 : 16),
                                     ),
-                                    const SizedBox(height: 6),
-                                    Align(
-                                      alignment: Alignment.bottomRight,
-                                      child: Text(
-                                        timeStr,
-                                        style: const TextStyle(color: Colors.white30, fontSize: 10),
+                                    border: Border.all(
+                                      color: isMe ? Colors.transparent : Colors.white12,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        message['content'] ?? '', 
+                                        style: const TextStyle(color: Colors.white, fontSize: 14)
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(height: 6),
+                                      Align(
+                                        alignment: Alignment.bottomRight,
+                                        child: Text(
+                                          timeStr,
+                                          style: const TextStyle(color: Colors.white30, fontSize: 10),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             );
