@@ -1323,9 +1323,12 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                               .map((link) {
                                 final platform = (link['platform'] ?? '').toString();
                                 final val = (link['value'] ?? '').toString().trim();
-                                final displayPlatform = platform.isNotEmpty
-                                    ? platform[0].toUpperCase() + platform.substring(1)
-                                    : "";
+                                final customLabel = (link['label'] ?? '').toString().trim();
+                                final displayPlatform = customLabel.isNotEmpty 
+                                    ? customLabel 
+                                    : (platform.isNotEmpty
+                                        ? platform[0].toUpperCase() + platform.substring(1)
+                                        : "");
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 12.0),
                                   child: _buildContactRow(_getPlatformIcon(platform), val, displayPlatform),
