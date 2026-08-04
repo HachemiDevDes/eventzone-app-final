@@ -11,11 +11,12 @@ import 'direct_messages_screen.dart';
 import 'professional_profile_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:easy_localization/easy_localization.dart';
+import '../services/export_service.dart';
+import '../widgets/export_contacts_sheet.dart';
 
 class MyNetworkScreen extends StatefulWidget {
   const MyNetworkScreen({super.key});
-
-
 
   @override
   State<MyNetworkScreen> createState() => _MyNetworkScreenState();
@@ -23,6 +24,7 @@ class MyNetworkScreen extends StatefulWidget {
 
 class _MyNetworkScreenState extends State<MyNetworkScreen> {
   String _searchQuery = "";
+  String? _selectedTag;
   List<Map<String, dynamic>> _supabaseConnections = [];
   bool _isLoading = true;
   RealtimeChannel? _connectionsChannel;
@@ -40,10 +42,10 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
   void _subscribeToMessages() async {
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
     if (currentUserId == null) return;
-    
+
     // Initial fetch
     _fetchUnreadCount(currentUserId);
-    
+
     // Subscribe to new messages
     _messagesChannel = Supabase.instance.client
         .channel('public:messages:unread')
@@ -52,12 +54,12 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
           schema: 'public',
           table: 'messages',
           callback: (_) {
-             _fetchUnreadCount(currentUserId);
+            _fetchUnreadCount(currentUserId);
           },
         )
         .subscribe();
   }
-  
+
   void _fetchUnreadCount(String currentUserId) async {
     try {
       final data = await Supabase.instance.client
@@ -99,7 +101,8 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
   Future<void> _loadConnections() async {
     try {
       final currentUser = Supabase.instance.client.auth.currentUser;
-      final currentUserId = currentUser?.id ?? "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
+      final currentUserId =
+          currentUser?.id ?? "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
 
       // Fetch from Supabase connections table
       final response = await Supabase.instance.client
@@ -108,9 +111,9 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
           .eq('user_id', currentUserId)
           .order('created_at', ascending: false);
 
-      List<Map<String, dynamic>> loaded = List<Map<String, dynamic>>.from(response);
-
-
+      List<Map<String, dynamic>> loaded = List<Map<String, dynamic>>.from(
+        response,
+      );
 
       if (mounted) {
         setState(() {
@@ -139,7 +142,10 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
             borderRadius: BorderRadius.circular(24),
             side: const BorderSide(color: Colors.white10),
           ),
-          title: const Text("Delete Contact", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          title: const Text(
+            "Delete Contact",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
           content: Text(
             "Are you sure you want to delete ${connection['name']} from your contacts?",
             style: const TextStyle(color: Colors.white70),
@@ -147,13 +153,16 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel", style: TextStyle(color: Colors.white38)),
+              child: const Text(
+                "Cancel",
+                style: TextStyle(color: Colors.white38),
+              ),
             ),
             ElevatedButton(
               onPressed: () async {
                 Navigator.pop(context);
                 setState(() => _isLoading = true);
-                
+
                 try {
                   // Delete from Supabase
                   if (connection['id'] != null) {
@@ -162,9 +171,9 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                         .delete()
                         .eq('id', connection['id']);
                   }
-                  
+
                   // (Removed static customConnections)
-                  
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text("Deleted ${connection['name']}!"),
@@ -172,19 +181,35 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                     ),
                   );
                 } catch (e) {
-                  print("Error deleting connection: $e");
+                  debugPrint("Error deleting connection: $e");
                 }
-                
+
                 _loadConnections();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.redAccent,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              child: const Text("Delete", style: TextStyle(color: Colors.white)),
+              child: const Text(
+                "Delete",
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
+      },
+    );
+  }
+
+  void _showExportOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return ExportContactsSheet(connections: _supabaseConnections);
       },
     );
   }
@@ -200,7 +225,11 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(context),
-                _buildSection(context, "Connected Professionals", _buildContactsGrid()),
+                _buildSection(
+                  context,
+                  "Connected Professionals".tr(),
+                  _buildContactsGrid(),
+                ),
                 const SizedBox(height: 100),
               ],
             ),
@@ -221,55 +250,77 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                "Contacts",
+                "Contacts".tr(),
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 32,
-                    ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const DirectMessagesScreen()),
-                  );
-                },
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    const Icon(LucideIcons.messageCircle, color: Colors.white, size: 28),
-                    if (_unreadCount > 0)
-                      Positioned(
-                        right: -2,
-                        top: -2,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.redAccent,
-                            shape: BoxShape.circle,
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 16,
-                            minHeight: 16,
-                          ),
-                          child: Text(
-                            "$_unreadCount",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                  ],
+                  fontWeight: FontWeight.w900,
+                  fontSize: 32,
                 ),
+              ),
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: _showExportOptions,
+                    child: const Icon(
+                      LucideIcons.download,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const DirectMessagesScreen(),
+                        ),
+                      );
+                    },
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(
+                          LucideIcons.messageCircle,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        if (_unreadCount > 0)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.redAccent,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Text(
+                                "$_unreadCount",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Text("Manage your profile and connections", style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            "Manage your profile and connections".tr(),
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
           const SizedBox(height: 16),
           GlassContainer(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -281,15 +332,75 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                   _searchQuery = val;
                 });
               },
-              decoration: const InputDecoration(
-                hintText: "Search connections...",
-                hintStyle: TextStyle(color: Colors.white38),
+              decoration: InputDecoration(
+                hintText: "Search connections...".tr(),
+                hintStyle: const TextStyle(color: Colors.white38),
                 border: InputBorder.none,
-                icon: Icon(LucideIcons.search, color: Colors.white38, size: 20),
+                icon: const Icon(LucideIcons.search, color: Colors.white38, size: 20),
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          _buildTagsList(),
         ],
+      ),
+    );
+  }
+
+  List<String> get _allTags {
+    final Set<String> tags = {};
+    for (var conn in _supabaseConnections) {
+      if (conn['tags'] != null && conn['tags'] is List) {
+        for (var t in conn['tags']) {
+          tags.add(t.toString());
+        }
+      }
+    }
+    return tags.toList()..sort();
+  }
+
+  Widget _buildTagsList() {
+    final tags = _allTags;
+    if (tags.isEmpty) return const SizedBox.shrink();
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          _buildTagChip("All".tr(), _selectedTag == null, () {
+            setState(() => _selectedTag = null);
+          }),
+          ...tags.map((tag) => _buildTagChip(tag, _selectedTag == tag, () {
+            setState(() => _selectedTag = tag);
+          })).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTagChip(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? EventzoneTheme.primaryAction : Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? EventzoneTheme.primaryAction : Colors.white12,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white70,
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
@@ -304,7 +415,11 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(title, style: Theme.of(context).textTheme.titleLarge),
-              const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white24),
+              const Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: Colors.white24,
+              ),
             ],
           ),
         ),
@@ -313,13 +428,13 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
     );
   }
 
-
-
   Widget _buildContactsGrid() {
     if (_isLoading) {
       return const Padding(
         padding: EdgeInsets.all(40.0),
-        child: Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction)),
+        child: Center(
+          child: CircularProgressIndicator(color: EventzoneTheme.primaryAction),
+        ),
       );
     }
 
@@ -327,13 +442,21 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
       final name = (c['name'] ?? '').toString().toLowerCase();
       final title = (c['title'] ?? '').toString().toLowerCase();
       final query = _searchQuery.toLowerCase();
-      return name.contains(query) || title.contains(query);
+      final matchesSearch = name.contains(query) || title.contains(query);
+      
+      final matchesTag = _selectedTag == null || 
+          (c['tags'] != null && (c['tags'] as List).map((e) => e.toString()).contains(_selectedTag));
+
+      return matchesSearch && matchesTag;
     }).toList();
 
     if (filteredConnections.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 12),
-        child: Text("No connections found matching search.", style: TextStyle(color: Colors.white24, fontSize: 13)),
+        child: Text(
+          "No connections found matching search.",
+          style: TextStyle(color: Colors.white24, fontSize: 13),
+        ),
       );
     }
 
@@ -347,117 +470,126 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
         itemBuilder: (context, index) {
           final connection = filteredConnections[index];
           final String name = connection['name'] ?? '';
-          final String title = connection['title'] ?? '';
+          final String rawTitle = connection['title'] ?? '';
+          final String title = rawTitle.replaceAll(' @', ' @');
           final String avatarUrl = connection['avatar_url'] ?? '';
           final String? source = connection['source'];
           final bool isNew = connection['is_new'] == true;
 
           return GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProfessionalProfileScreen(
-                    name: name,
-                    title: title,
-                    avatarUrl: avatarUrl,
-                    source: source,
-                    isNew: isNew ? 'true' : 'false',
-                    email: connection['email'],
-                    phone: connection['phone'],
-                    website: connection['website'],
-                    company: connection['company'],
-                    department: connection['department'],
-                    notes: connection['notes'],
-                    tags: connection['tags'] != null ? List<String>.from(connection['tags']) : null,
-                    address: connection['address'],
-                    connectionId: connection['id'],
-                    createdAt: connection['created_at'],
-                    targetUserId: connection['linked_profile_id'] ?? connection['target_user_id'],
-                  ),
-                ),
-              ).then((_) => _loadConnections());
-            },
-            child: GlassContainer(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 26,
-                    backgroundColor: Colors.white10,
-                    backgroundImage: getAvatarProvider(avatarUrl),
-                    child: getAvatarProvider(avatarUrl) == null
-                        ? const Icon(LucideIcons.user, size: 20, color: Colors.white54)
-                        : null,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ProfessionalProfileScreen(
+                        name: name,
+                        title: title,
+                        avatarUrl: avatarUrl,
+                        source: source,
+                        isNew: isNew ? 'true' : 'false',
+                        email: connection['email'],
+                        phone: connection['phone'],
+                        website: connection['website'],
+                        company: connection['company'],
+                        department: connection['department'],
+                        notes: connection['notes'],
+                        tags: connection['tags'] != null
+                            ? List<String>.from(connection['tags'])
+                            : null,
+                        address: connection['address'],
+                        connectionId: connection['id'],
+                        createdAt: connection['created_at'],
+                        targetUserId:
+                            connection['linked_profile_id'] ??
+                            connection['target_user_id'],
+                      ),
+                    ),
+                  ).then((_) => _loadConnections());
+                },
+                child: GlassContainer(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: Colors.white10,
+                        backgroundImage: getAvatarProvider(avatarUrl),
+                        child: getAvatarProvider(avatarUrl) == null
+                            ? const Icon(
+                                LucideIcons.user,
+                                size: 20,
+                                color: Colors.white54,
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              name,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
-                            ),
-                            if (isNew) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: EventzoneTheme.primaryAction.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: EventzoneTheme.primaryAction.withOpacity(0.4), width: 1),
-                                ),
-                                child: const Text(
-                                  "NEW",
-                                  style: TextStyle(
-                                    color: EventzoneTheme.primaryAction,
-                                    fontSize: 8,
+                            Row(
+                              children: [
+                                Text(
+                                  name,
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
+                                    fontSize: 15,
+                                    color: Colors.white,
                                   ),
                                 ),
+                                if (isNew) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: EventzoneTheme.primaryAction
+                                          .withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: EventzoneTheme.primaryAction
+                                            .withOpacity(0.4),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      "NEW",
+                                      style: TextStyle(
+                                        color: EventzoneTheme.primaryAction,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                color: Colors.white38,
+                                fontSize: 12,
                               ),
-                            ],
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          title,
-                          style: const TextStyle(color: Colors.white38, fontSize: 12),
-                        ),
-                        if (connection['tags'] != null && (connection['tags'] as List).isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: (connection['tags'] as List).take(3).map((tag) => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.white12, width: 0.5),
-                              ),
-                              child: Text(
-                                tag.toString(),
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            )).toList(),
-                          ),
-                        ],
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ).animate(delay: (index * 20).ms).fade(duration: 150.ms).slideY(begin: 0.1, end: 0, duration: 150.ms, curve: Curves.easeOutQuad);
+                ),
+              )
+              .animate(delay: (index * 20).ms)
+              .fade(duration: 150.ms)
+              .slideY(
+                begin: 0.1,
+                end: 0,
+                duration: 150.ms,
+                curve: Curves.easeOutQuad,
+              );
         },
       ),
     );

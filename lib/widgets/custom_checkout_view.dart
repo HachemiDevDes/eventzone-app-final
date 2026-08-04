@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart'; // ignore: depend_on_referenced_packages
 import 'package:chargily_pay/chargily_pay.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class CustomCheckoutView extends StatefulWidget {
   final Checkout checkout;
@@ -76,9 +77,9 @@ class _CustomCheckoutViewState extends State<CustomCheckoutView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Secure Payment"),
+        title: Text("Secure Payment".tr()),
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: Icon(Icons.close),
           onPressed: () {
             if (widget.onPaymentCancel != null) {
               widget.onPaymentCancel!();
@@ -92,7 +93,7 @@ class _CustomCheckoutViewState extends State<CustomCheckoutView> {
         children: [
           WebViewWidget(controller: _controller),
           if (_isLoading)
-            const Center(
+            Center(
               child: CircularProgressIndicator(),
             ),
         ],

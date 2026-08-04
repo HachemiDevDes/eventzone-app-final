@@ -1,10 +1,9 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
-import '../widgets/status_pill.dart';
-import '../models/session_model.dart';
 import '../providers/session_providers.dart';
 import 'schedule_screen.dart';
 import 'session_detail_screen.dart';
@@ -40,24 +39,24 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 72),
+              SizedBox(height: 72),
               
               // Header Title
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "MY HUB",
+                      "MY HUB".tr(),
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                             color: EventzoneTheme.primaryAction,
                             letterSpacing: 2,
                           ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text(
-                      "My Agenda",
+                      "My Agenda".tr(),
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.w900,
                             fontSize: 28,
@@ -69,7 +68,7 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
 
               // Tab Bar Selector
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
                 child: Container(
                   height: 48,
                   decoration: BoxDecoration(
@@ -86,10 +85,10 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
                     indicatorSize: TabBarIndicatorSize.tab,
                     labelColor: Colors.white,
                     unselectedLabelColor: Colors.white38,
-                    labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, ),
-                    unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, ),
+                    labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, ),
+                    unselectedLabelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, ),
                     dividerColor: Colors.transparent,
-                    padding: const EdgeInsets.all(4),
+                    padding: EdgeInsets.all(4),
                     tabs: const [
                       Tab(text: "Saved Sessions"),
                       Tab(text: "Meetings"),
@@ -104,7 +103,7 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
                   controller: _tabController,
                   children: [
                     _buildSessionsTab(),
-                    const MyMeetingsScreen(embedMode: true),
+                    MyMeetingsScreen(embedMode: true),
                   ],
                 ),
               ),
@@ -120,16 +119,16 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
     final favoritesAsync = ref.watch(sessionFavoritesProvider);
 
     return favoritesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction)),
-      error: (err, _) => Center(child: Text("Error: $err", style: const TextStyle(color: Colors.white38))),
+      loading: () => Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction)),
+      error: (err, _) => Center(child: Text("Error: $err", style: TextStyle(color: Colors.white38))),
       data: (favIds) {
         if (favIds.isEmpty) {
           return _buildSessionsEmptyState();
         }
 
         return sessionsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction)),
-          error: (err, _) => Center(child: Text("Error: $err", style: const TextStyle(color: Colors.white38))),
+          loading: () => Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction)),
+          error: (err, _) => Center(child: Text("Error: $err", style: TextStyle(color: Colors.white38))),
           data: (sessions) {
             // Filter sessions that are in favorites
             final favoritedSessions = sessions.where((s) => favIds.contains(s.id)).toList();
@@ -139,8 +138,8 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
             }
 
             return ListView.builder(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              physics: BouncingScrollPhysics(),
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               itemCount: favoritedSessions.length,
               itemBuilder: (context, index) {
                 final session = favoritedSessions[index];
@@ -148,7 +147,7 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
                 final dateStr = _formatDate(session.startTime);
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
+                  padding: EdgeInsets.only(bottom: 16),
                   child: GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -161,7 +160,7 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
                       });
                     },
                     child: GlassContainer(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.all(20),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -173,15 +172,15 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
                               children: [
                                 Text(
                                   startTimeStr,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: EventzoneTheme.primaryAction,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 12,
                                   ),
                                 ),
-                                const SizedBox(height: 6),
+                                SizedBox(height: 6),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withOpacity(0.05),
                                     borderRadius: BorderRadius.circular(4),
@@ -189,15 +188,15 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
                                   ),
                                   child: Text(
                                     session.date ?? "Day 1",
-                                    style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold),
+                                    style: TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: 12),
                           Container(width: 1, height: 64, color: Colors.white10),
-                          const SizedBox(width: 16),
+                          SizedBox(width: 16),
 
                           // Content
                           Expanded(
@@ -206,7 +205,7 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
                               children: [
                                 Text(
                                   session.title,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
                                     color: Colors.white,
@@ -215,14 +214,14 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 6),
+                                SizedBox(height: 6),
                                 Text(
                                   "$dateStr • ${session.location ?? 'TBA'}",
-                                  style: const TextStyle(fontSize: 12, color: Colors.white38),
+                                  style: TextStyle(fontSize: 12, color: Colors.white38),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 12),
+                                SizedBox(height: 12),
                                 Row(
                                   children: [
                                     if (session.speakers.isNotEmpty) ...[
@@ -232,25 +231,25 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
                                             ? NetworkImage(session.speakers.first.avatarUrl)
                                             : null,
                                         child: session.speakers.first.avatarUrl.isEmpty
-                                            ? const Icon(LucideIcons.user, size: 8, color: Colors.white)
+                                            ? Icon(LucideIcons.user, size: 8, color: Colors.white)
                                             : null,
                                       ),
-                                      const SizedBox(width: 8),
+                                      SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
                                           session.speakers.first.name,
-                                          style: const TextStyle(fontSize: 11, color: Colors.white70),
+                                          style: TextStyle(fontSize: 11, color: Colors.white70),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ] else
-                                      const Spacer(),
+                                      Spacer(),
                                     GestureDetector(
                                       onTap: () {
                                         ref.read(sessionFavoritesProvider.notifier).toggleFavorite(session.id);
                                       },
-                                      child: const Icon(
+                                      child: Icon(
                                         LucideIcons.bookmarkCheck,
                                         size: 20,
                                         color: EventzoneTheme.accentSuccess,
@@ -277,23 +276,23 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
   Widget _buildSessionsEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32.0),
+        padding: EdgeInsets.all(32.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(LucideIcons.bookmarkPlus, color: Colors.white24, size: 48),
-            const SizedBox(height: 16),
-            const Text(
-              "Your Agenda is Empty",
+            Icon(LucideIcons.bookmarkPlus, color: Colors.white24, size: 48),
+            SizedBox(height: 16),
+            Text(
+              "Your Agenda is Empty".tr(),
               style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "Browse the list of sessions and add them to your agenda to construct your summit schedule.",
+            SizedBox(height: 8),
+            Text(
+              "Browse the list of sessions and add them to your agenda to construct your summit schedule.".tr(),
               style: TextStyle(color: Colors.white38, fontSize: 12),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
             SizedBox(
               width: 180,
               height: 44,
@@ -319,7 +318,7 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
                   backgroundColor: EventzoneTheme.primaryAction,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text("Go to Hub", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Text("Go to Hub".tr(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
           ],

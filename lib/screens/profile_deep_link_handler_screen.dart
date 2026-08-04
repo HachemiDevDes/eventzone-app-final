@@ -70,13 +70,13 @@ class _ProfileDeepLinkHandlerScreenState extends State<ProfileDeepLinkHandlerScr
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: EventzoneTheme.darkTheme.scaffoldBackgroundColor,
+      backgroundColor: EventzoneTheme.backgroundEnd,
       body: Center(
         child: _isLoading
-            ? const CircularProgressIndicator()
+            ? CircularProgressIndicator()
             : Text(
                 _error ?? "Unknown error",
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: Colors.white),
               ),
       ),
     );

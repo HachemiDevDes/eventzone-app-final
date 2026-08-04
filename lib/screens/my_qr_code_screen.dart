@@ -6,7 +6,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import '../services/supabase_service.dart';
-
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/services.dart';
 class MyQRCodeScreen extends StatefulWidget {
   const MyQRCodeScreen({super.key});
 
@@ -73,7 +74,7 @@ class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
     // Unique data for the user
     final String userData = "https://profile.eventzone.pro/?id=$_userId";
     final subtitle = _companyName.isNotEmpty 
-        ? "$_jobTitle @ $_companyName"
+        ? "$_jobTitle @$_companyName"
         : _jobTitle;
 
     return Scaffold(
@@ -141,18 +142,28 @@ class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
                               ),
                             ),
                             const SizedBox(height: 32),
-                            const Text(
-                              "Scan to connect instantly",
-                              style: TextStyle(color: EventzoneTheme.primaryAction, fontWeight: FontWeight.bold),
+                            Text(
+                              "Scan to connect instantly".tr(),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: EventzoneTheme.primaryAction, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(height: 40),
                       OutlinedButton.icon(
-                        onPressed: () {},
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: userData));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text("Profile link copied to clipboard!".tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                              backgroundColor: EventzoneTheme.primaryAction,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
                         icon: const Icon(LucideIcons.share, size: 18),
-                        label: const Text("Share Pass"),
+                        label: Text("Share Pass".tr()),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white,
                           side: const BorderSide(color: Colors.white10),

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../theme/eventzone_theme.dart';
 import '../../../widgets/glass_container.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -36,7 +37,7 @@ class _AboutScreenState extends State<AboutScreen> {
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open link')),
+          SnackBar(content: Text('Could not open link'.tr())),
         );
       }
     }
@@ -50,16 +51,16 @@ class _AboutScreenState extends State<AboutScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
+          icon: Icon(LucideIcons.arrowLeft, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('About Eventzone', style: TextStyle(fontWeight: FontWeight.w600)),
+        title: Text('About Eventzone'.tr(), style: TextStyle(fontWeight: FontWeight.w600)),
         centerTitle: true,
       ),
       body: EventzoneTheme.buildPlayfulBackground(
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40),
+            padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 40),
             child: Column(
               children: [
                 Center(
@@ -82,54 +83,54 @@ class _AboutScreenState extends State<AboutScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Eventzone',
+                SizedBox(height: 24),
+                Text(
+                  'Eventzone'.tr(),
                   style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -1),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Where professionals connect',
+                SizedBox(height: 8),
+                Text(
+                  'Where professionals connect'.tr(),
                   style: TextStyle(color: EventzoneTheme.primaryAction, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 40),
+                SizedBox(height: 40),
                 GlassContainer(
-                  padding: const EdgeInsets.all(24),
+                  padding: EdgeInsets.all(24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        "Eventzone is a premium networking app built for professionals who mean business. Whether you're at a conference, a trade show, or an industry meetup — Eventzone turns every room you walk into an opportunity.",
+                      Text(
+                        "Eventzone is a premium networking app built for professionals who mean business. Whether you're at a conference, a trade show, or an industry meetup — Eventzone turns every room you walk into an opportunity.".tr(),
                         style: TextStyle(color: Colors.white70, fontSize: 15, height: 1.5),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 32),
-                      const Divider(color: Colors.white10),
-                      const SizedBox(height: 16),
-                      _buildInfoRow('Version', _version.isEmpty ? 'Loading...' : _version),
-                      const SizedBox(height: 12),
-                      _buildInfoRow('Company', 'SPASU Eventzone'),
-                      const SizedBox(height: 12),
-                      _buildInfoRow('Contact', 'contact@eventzone.pro'),
+                      SizedBox(height: 32),
+                      Divider(color: Colors.white10),
+                      SizedBox(height: 16),
+                      _buildInfoRow('Version'.tr(), _version.isEmpty ? 'Loading...'.tr() : _version),
+                      SizedBox(height: 12),
+                      _buildInfoRow('Company'.tr(), 'SPASU Eventzone'),
+                      SizedBox(height: 12),
+                      _buildInfoRow('Contact'.tr(), 'contact@eventzone.pro'),
                     ],
                   ),
                 ),
-                const SizedBox(height: 40),
+                SizedBox(height: 40),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     IconButton(
-                      icon: const FaIcon(FontAwesomeIcons.globe, color: Colors.white54),
+                      icon: FaIcon(FontAwesomeIcons.globe, color: Colors.white54),
                       onPressed: () => _launchUrl('https://landing.eventzone.pro/'),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     IconButton(
-                      icon: const FaIcon(FontAwesomeIcons.linkedinIn, color: Colors.white54),
+                      icon: FaIcon(FontAwesomeIcons.linkedinIn, color: Colors.white54),
                       onPressed: () => _launchUrl('https://dz.linkedin.com/company/spasu-eventzone'),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     IconButton(
-                      icon: const FaIcon(FontAwesomeIcons.instagram, color: Colors.white54),
+                      icon: FaIcon(FontAwesomeIcons.instagram, color: Colors.white54),
                       onPressed: () => _launchUrl('https://www.instagram.com/eventzone.pro/'),
                     ),
                   ],
@@ -146,8 +147,8 @@ class _AboutScreenState extends State<AboutScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 14)),
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+        Text(label, style: TextStyle(color: Colors.white54, fontSize: 14)),
+        Text(value, style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
       ],
     );
   }

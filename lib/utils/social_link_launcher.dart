@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 Future<void> launchSocialLink(BuildContext context, String platform, String value) async {
   if (value.trim().isEmpty) return;
@@ -106,7 +107,7 @@ Future<void> launchSocialLink(BuildContext context, String platform, String valu
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open this link')),
+          SnackBar(content: Text('Could not open this link'.tr())),
         );
       }
     }
@@ -114,8 +115,8 @@ Future<void> launchSocialLink(BuildContext context, String platform, String valu
     debugPrint('Could not launch $urlString: $e');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open this link. Check the address and try again.'),
+        SnackBar(
+          content: Text('Could not open this link. Check the address and try again.'.tr()),
         ),
       );
     }

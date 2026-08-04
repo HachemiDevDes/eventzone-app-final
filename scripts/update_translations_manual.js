@@ -1,0 +1,126 @@
+const fs = require('fs');
+const files = ['en.json', 'fr.json', 'ar.json'];
+
+const english = {
+  '1 Month': '1 Month',
+  '6 Months': '6 Months',
+  '12 Months': '12 Months',
+  'Basic': 'Basic',
+  'Popular': 'Popular',
+  'Premium': 'Premium',
+  '1 MONTH FREE': '1 MONTH FREE',
+  '2 MONTHS FREE': '2 MONTHS FREE',
+  'FREE TRIAL ACTIVE': 'FREE TRIAL ACTIVE',
+  'SUBSCRIPTION ACTIVE': 'SUBSCRIPTION ACTIVE',
+  'SUBSCRIPTION EXPIRED': 'SUBSCRIPTION EXPIRED',
+  'DZD': 'DZD',
+  'Morning': 'Morning',
+  'Afternoon': 'Afternoon',
+  'Evening': 'Evening',
+  'Night': 'Night',
+  'General Inquiry': 'General Inquiry',
+  'Bug Report': 'Bug Report',
+  'Partnership': 'Partnership',
+  'Other': 'Other',
+  'Version': 'Version',
+  'Company': 'Company',
+  'Contact': 'Contact',
+  'Eventzone': 'Eventzone',
+  'Loading...': 'Loading...',
+  'How do I connect with someone?': 'How do I connect with someone?',
+  'Simply tap the "Scan" button on the home screen to scan their QR code, or share your own QR code for them to scan. Once scanned, you can review their profile and accept the connection.': 'Simply tap the "Scan" button on the home screen to scan their QR code, or share your own QR code for them to scan. Once scanned, you can review their profile and accept the connection.',
+  'How does the subscription work?': 'How does the subscription work?',
+  'A subscription allows you to continuously accept new connections and scan badges. You get a 15-day free trial, after which you can purchase a plan in the Settings.': 'A subscription allows you to continuously accept new connections and scan badges. You get a 15-day free trial, after which you can purchase a plan in the Settings.',
+  'How do I export my contacts?': 'How do I export my contacts?',
+  'Go to the "My Network" tab and tap the export icon at the top right. You can export your connections as a CSV file to your device.': 'Go to the "My Network" tab and tap the export icon at the top right. You can export your connections as a CSV file to your device.',
+  'Can I delete my account?': 'Can I delete my account?',
+  'Yes. Please contact our support team to request full account deletion and data removal according to our privacy policy.': 'Yes. Please contact our support team to request full account deletion and data removal according to our privacy policy.',
+  'How do I report a user?': 'How do I report a user?',
+  'If you experience inappropriate behavior, tap the three dots on the user\'s profile and select "Report". Our team will review the report within 24 hours.': 'If you experience inappropriate behavior, tap the three dots on the user\'s profile and select "Report". Our team will review the report within 24 hours.'
+};
+
+const french = {
+  '1 Month': '1 Mois',
+  '6 Months': '6 Mois',
+  '12 Months': '12 Mois',
+  'Basic': 'Basique',
+  'Popular': 'Populaire',
+  'Premium': 'Premium',
+  '1 MONTH FREE': '1 MOIS GRATUIT',
+  '2 MONTHS FREE': '2 MOIS GRATUITS',
+  'FREE TRIAL ACTIVE': 'ESSAI GRATUIT ACTIF',
+  'SUBSCRIPTION ACTIVE': 'ABONNEMENT ACTIF',
+  'SUBSCRIPTION EXPIRED': 'ABONNEMENT EXPIRÉ',
+  'DZD': 'DZD',
+  'Morning': 'Matin',
+  'Afternoon': 'Après-midi',
+  'Evening': 'Soir',
+  'Night': 'Nuit',
+  'General Inquiry': 'Demande Générale',
+  'Bug Report': 'Signaler un Bug',
+  'Partnership': 'Partenariat',
+  'Other': 'Autre',
+  'Version': 'Version',
+  'Company': 'Entreprise',
+  'Contact': 'Contact',
+  'Eventzone': 'Eventzone',
+  'Loading...': 'Chargement...',
+  'How do I connect with someone?': 'Comment me connecter avec quelqu\'un ?',
+  'Simply tap the "Scan" button on the home screen to scan their QR code, or share your own QR code for them to scan. Once scanned, you can review their profile and accept the connection.': 'Appuyez simplement sur le bouton "Scanner" sur l\'écran d\'accueil pour scanner leur code QR, ou partagez votre propre code QR. Une fois scanné, vous pouvez consulter leur profil et accepter la connexion.',
+  'How does the subscription work?': 'Comment fonctionne l\'abonnement ?',
+  'A subscription allows you to continuously accept new connections and scan badges. You get a 15-day free trial, after which you can purchase a plan in the Settings.': 'Un abonnement vous permet d\'accepter continuellement de nouvelles connexions et de scanner des badges. Vous bénéficiez de 15 jours d\'essai gratuit, après quoi vous pouvez acheter un plan.',
+  'How do I export my contacts?': 'Comment exporter mes contacts ?',
+  'Go to the "My Network" tab and tap the export icon at the top right. You can export your connections as a CSV file to your device.': 'Allez dans l\'onglet "Mon Réseau" et appuyez sur l\'icône d\'exportation en haut à droite. Vous pouvez exporter vos connexions dans un fichier CSV.',
+  'Can I delete my account?': 'Puis-je supprimer mon compte ?',
+  'Yes. Please contact our support team to request full account deletion and data removal according to our privacy policy.': 'Oui. Veuillez contacter notre équipe d\'assistance pour demander la suppression de votre compte et de vos données.',
+  'How do I report a user?': 'Comment signaler un utilisateur ?',
+  'If you experience inappropriate behavior, tap the three dots on the user\'s profile and select "Report". Our team will review the report within 24 hours.': 'En cas de comportement inapproprié, appuyez sur les trois points sur le profil de l\'utilisateur et sélectionnez "Signaler". Notre équipe examinera le signalement sous 24h.'
+};
+
+const arabic = {
+  '1 Month': 'شهر واحد',
+  '6 Months': '6 أشهر',
+  '12 Months': '12 شهرًا',
+  'Basic': 'أساسي',
+  'Popular': 'شائع',
+  'Premium': 'مميز',
+  '1 MONTH FREE': 'شهر مجاني',
+  '2 MONTHS FREE': 'شهران مجانًا',
+  'FREE TRIAL ACTIVE': 'نسخة تجريبية نشطة',
+  'SUBSCRIPTION ACTIVE': 'الاشتراك نشط',
+  'SUBSCRIPTION EXPIRED': 'انتهت صلاحية الاشتراك',
+  'DZD': 'د.ج',
+  'Morning': 'الصباح',
+  'Afternoon': 'بعد الظهر',
+  'Evening': 'المساء',
+  'Night': 'الليل',
+  'General Inquiry': 'استفسار عام',
+  'Bug Report': 'الإبلاغ عن خطأ',
+  'Partnership': 'شراكة',
+  'Other': 'أخرى',
+  'Version': 'الإصدار',
+  'Company': 'الشركة',
+  'Contact': 'اتصال',
+  'Eventzone': 'Eventzone',
+  'Loading...': 'جارٍ التحميل...',
+  'How do I connect with someone?': 'كيف أتواصل مع شخص ما؟',
+  'Simply tap the "Scan" button on the home screen to scan their QR code, or share your own QR code for them to scan. Once scanned, you can review their profile and accept the connection.': 'ما عليك سوى الضغط على زر "مسح" في الشاشة الرئيسية لمسح رمز الاستجابة السريعة (QR) الخاص بهم، أو مشاركة الرمز الخاص بك. بمجرد المسح، يمكنك مراجعة ملفهم الشخصي وقبول الاتصال.',
+  'How does the subscription work?': 'كيف يعمل الاشتراك؟',
+  'A subscription allows you to continuously accept new connections and scan badges. You get a 15-day free trial, after which you can purchase a plan in the Settings.': 'يتيح لك الاشتراك قبول اتصالات جديدة ومسح الشارات بشكل مستمر. تحصل على 15 يومًا مجانيًا، وبعد ذلك يمكنك شراء خطة من الإعدادات.',
+  'How do I export my contacts?': 'كيف أقوم بتصدير جهات الاتصال الخاصة بي؟',
+  'Go to the "My Network" tab and tap the export icon at the top right. You can export your connections as a CSV file to your device.': 'انتقل إلى علامة التبويب "شبكتي" واضغط على أيقونة التصدير في أعلى اليمين. يمكنك تصدير اتصالاتك كملف CSV.',
+  'Can I delete my account?': 'هل يمكنني حذف حسابي؟',
+  'Yes. Please contact our support team to request full account deletion and data removal according to our privacy policy.': 'نعم. يرجى الاتصال بفريق الدعم لدينا لطلب حذف الحساب بالكامل وإزالة البيانات.',
+  'How do I report a user?': 'كيف أبلغ عن مستخدم؟',
+  'If you experience inappropriate behavior, tap the three dots on the user\'s profile and select "Report". Our team will review the report within 24 hours.': 'إذا واجهت سلوكًا غير لائق، فاضغط على النقاط الثلاث في الملف الشخصي للمستخدم وحدد "إبلاغ". سيقوم فريقنا بمراجعة التقرير في غضون 24 ساعة.'
+};
+
+const updates = { en: english, fr: french, ar: arabic };
+
+files.forEach(file => {
+  const lang = file.split('.')[0];
+  const path = 'assets/translations/' + file;
+  let data = JSON.parse(fs.readFileSync(path));
+  data = { ...data, ...updates[lang] };
+  fs.writeFileSync(path, JSON.stringify(data, null, 2));
+});

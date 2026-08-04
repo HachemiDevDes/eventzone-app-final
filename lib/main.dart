@@ -6,8 +6,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_displaymode/flutter_displaymode.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'theme/eventzone_theme.dart';
 import 'screens/discovery_screen.dart';
+import 'screens/events_screen.dart';
 import 'screens/event_dashboard.dart';
 import 'screens/networking_screen.dart';
 import 'screens/map_screen.dart';
@@ -20,11 +25,11 @@ import 'screens/my_agenda_screen.dart';
 import 'screens/event_connections_screen.dart';
 import 'models/event_model.dart';
 import 'widgets/qr_action_sheet.dart';
+import 'widgets/subscription_expired_bottom_sheet.dart';
 import 'screens/my_qr_code_screen.dart';
 import 'screens/scan_qr_screen.dart';
 import 'services/supabase_service.dart';
 import 'services/notification_service.dart';
-import 'screens/edit_profile_screen.dart';
 import 'screens/settings_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'screens/splash_screen.dart';
@@ -37,14 +42,15 @@ import 'dart:async';
 import 'screens/profile_deep_link_handler_screen.dart';
 import 'services/deep_link_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'providers/settings_providers.dart';
 import 'screens/settings/language_screen.dart';
 import 'screens/settings/subscription_screen.dart';
+import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/settings/about_screen.dart';
 import 'screens/settings/contact_screen.dart';
 import 'screens/settings/support_screen.dart';
 import 'screens/settings/terms_screen.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -54,9 +60,65 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint("Handling a background message: ${message.messageId}");
 }
 
-Future<void> main() async {
+// Holds futures started before runApp() — init runs in parallel with Flutter engine
+late final Future<List<Object?>> _appInitFuture;
+
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  if (kReleaseMode) {
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
+
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    bool isNetworkError = details.exceptionAsString().toLowerCase().contains('socketexception') ||
+                          details.exceptionAsString().toLowerCase().contains('clientexception') ||
+                          details.exceptionAsString().toLowerCase().contains('failed host lookup');
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F121E),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(isNetworkError ? Icons.wifi_off : Icons.error_outline, color: Colors.white54, size: 80),
+              const SizedBox(height: 24),
+              Text(
+                isNetworkError ? "No Internet Connection" : "Oops, something went wrong!",
+                style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                isNetworkError
+                  ? "Please connect to the internet to use Eventzone."
+                  : "We encountered an unexpected error. Please try again.",
+                style: const TextStyle(color: Colors.white70, fontSize: 16),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
+  // 🚀 Kick off ALL inits BEFORE runApp() — they run in parallel with Flutter engine startup
+  // By the time the first widget frame is built, these are already done or near-done.
+  _appInitFuture = Future.wait([
+    EasyLocalization.ensureInitialized(),   // parse translation JSON files
+    Supabase.initialize(                     // set up Supabase client + restore session
+      url: 'https://awkreadldqmidcrrqukm.supabase.co',
+      publishableKey: 'sb_publishable_MluMrwkWs5-YedITa6ggNw_imK2nv8z',
+    ),
+    SharedPreferences.getInstance(),         // read cached prefs from disk
+  ]);
+
+  // Fire-and-forget background tasks
+  if (Platform.isAndroid) {
+    FlutterDisplayMode.setHighRefreshRate().catchError((_) {});
+  }
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarDividerColor: Colors.transparent,
@@ -64,39 +126,65 @@ Future<void> main() async {
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  
-  await Supabase.initialize(
-    url: 'https://awkreadldqmidcrrqukm.supabase.co',
-    publishableKey: 'sb_publishable_MluMrwkWs5-YedITa6ggNw_imK2nv8z',
-  );
-
-  try {
-    await Firebase.initializeApp();
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  Firebase.initializeApp().then((_) {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  } catch (e) {
-    debugPrint("Firebase not configured: $e");
-  }
-  await NotificationService().initialize();
-  await NotificationService().scheduleDailyStreakNotifications();
+  }).catchError((e) => debugPrint("Firebase not configured: $e"));
+  NotificationService().initialize().then((_) {
+    NotificationService().scheduleDailyStreakNotifications();
+  });
 
-  // Initialize DeepLinkService for deferred deep links
-  DeepLinkService().onProfileIdFound = (profileId) {
-    if (rootNavigatorKey.currentContext != null) {
-      rootNavigatorKey.currentContext!.go('/profile?id=$profileId');
-    }
-  };
-  DeepLinkService().initialize();
-
-  final prefs = await SharedPreferences.getInstance();
-
-  runApp(ProviderScope(
-    overrides: [
-      sharedPreferencesProvider.overrideWithValue(prefs),
-    ],
-    child: const EventzoneApp(),
-  ));
+  // runApp() immediately — the app renders its first frame while inits are in flight
+  runApp(const AppBootstrap());
 }
+
+class AppBootstrap extends StatelessWidget {
+  const AppBootstrap({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Object?>>(
+      future: _appInitFuture,
+      builder: (context, snapshot) {
+        // While futures are in flight, show a seamless dark screen
+        // (matches Android launch background — user sees no transition)
+        if (!snapshot.hasData) {
+          return const MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              backgroundColor: Color(0xFF0F121E),
+              body: SizedBox.expand(),
+            ),
+          );
+        }
+
+        final prefs = snapshot.data![2] as SharedPreferences;
+
+        // Setup deep links once ready
+        DeepLinkService().onProfileIdFound = (profileId) {
+          if (rootNavigatorKey.currentContext != null) {
+            rootNavigatorKey.currentContext!.go('/profile?id=$profileId');
+          }
+        };
+        DeepLinkService().initialize();
+
+        return ProviderScope(
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(prefs),
+          ],
+          child: EasyLocalization(
+            supportedLocales: const [Locale('en'), Locale('fr'), Locale('ar')],
+            path: 'assets/translations',
+            fallbackLocale: const Locale('en'),
+            child: EventzoneApp(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+
 
 final routerProvider = Provider<GoRouter>((ref) {
   final refreshNotifier = GoRouterRefreshNotifier(ref);
@@ -107,30 +195,35 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     refreshListenable: refreshNotifier,
     redirect: (context, state) {
-      final user = ref.read(authStateProvider).value;
-      final onboardingCompleted = ref.read(onboardingStatusProvider);
+      final user = Supabase.instance.client.auth.currentUser;
       final isLoggedIn = user != null;
       final matchedLocation = state.matchedLocation;
-
-      // Allow Splash screen to run its course
-      if (matchedLocation == '/') return null;
 
       final isGoingToAuth = matchedLocation == '/welcome' ||
           matchedLocation == '/signin' ||
           matchedLocation == '/signup';
 
-      // Check if profile data is still loading
-      final profileAsync = ref.read(currentUserProvider);
-      final isProfileLoading = profileAsync.isLoading;
-
       if (!isLoggedIn) {
         return isGoingToAuth ? null : '/welcome';
       }
 
-      // If logged in and profile is still loading, wait on splash screen
-      if (isLoggedIn && isProfileLoading) {
-        return matchedLocation == '/' ? null : '/';
+      // Check if profile data is still loading
+      final profileAsync = ref.read(currentUserProvider);
+      final isProfileLoading = profileAsync.isLoading;
+
+      if (matchedLocation == '/') {
+        if (isProfileLoading) return null; // Wait briefly while loading
+        final onboardingCompleted = ref.read(onboardingStatusProvider);
+        return onboardingCompleted ? '/home' : '/onboarding';
       }
+
+      // While profile is loading, do NOT redirect the user anywhere else
+      if (isLoggedIn && isProfileLoading) {
+        return null;
+      }
+
+      // Now profile has loaded — read onboarding status
+      final onboardingCompleted = ref.read(onboardingStatusProvider);
 
       // If logged in but not onboarded, redirect to onboarding
       if (isLoggedIn && !onboardingCompleted) {
@@ -149,79 +242,93 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const SplashScreen(),
+        builder: (context, state) => Scaffold(
+          backgroundColor: const Color(0xFF0F121E),
+          body: const Center(
+            child: CircularProgressIndicator(color: Color(0xFF7c3aed)),
+          ),
+        ),
       ),
       GoRoute(
         path: '/welcome',
-        builder: (context, state) => const WelcomeScreen(),
+        builder: (context, state) => WelcomeScreen(),
       ),
       GoRoute(
         path: '/signin',
-        builder: (context, state) => const EmailSignInScreen(),
+        builder: (context, state) => EmailSignInScreen(),
       ),
       GoRoute(
         path: '/signup',
-        builder: (context, state) => const EmailSignUpScreen(),
+        builder: (context, state) => EmailSignUpScreen(),
       ),
       GoRoute(
         path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        builder: (context, state) => OnboardingScreen(),
       ),
       GoRoute(
         path: '/home',
-        builder: (context, state) => const MainNavigationHolder(),
+        builder: (context, state) => MainNavigationHolder(),
       ),
       GoRoute(
         path: '/settings/language',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const LanguageScreen(),
+          child: LanguageScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(animation), child: child);
+            return SlideTransition(position: Tween<Offset>(begin: Offset(1, 0), end: Offset.zero).animate(animation), child: child);
           },
         ),
       ),
       GoRoute(
         path: '/settings/subscription',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const SubscriptionScreen(),
+          child: SubscriptionScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(animation), child: child);
+            return SlideTransition(position: Tween<Offset>(begin: Offset(1, 0), end: Offset.zero).animate(animation), child: child);
+          },
+        ),
+      ),
+      GoRoute(
+        path: '/settings/admin',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          child: AdminDashboardScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(position: Tween<Offset>(begin: Offset(1, 0), end: Offset.zero).animate(animation), child: child);
           },
         ),
       ),
       GoRoute(
         path: '/settings/about',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const AboutScreen(),
+          child: AboutScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(animation), child: child);
+            return SlideTransition(position: Tween<Offset>(begin: Offset(1, 0), end: Offset.zero).animate(animation), child: child);
           },
         ),
       ),
       GoRoute(
         path: '/settings/contact',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const ContactScreen(),
+          child: ContactScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(animation), child: child);
+            return SlideTransition(position: Tween<Offset>(begin: Offset(1, 0), end: Offset.zero).animate(animation), child: child);
           },
         ),
       ),
       GoRoute(
         path: '/settings/support',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const SupportScreen(),
+          child: SupportScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(animation), child: child);
+            return SlideTransition(position: Tween<Offset>(begin: Offset(1, 0), end: Offset.zero).animate(animation), child: child);
           },
         ),
       ),
       GoRoute(
         path: '/settings/terms',
         pageBuilder: (context, state) => CustomTransitionPage(
-          child: const TermsScreen(),
+          child: TermsScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(animation), child: child);
+            return SlideTransition(position: Tween<Offset>(begin: Offset(1, 0), end: Offset.zero).animate(animation), child: child);
           },
         ),
       ),
@@ -245,7 +352,7 @@ class GoRouterRefreshNotifier extends ChangeNotifier {
 
     // Listen to profile state changes to trigger GoRouter redirection logic
     // This ensures we always re-evaluate when the profile finishes loading
-    ref.listen(currentUserProvider, (_, __) {
+    ref.listen(currentUserProvider, (_, _) {
       notifyListeners();
     });
   }
@@ -263,38 +370,29 @@ class EventzoneApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
-    final locale = ref.watch(languageProvider);
 
     return MaterialApp.router(
       title: 'Eventzone Attendee',
       debugShowCheckedModeBanner: false,
-      theme: EventzoneTheme.darkTheme,
+      theme: EventzoneTheme.getTheme(context.locale.languageCode),
       routerConfig: router,
-      locale: locale,
-      supportedLocales: const [
-        Locale('en', ''),
-        Locale('fr', ''),
-        Locale('ar', ''),
-      ],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
+      locale: context.locale,
+      supportedLocales: context.supportedLocales,
+      localizationsDelegates: context.localizationDelegates,
     );
   }
 }
 
 enum AppViewMode { global, event }
 
-class MainNavigationHolder extends StatefulWidget {
+class MainNavigationHolder extends ConsumerStatefulWidget {
   const MainNavigationHolder({super.key});
 
   @override
-  State<MainNavigationHolder> createState() => _MainNavigationHolderState();
+  ConsumerState<MainNavigationHolder> createState() => _MainNavigationHolderState();
 }
 
-class _MainNavigationHolderState extends State<MainNavigationHolder> {
+class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
   int _globalIndex = 0;
   int _eventIndex = 0;
   AppViewMode _currentMode = AppViewMode.global;
@@ -354,8 +452,8 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Failed to register. Please try again."),
+          SnackBar(
+            content: Text("Failed to register. Please try again.".tr()),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
           ),
@@ -389,14 +487,19 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => const QRActionSheet(),
+      builder: (context) => QRActionSheet(),
     );
     
     if (action != null && mounted) {
       if (action == 'my_qr') {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const MyQRCodeScreen()));
+        Navigator.push(context, MaterialPageRoute(builder: (context) => MyQRCodeScreen()));
       } else if (action == 'scan') {
-        Navigator.push(context, MaterialPageRoute(builder: (context) => const ScanQRScreen()));
+        final subStatus = ref.read(subscriptionStatusProvider).valueOrNull;
+        if (subStatus != null && !subStatus.isActive) {
+          SubscriptionExpiredBottomSheet.show(context);
+          return;
+        }
+        Navigator.push(context, MaterialPageRoute(builder: (context) => ScanQRScreen()));
       }
     }
   }
@@ -406,20 +509,17 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
     return Scaffold(
       backgroundColor: EventzoneTheme.backgroundStart,
       body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
+        duration: Duration(milliseconds: 300),
         child: _currentMode == AppViewMode.global 
           ? _buildGlobalView() 
           : _buildEventView(),
       ),
       bottomNavigationBar: _buildBottomBar(),
+      floatingActionButton: _buildBarScanButton(),
     );
   }
 
   Widget _buildGlobalView() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction));
-    }
-
     return FadeIndexedStack(
       index: _globalIndex,
       children: [
@@ -428,15 +528,21 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
           onAccessEvent: _onAccessEvent,
           events: _allEvents,
         ),
-        const LeaderboardAnalyticsScreen(),
-        const MyNetworkScreen(),
-        const SettingsScreen(),
+        EventsScreen(
+          events: _allEvents,
+          isLoading: _isLoading,
+          onEventJoined: _onRegisterEvent,
+          onAccessEvent: _onAccessEvent,
+        ),
+        LeaderboardAnalyticsScreen(),
+        MyNetworkScreen(),
+        SettingsScreen(),
       ],
     );
   }
 
   Widget _buildEventView() {
-    if (_activeEvent == null) return const SizedBox.shrink();
+    if (_activeEvent == null) return SizedBox.shrink();
     
     final isAtDashboard = _eventIndex == 0;
     
@@ -457,7 +563,7 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
                   left: 16,
                   right: 16,
                 ),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: Color(0xCC060913), // Semitransparent deep navy matching theme
                   border: Border(bottom: BorderSide(color: Colors.white12, width: 0.5)),
                 ),
@@ -472,16 +578,16 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
                               });
                             },
                       child: Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: Colors.white10,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.white10),
                         ),
-                        child: const Icon(LucideIcons.chevronLeft, color: Colors.white, size: 18),
+                        child: Icon(LucideIcons.chevronLeft, color: Colors.white, size: 18),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -489,7 +595,7 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
                         children: [
                           Text(
                             _activeEvent!.title.toUpperCase(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               
                               color: Colors.white,
                               fontSize: 14,
@@ -499,21 +605,21 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 2),
+                          SizedBox(height: 2),
                           Row(
                             children: [
                               Container(
                                 width: 6,
                                 height: 6,
-                                decoration: const BoxDecoration(
+                                decoration: BoxDecoration(
                                   color: Color(0xFF1A73E8), // Electric blue accent
                                   shape: BoxShape.circle,
                                 ),
                               ),
-                              const SizedBox(width: 6),
+                              SizedBox(width: 6),
                               Text(
                                 isAtDashboard ? "Event Dashboard" : _getEventHubTabTitle(_eventIndex),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: Colors.white54,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w500,
@@ -536,16 +642,16 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
 
   String _getEventHubTabTitle(int index) {
     switch (index) {
-      case 0: return "Dashboard";
-      case 1: return "My Agenda";
-      case 2: return "Attendee Networking";
-      case 3: return "Event Map";
-      case 4: return "Speakers";
-      case 5: return "Exhibitors";
-      case 6: return "Sponsors";
-      case 7: return "Sessions";
-      case 8: return "Connections";
-      default: return "Event Hub";
+      case 0: return "Dashboard".tr();
+      case 1: return "My Agenda".tr();
+      case 2: return "Attendee Networking".tr();
+      case 3: return "Event Map".tr();
+      case 4: return "Speakers".tr();
+      case 5: return "Exhibitors".tr();
+      case 6: return "Sponsors".tr();
+      case 7: return "Sessions".tr();
+      case 8: return "Connections".tr();
+      default: return "Event Hub".tr();
     }
   }
 
@@ -554,10 +660,10 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
       case 0: return EventDashboard(event: _activeEvent!, onNavigate: _navigateToEventIndex);
       case 1: return MyAgendaScreen(eventId: _activeEvent!.id);
       case 2: return NetworkingScreen(eventId: _activeEvent!.id);
-      case 3: return const MapScreen();
-      case 4: return const EventSpeakersScreen();
-      case 5: return const EventPartnersScreen(type: "Exhibitors");
-      case 6: return const EventPartnersScreen(type: "Sponsors");
+      case 3: return MapScreen();
+      case 4: return EventSpeakersScreen();
+      case 5: return EventPartnersScreen(type: "Exhibitors");
+      case 6: return EventPartnersScreen(type: "Sponsors");
       case 7: return EventSessionsScreen(eventId: _activeEvent!.id);
       case 8: return EventConnectionsScreen(eventId: _activeEvent!.id);
       default: return EventDashboard(event: _activeEvent!, onNavigate: _navigateToEventIndex);
@@ -566,7 +672,7 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
 
   Widget _buildBottomBar() {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: EventzoneTheme.backgroundEnd,
         border: Border(top: BorderSide(color: Colors.white12, width: 0.5)),
       ),
@@ -580,18 +686,17 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: _currentMode == AppViewMode.global 
             ? [
-                _buildNavItem(LucideIcons.home, "Home", 0, true),
-                _buildNavItem(LucideIcons.trophy, "Leaderboard", 1, true),
-                _buildBarScanButton(),
-                _buildNavItem(LucideIcons.users, "Contacts", 2, true),
-                _buildNavItem(LucideIcons.settings, "Settings", 3, true),
+                _buildNavItem(LucideIcons.home, "Home".tr(), 0, true),
+                _buildNavItem(LucideIcons.calendar, "Events".tr(), 1, true),
+                _buildNavItem(LucideIcons.trophy, "Leaderboard".tr(), 2, true),
+                _buildNavItem(LucideIcons.users, "Contacts".tr(), 3, true),
+                _buildNavItem(LucideIcons.settings, "Settings".tr(), 4, true),
               ]
             : [
-                _buildNavItem(LucideIcons.layoutDashboard, "Hub", 0, false),
-                _buildNavItem(LucideIcons.calendarCheck, "My Agenda", 1, false),
-                _buildBarScanButton(),
-                _buildNavItem(LucideIcons.users, "Connections", 8, false),
-                _buildNavItem(LucideIcons.map, "Map", 3, false),
+                _buildNavItem(LucideIcons.layoutDashboard, "Hub".tr(), 0, false),
+                _buildNavItem(LucideIcons.calendarCheck, "My Agenda".tr(), 1, false),
+                _buildNavItem(LucideIcons.users, "Connections".tr(), 8, false),
+                _buildNavItem(LucideIcons.map, "Map".tr(), 3, false),
               ],
         ),
       ),
@@ -599,28 +704,32 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
   }
 
   Widget _buildBarScanButton() {
-    return Transform.translate(
-      offset: const Offset(0, -8),
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          _showQRMenu();
-        },
-        child: Container(
-          width: 52,
-          height: 52,
-          decoration: const BoxDecoration(
-            color: EventzoneTheme.primaryAction,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black38,
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: const Icon(LucideIcons.scan, color: Colors.white, size: 24),
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        final subStatus = ref.read(subscriptionStatusProvider).valueOrNull;
+        if (subStatus != null && !subStatus.isActive) {
+          SubscriptionExpiredBottomSheet.show(context);
+          return;
+        }
+        Navigator.push(context, MaterialPageRoute(builder: (context) => ScanQRScreen()));
+      },
+      child: Container(
+        width: 64,
+        height: 64,
+        margin: const EdgeInsets.only(bottom: 4),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            SvgPicture.asset(
+              'assets/images/scan_button_bg.svg',
+              width: 64,
+              height: 64,
+              fit: BoxFit.contain,
+              colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+            ),
+            Icon(Icons.crop_free_rounded, color: EventzoneTheme.primaryAction, size: 28),
+          ],
         ),
       ),
     );
@@ -649,7 +758,7 @@ class _MainNavigationHolderState extends State<MainNavigationHolder> {
               color: isSelected ? EventzoneTheme.primaryAction : Colors.white38,
               size: 20,
             ),
-            const SizedBox(height: 2),
+            SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(

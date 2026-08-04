@@ -1,23 +1,157 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../widgets/status_pill.dart';
 import '../models/event_model.dart';
-import '../models/meeting_model.dart';
 import '../providers/session_providers.dart';
 import 'schedule_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/shake_providers.dart';
+import '../widgets/shake_search_overlay.dart';
 
-class EventDashboard extends ConsumerWidget {
+class EventDashboard extends ConsumerStatefulWidget {
   final EventModel event;
   final Function(int) onNavigate;
 
   const EventDashboard({super.key, required this.event, required this.onNavigate});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EventDashboard> createState() => _EventDashboardState();
+}
+
+class _EventDashboardState extends ConsumerState<EventDashboard> with WidgetsBindingObserver {
+
+  // Direct accelerometer subscription
+  StreamSubscription<AccelerometerEvent>? _accelSub;
+  final List<DateTime> _shakeTimestamps = [];
+  bool _isDebouncing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkTooltip();
+    _startShakeListener();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      final sessionState = ref.read(shakeSessionProvider).value;
+      if (sessionState != null && sessionState.status == ShakeStatus.searching) {
+        ref.read(shakeSessionProvider.notifier).forceReset();
+      }
+    }
+  }
+
+  void _startShakeListener() {
+    debugPrint('[ShakeToConnect] Starting accelerometer listener...');
+    _accelSub = accelerometerEventStream(
+      samplingPeriod: const Duration(milliseconds: 50),
+    ).listen(
+      (AccelerometerEvent event) {
+        if (_isDebouncing) return;
+
+        // accelerometerEventStream includes gravity (~9.8 m/s²).
+        // Compute total magnitude and subtract gravity to get shake force.
+        final double magnitude =
+            sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
+        final double shakeMagnitude = (magnitude - 9.8).abs();
+
+        // Threshold lowered to 5.5 for Samsung OneUI compatibility
+        if (shakeMagnitude > 5.5) {
+          final now = DateTime.now();
+          _shakeTimestamps.add(now);
+          _shakeTimestamps.removeWhere(
+              (t) => now.difference(t).inMilliseconds > 1000);
+
+          debugPrint(
+              '[ShakeToConnect] Shake hit! magnitude=$shakeMagnitude, '
+              'count=${_shakeTimestamps.length}/2');
+
+          if (_shakeTimestamps.length >= 2) {
+            _shakeTimestamps.clear();
+            _isDebouncing = true;
+            debugPrint('[ShakeToConnect] ✅ SHAKE DETECTED — triggering session');
+            HapticFeedback.heavyImpact();
+            _triggerShakeSession();
+            Future.delayed(const Duration(seconds: 5), () {
+              if (mounted) _isDebouncing = false;
+            });
+          }
+        }
+      },
+      onError: (error) {
+        debugPrint('[ShakeToConnect] ❌ Accelerometer error: $error');
+      },
+    );
+    debugPrint('[ShakeToConnect] Accelerometer listener started.');
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _accelSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkTooltip() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('shake_tooltip_shown') != true) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("💡 Shake your phone to connect with someone nearby"),
+            duration: const Duration(seconds: 10),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Dismiss',
+              onPressed: () {},
+            ),
+          ),
+        );
+        await prefs.setBool('shake_tooltip_shown', true);
+      }
+    }
+  }
+
+  void _triggerShakeSession() {
+    if (!mounted) return;
+    
+    final state = ref.read(shakeSessionProvider).value;
+    
+    if (state != null && (state.status == ShakeStatus.searching || state.status == ShakeStatus.matched)) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Searching for connection...".tr()),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black87,
+      builder: (_) => const ShakeSearchOverlay(),
+    );
+    
+    ref.read(shakeSessionProvider.notifier).startSession(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+
     // Watch networking / schedule stats
     final connectionsCount = ref.watch(connectionsCountProvider).value ?? 0;
     final sessionsCount = ref.watch(sessionFavoritesProvider).value?.length ?? 0;
@@ -27,171 +161,186 @@ class EventDashboard extends ConsumerWidget {
       body: EventzoneTheme.buildPlayfulBackground(
         child: SafeArea(
           child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.all(24.0),
+            physics: BouncingScrollPhysics(),
+            padding: EdgeInsets.all(24.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 64),
-                _buildEventStatusPill(event.startDate, event.endDate),
-                const SizedBox(height: 20),
+                SizedBox(height: 64),
+                _buildEventStatusPill(widget.event.startDate, widget.event.endDate),
+                SizedBox(height: 20),
                 Text(
-                  event.title,
+                  widget.event.title,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.w900,
                         fontSize: 32,
                       ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Row(
                   children: [
-                    const Icon(LucideIcons.calendar, color: Colors.white54, size: 14),
-                    const SizedBox(width: 8),
+                    Icon(LucideIcons.calendar, color: Colors.white54, size: 14),
+                    SizedBox(width: 8),
                     Text(
-                      event.date,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                      widget.event.date,
+                      style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(LucideIcons.mapPin, color: Colors.white54, size: 14),
-                    const SizedBox(width: 8),
+                    Icon(LucideIcons.mapPin, color: Colors.white54, size: 14),
+                    SizedBox(width: 8),
                     Text(
-                      event.location,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                      widget.event.location,
+                      style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
 
                 // Core Hub Grid
-                Text("EVENT HUB", style: Theme.of(context).textTheme.labelLarge),
-                const SizedBox(height: 16),
+                Text("EVENT HUB".tr(), style: Theme.of(context).textTheme.labelLarge),
+                SizedBox(height: 16),
                 GridView.count(
                   shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
+                  physics: NeverScrollableScrollPhysics(),
                   crossAxisCount: 3,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
                   children: [
-                    _buildHubItem(context, LucideIcons.calendar, "Sessions", 7),
-                    _buildHubItem(context, LucideIcons.users, "Attendees", 2),
-                    _buildHubItem(context, LucideIcons.map, "Floor Plan", 3),
-                    _buildHubItem(context, LucideIcons.mic2, "Speakers", 4),
-                    _buildHubItem(context, LucideIcons.store, "Exhibitors", 5),
-                    _buildHubItem(context, LucideIcons.award, "Sponsors", 6),
+                    _buildHubItem(context, LucideIcons.calendar, "Sessions".tr(), 7),
+                    _buildHubItem(context, LucideIcons.users, "Attendees".tr(), 2),
+                    _buildHubItem(context, LucideIcons.map, "Floor Plan".tr(), 3),
+                    _buildHubItem(context, LucideIcons.mic2, "Speakers".tr(), 4),
+                    _buildHubItem(context, LucideIcons.store, "Exhibitors".tr(), 5),
+                    _buildHubItem(context, LucideIcons.award, "Sponsors".tr(), 6),
                   ],
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 GestureDetector(
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const MyMeetingsScreen()),
+                      MaterialPageRoute(builder: (context) => MyMeetingsScreen()),
                     ).then((_) {
                       ref.invalidate(nextMeetingProvider);
                     });
                   },
                   child: GlassContainer(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(
                       children: [
-                        const Icon(LucideIcons.calendarClock, color: EventzoneTheme.primaryAction, size: 20),
-                        const SizedBox(width: 12),
-                        const Expanded(
+                        Icon(LucideIcons.calendarClock, color: EventzoneTheme.primaryAction, size: 20),
+                        SizedBox(width: 12),
+                        Expanded(
                           child: Text(
-                            "My Meetings & Schedule",
+                            "My Meetings & Schedule".tr(),
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
                           ),
                         ),
-                        const Icon(LucideIcons.chevronRight, color: Colors.white54, size: 16),
+                        Icon(LucideIcons.chevronRight, color: Colors.white54, size: 16),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
+                
+                // Shake to Connect Secondary Button
+                Center(
+                  child: OutlinedButton.icon(
+                    onPressed: _triggerShakeSession,
+                    icon: const Icon(LucideIcons.vibrate, size: 16, color: EventzoneTheme.primaryAction),
+                    label: Text("Shake to Connect".tr(), style: const TextStyle(color: EventzoneTheme.primaryAction)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: EventzoneTheme.primaryAction),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 32),
                 
                 // Personalized Networking Stats Section
-                _buildSectionHeader(context, "My Event Stats"),
-                const SizedBox(height: 16),
+                _buildSectionHeader(context, "My Event Stats".tr()),
+                SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
                       child: _buildMetricCard(
                         context,
                         "$connectionsCount",
-                        "Connections Made",
+                        "Connections Made".tr(),
                         LucideIcons.users,
-                        onTap: () => onNavigate(2),
+                        onTap: () => widget.onNavigate(2),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     Expanded(
                       child: _buildMetricCard(
                         context,
                         "$sessionsCount",
-                        "Agenda Sessions",
+                        "Agenda Sessions".tr(),
                         LucideIcons.calendarCheck2,
-                        onTap: () => onNavigate(1),
+                        onTap: () => widget.onNavigate(1),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 
                 // Next Planned Meeting
                 Text(
-                  "NEXT PLANNED MEETING",
+                  "NEXT PLANNED MEETING".tr(),
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: EventzoneTheme.primaryAction,
                         fontSize: 12,
                         letterSpacing: 1.5,
                       ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 nextMeetingAsync.when(
-                  loading: () => const Center(
+                  loading: () => Center(
                     child: Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
                       child: CircularProgressIndicator(color: EventzoneTheme.primaryAction),
                     ),
                   ),
                   error: (err, _) => Center(
-                    child: Text("Error fetching meetings: $err", style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                    child: Text("Error fetching meetings: $err", style: TextStyle(color: Colors.white38, fontSize: 12)),
                   ),
                   data: (meeting) {
                     if (meeting == null) {
                       return GlassContainer(
-                        padding: const EdgeInsets.all(20),
+                        padding: EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            const Icon(LucideIcons.calendarDays, color: Colors.white24, size: 36),
-                            const SizedBox(height: 12),
-                            const Text(
-                              "No upcoming meetings scheduled",
+                            Icon(LucideIcons.calendarDays, color: Colors.white24, size: 36),
+                            SizedBox(height: 12),
+                            Text(
+                              "No upcoming meetings scheduled".tr(),
                               style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
                             ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              "Connect and schedule meetings with other B2B attendees.",
+                            SizedBox(height: 4),
+                            Text(
+                              "Connect and schedule meetings with other B2B attendees.".tr(),
                               style: TextStyle(color: Colors.white38, fontSize: 11),
                               textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 16),
+                            SizedBox(height: 16),
                             SizedBox(
                               width: double.infinity,
                               height: 40,
                               child: ElevatedButton(
-                                onPressed: () => onNavigate(2),
+                                onPressed: () => widget.onNavigate(2),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: EventzoneTheme.primaryAction,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
-                                child: const Text(
-                                  "Connect with Attendees",
+                                child: Text(
+                                  "Connect with Attendees".tr(),
                                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                                 ),
                               ),
@@ -206,7 +355,7 @@ class EventDashboard extends ConsumerWidget {
                     final dateStr = _formatMeetingDate(meeting.date);
 
                     return GlassContainer(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.all(20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -218,59 +367,59 @@ class EventDashboard extends ConsumerWidget {
                                     ? NetworkImage(meeting.otherAvatarUrl!)
                                     : null,
                                 child: meeting.otherAvatarUrl == null || meeting.otherAvatarUrl!.isEmpty
-                                    ? const Icon(LucideIcons.user, size: 16, color: Colors.white)
+                                    ? Icon(LucideIcons.user, size: 16, color: Colors.white)
                                     : null,
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       meeting.otherName ?? "Attendee",
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
                                     ),
                                     Text(
                                       meeting.otherCompany != null && meeting.otherCompany!.isNotEmpty
-                                          ? "${meeting.otherTitle ?? ''} @ ${meeting.otherCompany}"
+                                          ? "${meeting.otherTitle ?? ''} @${meeting.otherCompany}"
                                           : meeting.otherTitle ?? '',
-                                      style: const TextStyle(color: Colors.white38, fontSize: 11),
+                                      style: TextStyle(color: Colors.white38, fontSize: 11),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),
                               ),
-                              const StatusPill(label: "SCHEDULED", isLive: false),
+                              StatusPill(label: "SCHEDULED", isLive: false),
                             ],
                           ),
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.symmetric(vertical: 14.0),
                             child: Divider(color: Colors.white10, height: 1),
                           ),
                           Text(
                             meeting.title,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                           ),
-                          const SizedBox(height: 12),
+                          SizedBox(height: 12),
                           Row(
                             children: [
-                              const Icon(LucideIcons.calendarClock, size: 14, color: EventzoneTheme.primaryAction),
-                              const SizedBox(width: 8),
+                              Icon(LucideIcons.calendarClock, size: 14, color: EventzoneTheme.primaryAction),
+                              SizedBox(width: 8),
                               Text(
                                 "$dateStr ($timeStr)",
-                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                style: TextStyle(color: Colors.white70, fontSize: 12),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(LucideIcons.mapPin, size: 14, color: EventzoneTheme.primaryAction),
-                              const SizedBox(width: 8),
+                              Icon(LucideIcons.mapPin, size: 14, color: EventzoneTheme.primaryAction),
+                              SizedBox(width: 8),
                               Text(
                                 meeting.location ?? "TBA",
-                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                style: TextStyle(color: Colors.white70, fontSize: 12),
                               ),
                             ],
                           ),
@@ -279,7 +428,7 @@ class EventDashboard extends ConsumerWidget {
                     );
                   },
                 ),
-                const SizedBox(height: 40),
+                SizedBox(height: 40),
               ],
             ),
           ),
@@ -290,17 +439,17 @@ class EventDashboard extends ConsumerWidget {
 
   Widget _buildHubItem(BuildContext context, IconData icon, String label, int targetIndex) {
     return GestureDetector(
-      onTap: () => onNavigate(targetIndex),
+      onTap: () => widget.onNavigate(targetIndex),
       child: GlassContainer(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: EdgeInsets.symmetric(vertical: 12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: EventzoneTheme.primaryAction, size: 24),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
               label,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
             ),
           ],
         ),
@@ -313,7 +462,7 @@ class EventDashboard extends ConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title, style: Theme.of(context).textTheme.titleLarge),
-        const Text("View All", style: TextStyle(color: EventzoneTheme.primaryAction, fontSize: 12, fontWeight: FontWeight.bold)),
+        Text("View All".tr(), style: TextStyle(color: EventzoneTheme.primaryAction, fontSize: 12, fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -322,14 +471,14 @@ class EventDashboard extends ConsumerWidget {
     return GestureDetector(
       onTap: onTap,
       child: GlassContainer(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(icon, color: EventzoneTheme.primaryAction, size: 20),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Text(value, style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 24, fontWeight: FontWeight.w900)),
-            Text(label, style: const TextStyle(fontSize: 12, color: Colors.white38)),
+            Text(label, style: TextStyle(fontSize: 12, color: Colors.white38)),
           ],
         ),
       ),

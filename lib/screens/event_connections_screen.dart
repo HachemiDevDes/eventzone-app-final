@@ -4,9 +4,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import '../services/supabase_service.dart';
-import '../providers/connection_providers.dart';
 import 'professional_profile_screen.dart';
 import 'chat_detail_screen.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class EventConnectionsScreen extends ConsumerStatefulWidget {
   final String eventId;
@@ -78,44 +78,44 @@ class _EventConnectionsScreenState extends ConsumerState<EventConnectionsScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 72),
+              SizedBox(height: 72),
               
               // Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "NETWORKING",
+                      "NETWORKING".tr(),
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                             color: EventzoneTheme.primaryAction,
                             letterSpacing: 2,
                           ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text(
-                      "My Connections",
+                      "My Connections".tr(),
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.w900,
                             fontSize: 28,
                           ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     
                     // Search Bar
                     GlassContainer(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       borderRadius: 30,
                       child: TextField(
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(color: Colors.white),
                         onChanged: (val) {
                           setState(() {
                             _searchQuery = val;
                           });
                         },
-                        decoration: const InputDecoration(
-                          hintText: "Search connections...",
+                        decoration: InputDecoration(
+                          hintText: "Search connections...".tr(),
                           hintStyle: TextStyle(color: Colors.white30, fontSize: 14),
                           border: InputBorder.none,
                           icon: Icon(LucideIcons.search, color: Colors.white38, size: 20),
@@ -129,46 +129,46 @@ class _EventConnectionsScreenState extends ConsumerState<EventConnectionsScreen>
               // Connections list
               Expanded(
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
+                    ? Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
                     : filteredConnections.isEmpty
                         ? _buildEmptyState()
                         : ListView.separated(
-                            physics: const BouncingScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
+                            physics: BouncingScrollPhysics(),
+                            padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
                             itemCount: filteredConnections.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 12),
+                            separatorBuilder: (context, index) => SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final profile = filteredConnections[index];
                               final String userId = profile['id'];
                               final name = profile['full_name'] ?? 'Attendee';
                               final jobTitle = profile['job_title'] ?? '';
                               final companyName = profile['company_name'] ?? '';
-                              final title = companyName.isNotEmpty ? "$jobTitle @ $companyName" : jobTitle;
+                              final title = companyName.isNotEmpty ? "$jobTitle @$companyName" : jobTitle;
 
                               return GestureDetector(
                                 onTap: () => _navigateToProfile(userId, profile),
                                 child: GlassContainer(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: EdgeInsets.all(16),
                                   child: Row(
                                     children: [
                                       _buildAvatar(name, profile['avatar_url']),
-                                      const SizedBox(width: 16),
+                                      SizedBox(width: 16),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               name,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 16,
                                                 color: Colors.white,
                                               ),
                                             ),
-                                            const SizedBox(height: 4),
+                                            SizedBox(height: 4),
                                             Text(
                                               title,
-                                              style: const TextStyle(color: Colors.white38, fontSize: 12),
+                                              style: TextStyle(color: Colors.white38, fontSize: 12),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             ),
@@ -178,7 +178,7 @@ class _EventConnectionsScreenState extends ConsumerState<EventConnectionsScreen>
                                       
                                       // Message Action Button
                                       IconButton(
-                                        icon: const Icon(LucideIcons.messageSquare, color: EventzoneTheme.primaryAction, size: 20),
+                                        icon: Icon(LucideIcons.messageSquare, color: EventzoneTheme.primaryAction, size: 20),
                                         onPressed: () {
                                           Navigator.push(
                                             context,
@@ -226,7 +226,7 @@ class _EventConnectionsScreenState extends ConsumerState<EventConnectionsScreen>
           ? Center(
               child: Text(
                 name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').join(),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             )
           : null,
@@ -236,19 +236,19 @@ class _EventConnectionsScreenState extends ConsumerState<EventConnectionsScreen>
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32.0),
+        padding: EdgeInsets.all(32.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(LucideIcons.users, color: Colors.white24, size: 48),
-            const SizedBox(height: 16),
-            const Text(
-              "No Connections Yet",
+            Icon(LucideIcons.users, color: Colors.white24, size: 48),
+            SizedBox(height: 16),
+            Text(
+              "No Connections Yet".tr(),
               style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "Start networking! Visit the Attendee Directory from the Event Hub to send connection requests.",
+            SizedBox(height: 8),
+            Text(
+              "Start networking! Visit the Attendee Directory from the Event Hub to send connection requests.".tr(),
               style: TextStyle(color: Colors.white38, fontSize: 12),
               textAlign: TextAlign.center,
             ),

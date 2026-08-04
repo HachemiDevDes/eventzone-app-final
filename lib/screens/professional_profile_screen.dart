@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'dart:convert';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'chat_detail_screen.dart';
 import '../providers/connection_providers.dart';
-import '../widgets/meeting_scheduler_sheet.dart';
 import '../utils/avatar_helper.dart';
 import '../utils/social_link_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:easy_localization/easy_localization.dart';
 class ProfessionalProfileScreen extends ConsumerStatefulWidget {
   final String name;
   final String title;
@@ -131,7 +129,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
     _department = widget.department ?? "";
     _address = widget.address ?? "";
     _name = widget.name;
-    _title = widget.title;
+    _title = widget.title.replaceAll(' @', ' @');
     _avatarUrl = widget.avatarUrl;
     _socialLinks = _parseSocialLinks(widget.socialLinks);
     _fetchInitialProfile();
@@ -381,7 +379,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
               ),
               child: GlassContainer(
                 borderRadius: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -393,26 +391,26 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
                     Text(
-                      "Add Tag",
+                      "Add Tag".tr(),
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.w900,
                             fontSize: 24,
                           ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      "Organize your connections with custom tags",
+                    SizedBox(height: 8),
+                    Text(
+                      "Organize your connections with custom tags".tr(),
                       style: TextStyle(color: Colors.white38, fontSize: 14),
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
                     TextField(
                       controller: textController,
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: "Enter tag name (e.g. Designer, Investor)",
-                        hintStyle: const TextStyle(color: Colors.white24),
+                        hintText: "Enter tag name (e.g. Designer, Investor)".tr(),
+                        hintStyle: TextStyle(color: Colors.white24),
                         filled: true,
                         fillColor: Colors.white10,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -420,19 +418,19 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                       autofocus: true,
                     ),
                     if (existingTags.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      const Align(
+                      SizedBox(height: 16),
+                      Align(
                         alignment: Alignment.centerLeft,
-                        child: Text("Recent Tags", style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold)),
+                        child: Text("Recent Tags".tr(), style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.bold)),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: existingTags.map((tag) => Container(
-                            padding: const EdgeInsets.only(left: 12, right: 4, top: 4, bottom: 4),
+                            padding: EdgeInsets.only(left: 12, right: 4, top: 4, bottom: 4),
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.08),
                               borderRadius: BorderRadius.circular(16),
@@ -452,19 +450,19 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                                     Navigator.pop(context);
                                   },
                                   child: Padding(
-                                    padding: const EdgeInsets.only(right: 4.0),
-                                    child: Text(tag, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                    padding: EdgeInsets.only(right: 4.0),
+                                    child: Text(tag, style: TextStyle(color: Colors.white70, fontSize: 12)),
                                   ),
                                 ),
                                 GestureDetector(
                                   onTap: () => deleteTagFromGlobal(tag),
                                   child: Container(
-                                    padding: const EdgeInsets.all(4),
+                                    padding: EdgeInsets.all(4),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withOpacity(0.1),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.close, size: 12, color: Colors.white54),
+                                    child: Icon(Icons.close, size: 12, color: Colors.white54),
                                   ),
                                 ),
                               ],
@@ -473,20 +471,20 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                         ),
                       ),
                     ],
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24),
                     Row(
                       children: [
                         Expanded(
                           child: TextButton(
                             onPressed: () => Navigator.pop(context),
                             style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              padding: EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                             ),
-                            child: const Text("Cancel", style: TextStyle(color: Colors.white38, fontSize: 16)),
+                            child: Text("Cancel".tr(), style: TextStyle(color: Colors.white38, fontSize: 16)),
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        SizedBox(width: 16),
                         Expanded(
                           child: ElevatedButton(
                             onPressed: () {
@@ -504,10 +502,10 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: EventzoneTheme.primaryAction,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              padding: EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                             ),
-                            child: const Text("Add", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                            child: Text("Add".tr(), style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                           ),
                         ),
                       ],
@@ -535,7 +533,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
           ),
           child: GlassContainer(
             borderRadius: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -547,47 +545,47 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 Text(
-                  "Connection Note",
+                  "Connection Note".tr(),
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.w900,
                         fontSize: 24,
                       ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  "Write down a memorable reminder...",
+                SizedBox(height: 8),
+                Text(
+                  "Write down a memorable reminder...".tr(),
                   style: TextStyle(color: Colors.white38, fontSize: 14),
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 TextField(
                   controller: textController,
                   maxLines: 4,
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: Colors.white),
                   decoration: InputDecoration(
-                    hintText: "Enter your notes here...",
-                    hintStyle: const TextStyle(color: Colors.white24),
+                    hintText: "Enter your notes here...".tr(),
+                    hintStyle: TextStyle(color: Colors.white24),
                     filled: true,
                     fillColor: Colors.white10,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                   ),
                   autofocus: true,
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 Row(
                   children: [
                     Expanded(
                       child: TextButton(
                         onPressed: () => Navigator.pop(context),
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                         ),
-                        child: const Text("Cancel", style: TextStyle(color: Colors.white38, fontSize: 16)),
+                        child: Text("Cancel".tr(), style: TextStyle(color: Colors.white38, fontSize: 16)),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
@@ -606,10 +604,10 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: EventzoneTheme.primaryAction,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                         ),
-                        child: const Text("Save", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        child: Text("Save".tr(), style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -637,8 +635,8 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0C0F1A),
-      shape: const RoundedRectangleBorder(
+      backgroundColor: Color(0xFF0C0F1A),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) {
@@ -651,8 +649,8 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Edit Connection Details", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 20),
+                    Text("Edit Connection Details".tr(), style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    SizedBox(height: 20),
                     
                     // Avatar Upload section
                     Center(
@@ -681,38 +679,38 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                               radius: 40,
                               backgroundColor: Colors.white10,
                               backgroundImage: getAvatarProvider(currentAvatarUrl),
-                              child: currentAvatarUrl.isEmpty ? const Icon(LucideIcons.user, size: 40, color: Colors.white38) : null,
+                              child: currentAvatarUrl.isEmpty ? Icon(LucideIcons.user, size: 40, color: Colors.white38) : null,
                             ),
                             if (isUploadingImage)
-                              const CircularProgressIndicator(color: EventzoneTheme.primaryAction)
+                              CircularProgressIndicator(color: EventzoneTheme.primaryAction)
                             else
                               Positioned(
                                 bottom: 0,
                                 right: 0,
                                 child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: const BoxDecoration(
+                                  padding: EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
                                     color: EventzoneTheme.primaryAction,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(LucideIcons.camera, size: 14, color: Colors.white),
+                                  child: Icon(LucideIcons.camera, size: 14, color: Colors.white),
                                 ),
                               ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: 20),
                     
                     _buildField("Name", nameCtrl),
-                    _buildField("Job Title", titleCtrl),
-                    _buildField("Company", companyCtrl),
+                    _buildField("Job Title".tr(), titleCtrl),
+                    _buildField("Company".tr(), companyCtrl),
                     _buildField("Department", deptCtrl),
-                    _buildField("Email", emailCtrl),
+                    _buildField("Email".tr(), emailCtrl),
                     _buildField("Phone", phoneCtrl),
                     _buildField("Website", webCtrl),
-                    _buildField("Address", addressCtrl),
-                    const SizedBox(height: 24),
+                    _buildField("Address".tr(), addressCtrl),
+                    SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -745,10 +743,10 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                         },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: EventzoneTheme.primaryAction,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    child: const Text("Save Changes", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    child: Text("Save Changes".tr(), style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                   ),
                 ),
               ],
@@ -763,19 +761,19 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
 
   Widget _buildField(String label, TextEditingController controller) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
+      padding: EdgeInsets.only(bottom: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
+          Text(label, style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold)),
+          SizedBox(height: 6),
           TextField(
             controller: controller,
-            style: const TextStyle(color: Colors.white, fontSize: 13),
+            style: TextStyle(color: Colors.white, fontSize: 13),
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white10,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             ),
           ),
@@ -787,8 +785,8 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
   void _showMoreMenu() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0F1322),
-      shape: const RoundedRectangleBorder(
+      backgroundColor: Color(0xFF0F1322),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
@@ -797,24 +795,24 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(LucideIcons.trash2, color: Colors.redAccent),
-                title: const Text("Delete Connection", style: TextStyle(color: Colors.white)),
+                leading: Icon(LucideIcons.trash2, color: Colors.redAccent),
+                title: Text("Delete Connection".tr(), style: TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(context);
                   _confirmDeleteConnection();
                 },
               ),
               ListTile(
-                leading: const Icon(LucideIcons.share2, color: Colors.white),
-                title: const Text("Share Connection", style: TextStyle(color: Colors.white)),
+                leading: Icon(LucideIcons.share2, color: Colors.white),
+                title: Text("Share Connection".tr(), style: TextStyle(color: Colors.white)),
                 onTap: () {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Connection details copied to clipboard!")),
+                    SnackBar(content: Text("Connection details copied to clipboard!".tr())),
                   );
                 },
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
             ],
           ),
         );
@@ -834,7 +832,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
           ),
           child: GlassContainer(
             borderRadius: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -846,30 +844,30 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 Text(
-                  "Delete Contact",
+                  "Delete Contact".tr(),
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.w900,
                         fontSize: 24,
                       ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 Text(
-                  "Are you sure you want to delete $_name from your contacts?",
-                  style: const TextStyle(color: Colors.white70, fontSize: 16),
+                  "delete_contact_prompt".tr(args: [_name]),
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 Row(
                   children: [
                     Expanded(
                       child: TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text("Cancel", style: TextStyle(color: Colors.white38, fontSize: 16)),
+                        child: Text("Cancel".tr(), style: TextStyle(color: Colors.white38, fontSize: 16)),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () async {
@@ -894,10 +892,10 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.redAccent,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        child: const Text("Delete", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        child: Text("Delete".tr(), style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -912,21 +910,21 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
 
   Widget _buildLockedOverlay() {
     return GlassContainer(
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      padding: EdgeInsets.symmetric(vertical: 40, horizontal: 20),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.05),
               shape: BoxShape.circle,
             ),
-            child: const Icon(LucideIcons.lock, color: EventzoneTheme.primaryAction, size: 28),
+            child: Icon(LucideIcons.lock, color: EventzoneTheme.primaryAction, size: 28),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            "Connect to view full profile",
+          SizedBox(height: 16),
+          Text(
+            "Connect to view full profile".tr(),
             style: TextStyle(
               color: Colors.white,
               fontSize: 16,
@@ -934,9 +932,9 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
               letterSpacing: -0.2,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            "Unlock email, phone number, notes, and other professional card details.",
+          SizedBox(height: 8),
+          Text(
+            "Unlock email, phone number, notes, and other professional card details.".tr(),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white38,
@@ -973,7 +971,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: sourceColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(20),
@@ -983,9 +981,9 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(sourceIcon, color: sourceColor, size: 14),
-          const SizedBox(width: 6),
+          SizedBox(width: 6),
           Text(
-            "Scanned via $source",
+            "scanned_via".tr(args: [source.toString().tr()]),
             style: TextStyle(
               color: sourceColor,
               fontWeight: FontWeight.bold,
@@ -1000,7 +998,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
 
   Widget _buildConnectionCTA(String status) {
     if (widget.source == 'Business Card' || widget.source == 'Event Badge' || widget.source == 'Manual Entry') {
-      return const SizedBox.shrink();
+      return SizedBox.shrink();
     }
     
     if (status == 'accepted') {
@@ -1020,12 +1018,12 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
               ),
             );
           },
-          icon: const Icon(LucideIcons.messageSquare, size: 16),
-          label: const Text("Message", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+          icon: Icon(LucideIcons.messageSquare, size: 16),
+          label: Text("Message".tr(), style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           style: ElevatedButton.styleFrom(
             backgroundColor: EventzoneTheme.primaryAction,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
           ),
         ),
@@ -1048,19 +1046,19 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
               );
             } else {
               messenger.showSnackBar(
-                const SnackBar(
-                  content: Text("Failed to connect."),
+                SnackBar(
+                  content: Text("Failed to connect.".tr()),
                   backgroundColor: Colors.redAccent,
                 ),
               );
             }
           },
-          icon: const Icon(LucideIcons.userPlus, size: 16),
-          label: const Text("Connect", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+          icon: Icon(LucideIcons.userPlus, size: 16),
+          label: Text("Connect".tr(), style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
           style: ElevatedButton.styleFrom(
             backgroundColor: EventzoneTheme.primaryAction,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
@@ -1081,12 +1079,12 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
     final bool isConnected = connectionStatus == 'accepted';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF060913),
+      backgroundColor: Color(0xFF060913),
       body: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
+              physics: BouncingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1096,9 +1094,9 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                       Container(
                         height: 320,
                         width: double.infinity,
-                        color: const Color(0xFF0F1322),
+                        color: Color(0xFF0F1322),
                         child: getAvatarProvider(widget.avatarUrl) == null
-                            ? const Center(
+                            ? Center(
                                 child: Icon(
                                   LucideIcons.user,
                                   size: 100,
@@ -1112,7 +1110,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                       ),
                       Container(
                         height: 320,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
@@ -1127,20 +1125,20 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                       // Top Buttons Overlays
                       SafeArea(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               GestureDetector(
                                 onTap: () => Navigator.pop(context),
                                 child: Container(
-                                  padding: const EdgeInsets.all(10),
+                                  padding: EdgeInsets.all(10),
                                   decoration: BoxDecoration(
                                     color: Colors.black45,
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(color: Colors.white10),
                                   ),
-                                  child: const Icon(LucideIcons.chevronLeft, color: Colors.white, size: 20),
+                                  child: Icon(LucideIcons.chevronLeft, color: Colors.white, size: 20),
                                 ),
                               ),
                               Row(
@@ -1149,28 +1147,28 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                                     GestureDetector(
                                       onTap: _showEditProfileDialog,
                                       child: Container(
-                                        padding: const EdgeInsets.all(10),
+                                        padding: EdgeInsets.all(10),
                                         decoration: BoxDecoration(
                                           color: Colors.black45,
                                           borderRadius: BorderRadius.circular(20),
                                           border: Border.all(color: Colors.white10),
                                         ),
-                                        child: const Icon(LucideIcons.edit3, color: Colors.white, size: 18),
+                                        child: Icon(LucideIcons.edit3, color: Colors.white, size: 18),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
+                                    SizedBox(width: 8),
                                   ],
                                   if (isConnected || widget.targetUserId == null)
                                     GestureDetector(
                                       onTap: _confirmDeleteConnection,
                                       child: Container(
-                                        padding: const EdgeInsets.all(10),
+                                        padding: EdgeInsets.all(10),
                                         decoration: BoxDecoration(
                                           color: Colors.black45,
                                           borderRadius: BorderRadius.circular(20),
                                           border: Border.all(color: Colors.white10),
                                         ),
-                                        child: const Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
+                                        child: Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
                                       ),
                                     ),
                                 ],
@@ -1184,7 +1182,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
 
                   // 2. Name and Job details section
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    padding: EdgeInsets.fromLTRB(24, 0, 24, 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1192,45 +1190,45 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                           children: [
                             Text(
                               _name,
-                              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
+                              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
                             ),
                             if (widget.isNew == 'true') ...[
-                              const SizedBox(width: 8),
+                              SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: EventzoneTheme.primaryAction.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(4),
                                   border: Border.all(color: EventzoneTheme.primaryAction.withOpacity(0.4)),
                                 ),
-                                child: const Text(
-                                  "NEW",
+                                child: Text(
+                                  "NEW".tr(),
                                   style: TextStyle(color: EventzoneTheme.primaryAction, fontSize: 8, fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ],
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: 6),
                         Text(
                           _title,
-                          style: const TextStyle(fontSize: 15, color: Colors.white70, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 15, color: Colors.white70, fontWeight: FontWeight.w500),
                         ),
                         if (_department.isNotEmpty) ...[
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4),
                           Text(
                             _department,
-                            style: const TextStyle(fontSize: 14, color: Colors.white54, fontWeight: FontWeight.w400),
+                            style: TextStyle(fontSize: 14, color: Colors.white54, fontWeight: FontWeight.w400),
                           ),
                         ],
                         if (_company.isNotEmpty) ...[
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4),
                           Text(
                             _company,
-                            style: const TextStyle(fontSize: 14, color: Colors.white54, fontWeight: FontWeight.w400),
+                            style: TextStyle(fontSize: 14, color: Colors.white54, fontWeight: FontWeight.w400),
                           ),
                         ],
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16),
                         
                         // Top Info Row (Source Badge + Date)
                         SizedBox(
@@ -1248,13 +1246,13 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(LucideIcons.calendar, color: Colors.white38, size: 14),
-                                    const SizedBox(width: 6),
+                                    Icon(LucideIcons.calendar, color: Colors.white38, size: 14),
+                                    SizedBox(width: 6),
                                     Text(
                                       widget.createdAt != null 
                                           ? _formatDate(widget.createdAt!) 
                                           : "Unknown Date", 
-                                      style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w500)
+                                      style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w500)
                                     ),
                                   ],
                                 ),
@@ -1262,61 +1260,75 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                           ),
                         ),
                         
-                        const SizedBox(height: 16),
-                        
-                        // Tags Wrap
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            ..._tags.map((tag) => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: Colors.white10,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.white12),
-                              ),
-                              child: Text(tag, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
-                            )),
-
-                          ],
-                        ),
-                        
-                        const SizedBox(height: 24),
-
-                        // Action Buttons Layer
-                        _buildConnectionCTA(connectionStatus),
-                          
-                        const SizedBox(height: 24),
-                        
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutCubic,
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: (_bio.isNotEmpty || _lookingFor.isNotEmpty || _industries.isNotEmpty || _interests.isNotEmpty)
-                                    ? Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text("About Me", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5)),
-                                          const SizedBox(height: 16),
-                                          if (_bio.isNotEmpty) _buildCollapsibleBio(),
-                                          if (_lookingFor.isNotEmpty) _buildCollapsibleLookingFor(),
-                                          if (_industries.isNotEmpty || _interests.isNotEmpty) _buildCollapsibleIndustriesAndInterests(),
-                                        ],
-                                      )
-                                    : const SizedBox.shrink(),
+                        if (_tags.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          // Tags Wrap
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              ..._tags.map((tag) => Container(
+                                padding: const EdgeInsets.only(left: 10, right: 6, top: 5, bottom: 5),
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.white12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(tag, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    const SizedBox(width: 4),
+                                    GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _tags.remove(tag);
+                                        });
+                                        _updateFieldInSupabase('tags', _tags);
+                                      },
+                                      child: const Icon(LucideIcons.x, size: 12, color: Colors.white54),
+                                    ),
+                                  ],
+                                ),
+                              )),
+                            ],
                           ),
-                        ),
+                        ],
+                        
+                        if (widget.source != 'Business Card' && widget.source != 'Event Badge' && widget.source != 'Manual Entry') ...[
+                          const SizedBox(height: 24),
+                          // Action Buttons Layer
+                          _buildConnectionCTA(connectionStatus),
+                        ],
+                          
+                        if (_bio.isNotEmpty || _lookingFor.isNotEmpty || _industries.isNotEmpty || _interests.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOutCubic,
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("About Me".tr(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5)),
+                                  const SizedBox(height: 16),
+                                  if (_bio.isNotEmpty) _buildCollapsibleBio(),
+                                  if (_lookingFor.isNotEmpty) _buildCollapsibleLookingFor(),
+                                  if (_industries.isNotEmpty || _interests.isNotEmpty) _buildCollapsibleIndustriesAndInterests(),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                           
                         if (!isConnected) ...[
                           const SizedBox(height: 16),
                           _buildLockedOverlay(),
                         ],
-                        const SizedBox(height: 16),
 
-
-                          
+                        if (_socialLinks.where((link) => (link['value'] ?? '').toString().trim().isNotEmpty).isNotEmpty) ...[
+                          const SizedBox(height: 16),
                           // Render dynamic social links (LinkedIn, WhatsApp, GitHub, etc.)
                           ..._socialLinks
                               .where((link) => (link['value'] ?? '').toString().trim().isNotEmpty)
@@ -1333,33 +1345,33 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                                   padding: const EdgeInsets.only(bottom: 12.0),
                                   child: _buildContactRow(_getPlatformIcon(platform), val, displayPlatform),
                                 );
-                              }).toList(),
+                              }),
+                        ],
                           
-                          const SizedBox(height: 12),
-                          
-                          const Divider(color: Colors.white10),
-                          const SizedBox(height: 16),
+                        const SizedBox(height: 12),
+                        const Divider(color: Colors.white10),
+                        const SizedBox(height: 16),
 
                           // 5. Notes Section
-                          const Text("Notes", style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                          const SizedBox(height: 12),
+                          Text("Notes".tr(), style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                          SizedBox(height: 12),
                           if (_parsedNotes.isEmpty) ...[
                             Center(
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                                padding: EdgeInsets.symmetric(vertical: 16.0),
                                 child: Column(
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.all(16),
+                                      padding: EdgeInsets.all(16),
                                       decoration: BoxDecoration(
                                         color: Colors.white10,
                                         borderRadius: BorderRadius.circular(16),
                                       ),
-                                      child: const Icon(LucideIcons.fileText, color: Colors.white30, size: 24),
+                                      child: Icon(LucideIcons.fileText, color: Colors.white30, size: 24),
                                     ),
-                                    const SizedBox(height: 12),
-                                    const Text(
-                                      "Write down a memorable reminder about\nyour contact",
+                                    SizedBox(height: 12),
+                                    Text(
+                                      "Write down a memorable reminder about\nyour contact".tr(),
                                       textAlign: TextAlign.center,
                                       style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.4),
                                     ),
@@ -1377,34 +1389,34 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                                 } catch (_) {}
                               }
                               return Padding(
-                                padding: const EdgeInsets.only(bottom: 8.0),
+                                padding: EdgeInsets.only(bottom: 8.0),
                                 child: GlassContainer(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: EdgeInsets.all(16),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       if (displayDate.isNotEmpty)
                                         Padding(
-                                          padding: const EdgeInsets.only(bottom: 8.0),
+                                          padding: EdgeInsets.only(bottom: 8.0),
                                           child: Row(
                                             children: [
-                                              const Icon(LucideIcons.calendar, size: 10, color: Colors.white38),
-                                              const SizedBox(width: 4),
-                                              Text(displayDate, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                                              Icon(LucideIcons.calendar, size: 10, color: Colors.white38),
+                                              SizedBox(width: 4),
+                                              Text(displayDate, style: TextStyle(color: Colors.white38, fontSize: 10)),
                                             ],
                                           ),
                                         ),
                                       Text(
                                         note['text'] ?? '',
-                                        style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                                        style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                                       ),
                                     ],
                                   ),
                                 ),
                               );
-                            }).toList(),
+                            }),
                           ],
-                        const SizedBox(height: 40),
+                        SizedBox(height: 40),
                       ],
                     ),
                   ),
@@ -1416,8 +1428,8 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
           // 6. Bottom Sticky Actions Bar
           if (isConnected)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: const BoxDecoration(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
                 color: Color(0xFF090C16),
                 border: Border(top: BorderSide(color: Colors.white10)),
               ),
@@ -1431,32 +1443,32 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                       child: ElevatedButton(
                         onPressed: _showAddTagDialog,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF131726),
+                          backgroundColor: Color(0xFF131726),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: Colors.white10),
+                            side: BorderSide(color: Colors.white10),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: EdgeInsets.symmetric(vertical: 14),
                         ),
-                        child: const Text("Add tag", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        child: Text("Add tag".tr(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Expanded(
                       flex: 3,
                       child: ElevatedButton(
                         onPressed: _showAddNoteDialog,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF131726),
+                          backgroundColor: Color(0xFF131726),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: Colors.white10),
+                            side: BorderSide(color: Colors.white10),
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: EdgeInsets.symmetric(vertical: 14),
                         ),
-                        child: const Text("Add note", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        child: Text("Add note".tr(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                       ),
                     ),
                   ],
@@ -1476,8 +1488,8 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("About Me", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5)),
-        const SizedBox(height: 16),
+        Text("About Me".tr(), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5)),
+        SizedBox(height: 16),
         Container(
           height: 56,
           decoration: BoxDecoration(
@@ -1486,7 +1498,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
             border: Border.all(color: Colors.white10),
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Container(
           height: 56,
           decoration: BoxDecoration(
@@ -1495,7 +1507,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
             border: Border.all(color: Colors.white10),
           ),
         ),
-        const SizedBox(height: 24),
+        SizedBox(height: 24),
       ],
     );
   }
@@ -1504,23 +1516,23 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.03),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.white10),
         ),
         child: ExpansionTile(
-          title: const Text("Professional Bio", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+          title: Text("Professional Bio".tr(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
           iconColor: Colors.white54,
           collapsedIconColor: Colors.white54,
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          childrenPadding: EdgeInsets.fromLTRB(16, 0, 16, 16),
           children: [
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 _bio,
-                style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
               ),
             ),
           ],
@@ -1533,17 +1545,17 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.03),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.white10),
         ),
         child: ExpansionTile(
-          title: const Text("What I'm Looking For", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+          title: Text("What I'm Looking For".tr(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
           iconColor: Colors.white54,
           collapsedIconColor: Colors.white54,
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          childrenPadding: EdgeInsets.fromLTRB(16, 0, 16, 16),
           children: [
             Align(
               alignment: Alignment.centerLeft,
@@ -1553,7 +1565,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                 alignment: WrapAlignment.start,
                 children: _lookingFor.map((item) {
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: EventzoneTheme.primaryAction.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -1561,7 +1573,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                     ),
                     child: Text(
                       item,
-                      style: const TextStyle(color: EventzoneTheme.primaryAction, fontWeight: FontWeight.w600, fontSize: 13),
+                      style: TextStyle(color: EventzoneTheme.primaryAction, fontWeight: FontWeight.w600, fontSize: 13),
                     ),
                   );
                 }).toList(),
@@ -1579,17 +1591,17 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.03),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.white10),
         ),
         child: ExpansionTile(
-          title: const Text("Industries & Interests", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+          title: Text("Industries & Interests".tr(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
           iconColor: Colors.white54,
           collapsedIconColor: Colors.white54,
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          childrenPadding: EdgeInsets.fromLTRB(16, 0, 16, 16),
           children: [
             Align(
               alignment: Alignment.centerLeft,
@@ -1599,7 +1611,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                 alignment: WrapAlignment.start,
                 children: uniqueTags.map((item) {
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.purpleAccent.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -1607,7 +1619,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                     ),
                     child: Text(
                       item,
-                      style: const TextStyle(color: Colors.purpleAccent, fontWeight: FontWeight.w600, fontSize: 13),
+                      style: TextStyle(color: Colors.purpleAccent, fontWeight: FontWeight.w600, fontSize: 13),
                     ),
                   );
                 }).toList(),
@@ -1644,14 +1656,14 @@ class _TappableContactRowState extends State<_TappableContactRow> {
     
     return AnimatedScale(
       scale: _isPressed ? 0.97 : 1.0,
-      duration: const Duration(milliseconds: 100),
+      duration: Duration(milliseconds: 100),
       child: Opacity(
         opacity: isEmpty ? 0.4 : 1.0,
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            splashColor: const Color(0x331A73E8), // Electric blue ripple
+            splashColor: Color(0x331A73E8), // Electric blue ripple
             highlightColor: Colors.transparent,
             onTapDown: isEmpty ? null : (_) => setState(() => _isPressed = true),
             onTapUp: isEmpty ? null : (_) => setState(() => _isPressed = false),
@@ -1660,30 +1672,30 @@ class _TappableContactRowState extends State<_TappableContactRow> {
               launchSocialLink(context, widget.type, widget.value);
             },
             child: GlassContainer(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(16),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(
+                    padding: EdgeInsets.all(10),
+                    decoration: BoxDecoration(
                       color: Colors.white10,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(widget.icon, color: Colors.white70, size: 16),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           widget.value,
-                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                         ),
-                        const SizedBox(height: 2),
+                        SizedBox(height: 2),
                         Text(
                           widget.type,
-                          style: const TextStyle(color: Colors.white38, fontSize: 10),
+                          style: TextStyle(color: Colors.white38, fontSize: 10),
                         ),
                       ],
                     ),

@@ -1,0 +1,286 @@
++1234567890
+000000
+555-5555
+ABOUT THIS SESSION
+About Event
+About Eventzone
+About Me
+About You
+Accept
+Accepted Connection
+Add
+Add Tag
+Add a message to accompany the request...
+Add more details
+Add note
+Add photo
+Add tag
+Add your online profiles so others can follow up with you (Optional).
+Address
+Agenda & Sessions
+Already have an account? 
+An active subscription is required to add connections!
+An unexpected error occurred. Please try again.
+Analytics
+Are you sure you want to delete this conversation? This cannot be undone.
+Are you sure you want to delete this message?
+Are you sure you want to sign out? Your session will be ended.
+Attendee Directory
+Awaiting confirmation
+Back
+Back to Sign In
+Bio saved!
+Booth, hall, or virtual link...
+Briefly tell us about your experience and background...
+Browse the list of sessions and add them to your agenda to construct your summit schedule.
+CEO @ Future
+COMMUNITY
+Camera
+Camera not initialized yet.
+Cancel
+Cancel Meeting
+Capture failed: Path is null
+Check your inbox to verify your email
+Choose
+Choose a Plan
+Choose from Gallery
+Close
+Company
+Confirm
+Confirm Password
+Confirm Subscription
+Confirming your payment…
+Connect
+Connect and schedule meetings with other B2B attendees.
+Connect to view full profile
+Connect with Attendees
+Connect with the right people at every event
+Connection Note
+Connection details copied to clipboard!
+Contact Sources
+Contact Support
+Contact Us
+Contacts
+Continue with Google
+Could not open link
+Could not open this link
+Could not open this link. Check the address and try again.
+Create
+Create Account
+DATE & TIME
+Decline
+Delete
+Delete Chat
+Delete Connection
+Delete Contact
+Delete Message
+Details
+Didn't receive the email? Resend
+Direct Contact
+Direct Messages
+Don't have an account? 
+Dr. Jane Smith
+Duration
+EVENT HUB
+Edit Connection Details
+Edit Profile
+Edit profile
+Email
+Email Address
+Enter manually
+Enter tag name (e.g. Designer, Investor)
+Enter your notes here...
+Error communicating with database.
+Error loading profile
+Error loading status
+Error: Eventzone Profile not found in database.
+Error: Not a valid Eventzone Profile QR code.
+Event Speakers
+Eventzone
+Eventzone is a premium networking app built for professionals who mean business. Whether you're at a conference, a trade show, or an industry meetup — Eventzone turns every room you walk into an opportunity.
+Exhibitors
+Expired
+Failed to connect.
+Failed to register. Please try again.
+Failed to send magic link. Please check your connection.
+Failed to send message. Please try again.
+First name
+First name is required!
+Frequently Asked Questions
+Full Name
+GitHub
+Go back
+Go to Hub
+Google sign-in failed. Please try again.
+Help other attendees identify you at a glance.
+How can we help you?
+Industries & Interests
+Industry Leaders
+Industry: Tech/Innovation
+Job Title
+John Doe
+LOCATION
+Label
+Language
+Last name
+Last updated: June 2025
+Leaderboard
+Link
+LinkedIn
+Live Floor Plan
+Location
+MY EVENTS
+MY HUB
+Magic sign-in link sent to your email!
+Manage your profile and connections
+Meeting Title
+Message
+Message sent!
+Min. 8 characters
+My Agenda
+My Connections
+My Event Pass
+My Meetings
+My Meetings & Schedule
+NETWORKING
+NEW
+NEXT PLANNED MEETING
+Networking Activity (Last 7 Days)
+Networking Time-of-Day
+New contact
+No Connections Yet
+No connections found matching search.
+No conversations found.
+No leaderboard data available yet.
+No meetings scheduled
+No messages yet. Send a message to start!
+No profiles found
+No sessions on this day.
+No sessions scheduled for this event.
+No social links added yet.
+No text detected on card/badge. Please try a clearer image.
+No transactions yet
+No upcoming events
+No upcoming meetings scheduled
+Not logged in
+Note (Optional)
+Note / Message:
+Notes
+Organize your connections with custom tags
+Password
+Payment was failed or cancelled.
+Phone
+Photo Gallery
+Please choose a plan to continue
+Please enter a valid 6-digit verification code.
+Popular Tags
+Premium Sponsors
+Privacy Policy
+Product Lead
+Professional Bio
+Profile Basics
+Profile link copied to clipboard!
+Quick Connect
+Re-enter password
+Recent Tags
+Register now to unlock event directory, networking, and meetings.
+Registered! 🎉
+Resend Code
+Review Scanned Contact
+SCHEDULE
+SPEAKERS
+SUPPORTED BY
+Save
+Save Bio
+Save Changes
+Save Contact
+Saved
+Scan
+Scan from Gallery
+Scan to connect instantly
+Scan vs Manual
+Schedule a Meeting
+Search areas...
+Search by name or company...
+Search connections...
+Search conversations...
+Search country
+Secure Payment
+Secure Payment Methods
+See how you rank among other professionals
+Select Date
+Select Language
+Select Time
+Select up to 5 areas that match your expertise or interest.
+Send Meeting Request
+Send Message
+Send us a message
+Sessions & Agenda
+Set Up Profile
+Share Card
+Share Connection
+Share Pass
+Share a short bio and what you're looking to achieve.
+Share link copied to clipboard!
+Share your profile or scan a colleague
+Sign Out
+Sign in
+Sign in with Email
+Sign up
+Skip
+Social Connections
+Start Conversation
+Start networking! Visit the Attendee Directory from the Event Hub to send connection requests.
+Status: 
+Still need help?
+Subject
+Subscription
+Support
+Take Photo
+TechFlow
+Terms & Privacy
+Terms of Service
+This summit brings together global leaders, innovators, and disruptive thinkers to explore the next frontier of technology. Join us for 3 days of intensive networking, workshops, and keynote sessions.
+Toggle Flash
+Top Companies
+Top Connection Roles
+Transaction History
+Type your message...
+Unlock email, phone number, notes, and other professional card details.
+VENUE
+Verification Code
+Verification email resent!
+Verification failed. Please try again.
+View All
+View Details
+Want to try another way? 
+We'll get back to you within 24 hours.
+Website URL
+Welcome back,
+What I'm Looking For
+WhatsApp
+WhatsApp Number
+Where professionals connect
+Write down a memorable reminder about\nyour contact
+Write down a memorable reminder...
+You can select up to 5 tags maximum.
+You cannot connect with yourself!
+You have active conversations with all contacts!
+Your Agenda is Empty
+Your network, everywhere.
+Your payment is encrypted and secure
+Your professional network starts here
+Your purchase history will appear here
+Your trial/subscription has expired. Please upgrade to save contacts.
+by Eventzone
+contact@eventzone.pro
+days remaining
+e.g. Quick Intro, Partnership Discussion
+e.g. Work, Personal, Mobile
+github.com/username
+https://yourwebsite.com
+john@example.com
+linkedin.com/in/username
+or
+you@example.com
+✓

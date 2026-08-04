@@ -28,18 +28,18 @@ class NotificationService {
 
     // 2. Initialize Local Notifications & Timezone
     tz.initializeTimeZones();
-    const AndroidInitializationSettings initializationSettingsAndroid =
+    AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/launcher_icon');
     
     // For iOS if needed later
-    const DarwinInitializationSettings initializationSettingsIOS =
+    DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
     
-    const InitializationSettings initializationSettings = InitializationSettings(
+    InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsIOS,
     );
@@ -195,7 +195,7 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+    AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
       'high_importance_channel', // id
       'High Importance Notifications', // name
@@ -205,7 +205,7 @@ class NotificationService {
       showWhen: true,
     );
     
-    const NotificationDetails platformChannelSpecifics =
+    NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);
         
     await _localNotificationsPlugin.show(
@@ -227,17 +227,17 @@ class NotificationService {
     tz.TZDateTime scheduledDate9PM =
         tz.TZDateTime(tz.local, now.year, now.month, now.day, 21);
     if (scheduledDate9PM.isBefore(now)) {
-      scheduledDate9PM = scheduledDate9PM.add(const Duration(days: 1));
+      scheduledDate9PM = scheduledDate9PM.add(Duration(days: 1));
     }
 
     // 11 AM Notification
     tz.TZDateTime scheduledDate11AM =
         tz.TZDateTime(tz.local, now.year, now.month, now.day, 11);
     if (scheduledDate11AM.isBefore(now)) {
-      scheduledDate11AM = scheduledDate11AM.add(const Duration(days: 1));
+      scheduledDate11AM = scheduledDate11AM.add(Duration(days: 1));
     }
 
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+    AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
       'daily_streak_channel',
       'Daily Streak Reminder',
@@ -246,7 +246,7 @@ class NotificationService {
       priority: Priority.high,
     );
 
-    const NotificationDetails platformChannelSpecifics =
+    NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);
 
     // Schedule 9 PM

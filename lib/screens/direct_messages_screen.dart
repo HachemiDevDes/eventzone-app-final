@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import 'chat_detail_screen.dart';
 import '../utils/avatar_helper.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class DirectMessagesScreen extends StatefulWidget {
   const DirectMessagesScreen({super.key});
@@ -223,10 +223,10 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
         backgroundColor: EventzoneTheme.backgroundStart,
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: const Text("Direct Messages", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text("Direct Messages".tr(), style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
+          icon: Icon(LucideIcons.chevronLeft, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -234,19 +234,19 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: EdgeInsets.all(24.0),
               child: GlassContainer(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 borderRadius: 30,
                 child: TextField(
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: Colors.white),
                   onChanged: (val) {
                     setState(() {
                       _searchQuery = val;
                     });
                   },
-                  decoration: const InputDecoration(
-                    hintText: "Search conversations...",
+                  decoration: InputDecoration(
+                    hintText: "Search conversations...".tr(),
                     hintStyle: TextStyle(color: Colors.white38),
                     border: InputBorder.none,
                     icon: Icon(LucideIcons.search, color: Colors.white38, size: 20),
@@ -256,13 +256,13 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
             ),
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
+                  ? Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
                   : filteredChats.isEmpty
-                      ? const Center(child: Text("No conversations found.", style: TextStyle(color: Colors.white24)))
+                      ? Center(child: Text("No conversations found.".tr(), style: TextStyle(color: Colors.white24)))
                       : ListView.separated(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          padding: EdgeInsets.symmetric(horizontal: 24),
                           itemCount: filteredChats.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          separatorBuilder: (context, index) => SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final chat = filteredChats[index];
                             final String avatar = chat['avatar'] ?? '';
@@ -281,17 +281,17 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
                                 ).then((_) => _loadConversations());
                               },
                               child: GlassContainer(
-                                padding: const EdgeInsets.all(16),
+                                padding: EdgeInsets.all(16),
                                 child: Row(
                                   children: [
                                     CircleAvatar(
                                       radius: 24,
                                       backgroundImage: getAvatarProvider(avatar),
                                       child: getAvatarProvider(avatar) == null
-                                          ? const Icon(LucideIcons.user, size: 18, color: Colors.white70)
+                                          ? Icon(LucideIcons.user, size: 18, color: Colors.white70)
                                           : null,
                                     ),
-                                    const SizedBox(width: 16),
+                                    SizedBox(width: 16),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,32 +301,32 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
                                             children: [
                                               Text(
                                                 chat['name'],
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
                                               ),
                                               Text(
                                                 chat['time'],
-                                                style: const TextStyle(color: Colors.white38, fontSize: 11),
+                                                style: TextStyle(color: Colors.white38, fontSize: 11),
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 4),
+                                          SizedBox(height: 4),
                                           Text(
                                             chat['lastMsg'],
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(color: Colors.white60, fontSize: 13),
+                                            style: TextStyle(color: Colors.white60, fontSize: 13),
                                           ),
                                         ],
                                       ),
                                     ),
                                     if (chat['unread'] > 0) ...[
-                                      const SizedBox(width: 12),
+                                      SizedBox(width: 12),
                                       CircleAvatar(
                                         radius: 10,
                                         backgroundColor: EventzoneTheme.primaryAction,
                                         child: Text(
                                           chat['unread'].toString(),
-                                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                                         ),
                                       ),
                                     ],
@@ -345,7 +345,7 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
           _showStartNewChatDialog(context);
         },
         backgroundColor: EventzoneTheme.primaryAction,
-        child: const Icon(LucideIcons.messageSquarePlus, color: Colors.white),
+        child: Icon(LucideIcons.messageSquarePlus, color: Colors.white),
       ),
     );
   }
@@ -369,11 +369,11 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Container(
                 height: 250,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: Color(0xFF111827),
                   borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-                child: const Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction)),
+                child: Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction)),
               );
             }
 
@@ -390,7 +390,7 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
               ),
               child: GlassContainer(
                 borderRadius: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -402,27 +402,27 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
                     Text(
-                      "Start Conversation",
+                      "Start Conversation".tr(),
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.w900,
                             fontSize: 24,
                           ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                   Expanded(
                     child: untextedConnections.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Text(
-                              "You have active conversations with all contacts!",
+                              "You have active conversations with all contacts!".tr(),
                               style: TextStyle(color: Colors.white38, fontSize: 13),
                               textAlign: TextAlign.center,
                             ),
                           )
                         : ListView.separated(
                             itemCount: untextedConnections.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 12),
+                            separatorBuilder: (context, index) => SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final connection = untextedConnections[index];
                               final String name = connection['name'] ?? 'Eventzone User';
@@ -446,7 +446,7 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
                                   ).then((_) => _loadConversations());
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.all(12),
+                                  padding: EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withOpacity(0.02),
                                     borderRadius: BorderRadius.circular(16),
@@ -457,20 +457,20 @@ class _DirectMessagesScreenState extends State<DirectMessagesScreen> {
                                         radius: 20,
                                         backgroundImage: getAvatarProvider(avatar),
                                         child: getAvatarProvider(avatar) == null
-                                            ? const Icon(LucideIcons.user, size: 14, color: Colors.white)
+                                            ? Icon(LucideIcons.user, size: 14, color: Colors.white)
                                             : null,
                                       ),
-                                      const SizedBox(width: 16),
+                                      SizedBox(width: 16),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(name, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                                            Text(title, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                            Text(name, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                                            Text(title, style: TextStyle(color: Colors.white38, fontSize: 11)),
                                           ],
                                         ),
                                       ),
-                                      const Icon(LucideIcons.messageSquare, color: EventzoneTheme.primaryAction, size: 18),
+                                      Icon(LucideIcons.messageSquare, color: EventzoneTheme.primaryAction, size: 18),
                                     ],
                                   ),
                                 ),

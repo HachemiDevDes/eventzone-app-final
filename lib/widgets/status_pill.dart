@@ -1,4 +1,6 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class StatusPill extends StatelessWidget {
   final String label;
@@ -12,15 +14,15 @@ class StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    Widget pill = Container(
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: isLive 
-            ? const Color(0xFF059669) // Solid emerald green (rich and bright)
-            : const Color(0xFF1E293B), // Solid slate grey (dark and clean)
+            ? Color(0xFFE11D48) // Red color for live
+            : Color(0xFF1E293B), // Solid slate grey
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isLive ? const Color(0xFF34D399) : Colors.white54, // Bright borders
+          color: isLive ? Color(0xFFFDA4AF) : Colors.white54,
           width: 1.5,
         ),
       ),
@@ -31,30 +33,31 @@ class StatusPill extends StatelessWidget {
             Container(
               width: 6,
               height: 6,
-              margin: const EdgeInsets.only(right: 6),
-              decoration: const BoxDecoration(
+              margin: EdgeInsets.only(right: 6),
+              decoration: BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
               ),
-            ),
+            ).animate(onPlay: (controller) => controller.repeat(reverse: true))
+             .fade(begin: 0.3, end: 1.0, duration: 800.ms),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white, // Pure white text for maximum readability
+            style: TextStyle(
+              color: Colors.white,
               fontSize: 12,
-              fontWeight: FontWeight.bold, // Bold text for extra emphasis
+              fontWeight: FontWeight.bold,
               letterSpacing: 0.5,
             ),
           ),
-          if (isLive) ...[
-            const SizedBox(width: 4),
-            const Text(
-              "✓",
-              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-          ]
         ],
       ),
     );
+
+    if (isLive) {
+      return pill.animate(onPlay: (controller) => controller.repeat(reverse: true))
+                 .scaleXY(end: 1.03, duration: 1200.ms, curve: Curves.easeInOut);
+    }
+
+    return pill;
   }
 }

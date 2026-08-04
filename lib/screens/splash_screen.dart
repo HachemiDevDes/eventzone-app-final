@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -48,19 +49,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     // Main sequenced animation — 2.5 seconds
     _mainController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2500),
+      duration: Duration(milliseconds: 2500),
     );
 
     // Continuous subtle pulse on the icon
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: Duration(milliseconds: 2000),
     );
 
     // Particle/shimmer rotation
     _particleController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 8),
+      duration: Duration(seconds: 8),
     );
 
     // ── Animation Sequence ──
@@ -69,13 +70,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _iconScale = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _mainController,
-        curve: const Interval(0.0, 0.35, curve: Curves.elasticOut),
+        curve: Interval(0.0, 0.35, curve: Curves.elasticOut),
       ),
     );
     _iconOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _mainController,
-        curve: const Interval(0.0, 0.15, curve: Curves.easeOut),
+        curve: Interval(0.0, 0.15, curve: Curves.easeOut),
       ),
     );
 
@@ -83,13 +84,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _glowScale = Tween<double>(begin: 0.5, end: 1.3).animate(
       CurvedAnimation(
         parent: _mainController,
-        curve: const Interval(0.1, 0.45, curve: Curves.easeOutCubic),
+        curve: Interval(0.1, 0.45, curve: Curves.easeOutCubic),
       ),
     );
     _glowOpacity = Tween<double>(begin: 0.0, end: 0.6).animate(
       CurvedAnimation(
         parent: _mainController,
-        curve: const Interval(0.1, 0.45, curve: Curves.easeOut),
+        curve: Interval(0.1, 0.45, curve: Curves.easeOut),
       ),
     );
 
@@ -97,16 +98,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _wordmarkOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _mainController,
-        curve: const Interval(0.35, 0.6, curve: Curves.easeOut),
+        curve: Interval(0.35, 0.6, curve: Curves.easeOut),
       ),
     );
     _wordmarkSlide = Tween<Offset>(
-      begin: const Offset(0, 0.5),
+      begin: Offset(0, 0.5),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
         parent: _mainController,
-        curve: const Interval(0.35, 0.6, curve: Curves.easeOutCubic),
+        curve: Interval(0.35, 0.6, curve: Curves.easeOutCubic),
       ),
     );
 
@@ -114,16 +115,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _taglineOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _mainController,
-        curve: const Interval(0.5, 0.75, curve: Curves.easeOut),
+        curve: Interval(0.5, 0.75, curve: Curves.easeOut),
       ),
     );
     _taglineSlide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
+      begin: Offset(0, 0.3),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
         parent: _mainController,
-        curve: const Interval(0.5, 0.75, curve: Curves.easeOutCubic),
+        curve: Interval(0.5, 0.75, curve: Curves.easeOutCubic),
       ),
     );
 
@@ -131,7 +132,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _loaderOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _mainController,
-        curve: const Interval(0.7, 0.9, curve: Curves.easeOut),
+        curve: Interval(0.7, 0.9, curve: Curves.easeOut),
       ),
     );
 
@@ -160,7 +161,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   bool _timerDone = false;
 
   Future<void> _startTimer() async {
-    await Future.delayed(const Duration(milliseconds: 3000));
+    await Future.delayed(Duration(milliseconds: 1200));
     if (!mounted) return;
     _timerDone = true;
     _checkAndNavigate();
@@ -192,7 +193,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(currentUserProvider, (_, __) {
+    ref.listen(currentUserProvider, (_, _) {
       _checkAndNavigate();
     });
 
@@ -205,7 +206,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           return Container(
             width: double.infinity,
             height: double.infinity,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -241,7 +242,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   left: -60,
                   child: _buildGlowOrb(
                     200,
-                    const Color(0xFF6366F1).withValues(alpha: 0.06),
+                    Color(0xFF6366F1).withValues(alpha: 0.06),
                   ),
                 ),
 
@@ -254,7 +255,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     child: Opacity(
                       opacity: _glowOpacity.value * 0.3,
                       child: CustomPaint(
-                        size: const Size(240, 240),
+                        size: Size(240, 240),
                         painter: _OrbitDotsPainter(
                           progress: _particleController.value,
                           color: EventzoneTheme.primaryAction,
@@ -325,7 +326,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         ],
                       ),
 
-                      const SizedBox(height: 36),
+                      SizedBox(height: 36),
 
                       // Wordmark
                       SlideTransition(
@@ -341,15 +342,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         ),
                       ),
 
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
 
                       // Tagline
                       SlideTransition(
                         position: _taglineSlide,
                         child: Opacity(
                           opacity: _taglineOpacity.value,
-                          child: const Text(
-                            "Your network, everywhere.",
+                          child: Text(
+                            "Your network, everywhere.".tr(),
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w400,
@@ -362,7 +363,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         ),
                       ),
 
-                      const SizedBox(height: 48),
+                      SizedBox(height: 48),
 
                       // Loading shimmer dots
                       Opacity(
@@ -380,8 +381,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   right: 0,
                   child: Opacity(
                     opacity: _loaderOpacity.value * 0.5,
-                    child: const Text(
-                      "by Eventzone",
+                    child: Text(
+                      "by Eventzone".tr(),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -419,7 +420,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       children: List.generate(3, (index) {
         return TweenAnimationBuilder<double>(
           tween: Tween(begin: 0.3, end: 1.0),
-          duration: const Duration(milliseconds: 600),
+          duration: Duration(milliseconds: 600),
           curve: Curves.easeInOut,
           builder: (context, value, child) {
             // Stagger the animation for each dot
@@ -429,7 +430,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             final scale = (math.sin(t * math.pi) * 0.3 + 0.7).clamp(0.0, 1.0);
 
             return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 4),
+              margin: EdgeInsets.symmetric(horizontal: 4),
               child: Transform.scale(
                 scale: scale,
                 child: Opacity(

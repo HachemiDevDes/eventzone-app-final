@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
@@ -27,7 +28,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _jobController = TextEditingController();
   final _companyController = TextEditingController();
-  final _addressController = TextEditingController();
+  final _phoneController = TextEditingController();
+  String _phoneCountryCode = '+1';
   final _bioController = TextEditingController();
   final ExpansionTileController _bioExpansionController = ExpansionTileController();
 
@@ -36,7 +38,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   final List<String> _predefinedIndustries = [
     'Artificial Intelligence', 'Blockchain & Web3', 'Cybersecurity', 'FinTech',
-    'HealthTech', 'EdTech', 'CleanTech & Energy', 'E-Commerce', 'SaaS',
+    'HealthTech', 'EdTech', 'CleanTech & Energy', 'E-Commerce'.tr(), 'SaaS',
     'Venture Capital', 'Angel Investing', 'Product Management', 'Software Engineering',
     'UX/UI Design', 'Digital Marketing', 'Sales & Business Dev', 'Cloud Computing',
     'Data Science', 'Mobile Development', 'AR/VR', 'IoT (Internet of Things)',
@@ -64,7 +66,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _nameController.addListener(_onFieldChanged);
     _jobController.addListener(_onFieldChanged);
     _companyController.addListener(_onFieldChanged);
-    _addressController.addListener(_onFieldChanged);
+    _phoneController.addListener(_onFieldChanged);
     _bioController.addListener(_onFieldChanged);
   }
 
@@ -73,13 +75,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _nameController.removeListener(_onFieldChanged);
     _jobController.removeListener(_onFieldChanged);
     _companyController.removeListener(_onFieldChanged);
-    _addressController.removeListener(_onFieldChanged);
+    _phoneController.removeListener(_onFieldChanged);
     _bioController.removeListener(_onFieldChanged);
     _debounceTimer?.cancel();
     _nameController.dispose();
     _jobController.dispose();
     _companyController.dispose();
-    _addressController.dispose();
+    _phoneController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -115,7 +117,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       jobTitle: _jobController.text,
       companyName: _companyController.text,
       avatarUrl: _avatarUrl,
-      address: _addressController.text,
+      phone: '$_phoneCountryCode ${_phoneController.text.trim()}',
       bio: _bioController.text,
       whatImLookingFor: _selectedLookingFor.join(', '),
       industries: _selectedIndustries,
@@ -132,7 +134,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         'job_title': _jobController.text,
         'company_name': _companyController.text,
         'avatar_url': _avatarUrl,
-        'address': _addressController.text,
+        'phone': '$_phoneCountryCode ${_phoneController.text.trim()}',
         'bio': _bioController.text,
         'what_im_looking_for': _selectedLookingFor.join(', '),
         'industries': _selectedIndustries,
@@ -172,7 +174,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       _nameController.text = data['full_name'] ?? '';
       _jobController.text = data['job_title'] ?? '';
       _companyController.text = data['company_name'] ?? '';
-      _addressController.text = data['address'] ?? '';
+      
+      String savedPhone = data['phone'] ?? '';
+      if (savedPhone.isNotEmpty && savedPhone.contains(' ')) {
+        final parts = savedPhone.split(' ');
+        if (parts[0].startsWith('+')) {
+          _phoneCountryCode = parts[0];
+          _phoneController.text = parts.sublist(1).join(' ');
+        } else {
+          _phoneController.text = savedPhone;
+        }
+      } else {
+        _phoneController.text = savedPhone;
+      }
+
       _bioController.text = data['bio'] ?? '';
       
       final lookingForStr = data['what_im_looking_for'] as String?;
@@ -286,8 +301,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   void _showAddEditSocialDialog({Map<String, dynamic>? existingLink, int? index, String? platformName}) {
     final isEditing = existingLink != null;
-    final platform = isEditing ? existingLink['platform'] as String : (platformName ?? 'LinkedIn');
-    final isPhoneOrWhatsApp = platform == 'Phone Number' || platform == 'WhatsApp';
+    final platform = isEditing ? existingLink['platform'] as String : (platformName ?? 'LinkedIn'.tr());
+    final isPhoneOrWhatsApp = platform == 'Phone Number'.tr() || platform == 'WhatsApp'.tr();
     
     String selectedCode = '+1';
     String initialValue = isEditing ? existingLink['value'] as String : '';
@@ -304,7 +319,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
 
     final valueController = TextEditingController(text: initialValue);
-    final labelController = TextEditingController(text: isEditing ? existingLink['label'] as String : (platform == 'Email' ? 'Work' : platform == 'Phone Number' ? 'Mobile' : platform));
+    final labelController = TextEditingController(text: isEditing ? existingLink['label'] as String : (platform == 'Email'.tr() ? 'Work' : platform == 'Phone Number'.tr() ? 'Mobile' : platform));
 
     showModalBottomSheet(
       context: context,
@@ -345,7 +360,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    Text(isPhoneOrWhatsApp ? "Phone Number" : "Value / URL", style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
+                    Text(isPhoneOrWhatsApp ? "Phone Number".tr() : "Value / URL", style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Container(
                       decoration: BoxDecoration(
@@ -377,16 +392,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                   dialogTextStyle: const TextStyle(color: Colors.white),
                                   dialogBackgroundColor: const Color(0xFF141927),
                                   searchStyle: const TextStyle(color: Colors.white),
-                                  searchDecoration: const InputDecoration(
-                                    hintText: "Search country",
-                                    hintStyle: TextStyle(color: Colors.white54),
-                                    prefixIcon: Icon(Icons.search, color: Colors.white54),
+                                  searchDecoration: InputDecoration(
+                                    hintText: "Search country".tr(),
+                                    hintStyle: const TextStyle(color: Colors.white54),
+                                    prefixIcon: const Icon(Icons.search, color: Colors.white54),
                                   ),
                                   closeIcon: const Icon(Icons.close, color: Colors.white),
                                 ),
                               )
                             : null,
-                          hintText: platform == 'Email' ? 'example@email.com' : isPhoneOrWhatsApp ? '555-5555' : 'https://...',
+                          hintText: platform == 'Email'.tr() ? 'example@email.com' : isPhoneOrWhatsApp ? '555-5555' : 'https://...',
                           hintStyle: const TextStyle(color: Colors.white24),
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.symmetric(horizontal: isPhoneOrWhatsApp ? 0 : 16, vertical: 16),
@@ -499,7 +514,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 onPressed: () => Navigator.pop(context, true),
               )
             : null,
-        title: const Text("Edit Profile", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text("Edit Profile".tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
           if (_isAutoSaving)
@@ -522,13 +537,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
             )
           else if (_isLoaded)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  Icon(LucideIcons.cloudCheck, color: Colors.white24, size: 18),
-                  SizedBox(width: 4),
-                  Text("Saved", style: TextStyle(color: Colors.white24, fontSize: 12)),
+                  const Icon(LucideIcons.cloudCheck, color: Colors.white24, size: 18),
+                  const SizedBox(width: 4),
+                  Text("Saved".tr(), style: const TextStyle(color: Colors.white24, fontSize: 12)),
                 ],
               ),
             ),
@@ -585,21 +600,21 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              _buildSectionTitle("Personal Details"),
-              _buildTextField("Full Name", _nameController),
-              _buildTextField("Job Title", _jobController),
-              _buildTextField("Company", _companyController),
-              _buildTextField("Address", _addressController),
+              _buildSectionTitle("Personal Details".tr()),
+              _buildTextField("Full Name".tr(), _nameController),
+              _buildTextField("Job Title".tr(), _jobController),
+              _buildTextField("Company".tr(), _companyController),
+              _buildPhoneField(),
               
               const SizedBox(height: 32),
-              _buildSectionTitle("About Me"),
+              _buildSectionTitle("About Me".tr()),
               const SizedBox(height: 8),
               _buildCollapsibleBio(),
               _buildCollapsibleLookingFor(),
               _buildCollapsibleIndustriesAndInterests(),
               
               const SizedBox(height: 32),
-              _buildSectionTitle("Social Links"),
+              _buildSectionTitle("Social Links".tr()),
               const SizedBox(height: 8),
               
               Container(
@@ -618,29 +633,29 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       runSpacing: 24,
                       alignment: WrapAlignment.center,
                       children: [
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.phone, "Phone Number")),
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.envelope, "Email")),
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.link, "Link")),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.phone, "Phone Number".tr())),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.envelope, "Email".tr())),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.link, "Link".tr())),
                         
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.locationDot, "Address")),
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.globe, "Company Website")),
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.linkedinIn, "LinkedIn")),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.locationDot, "Address".tr())),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.globe, "Company Website".tr())),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.linkedinIn, "LinkedIn".tr())),
                         
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.instagram, "Instagram")),
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.xTwitter, "X")),
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.calendarCheck, "Calendly")),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.instagram, "Instagram".tr())),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.xTwitter, "X".tr())),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.calendarCheck, "Calendly".tr())),
                         
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.facebookF, "Facebook")),
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.threads, "Threads")),
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.youtube, "YouTube")),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.facebookF, "Facebook".tr())),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.threads, "Threads".tr())),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.youtube, "YouTube".tr())),
                         
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.whatsapp, "WhatsApp")),
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.snapchat, "Snapchat")),
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.tiktok, "TikTok")),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.whatsapp, "WhatsApp".tr())),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.snapchat, "Snapchat".tr())),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.tiktok, "TikTok".tr())),
                         
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.github, "GitHub")),
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.yelp, "Yelp")),
-                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.moneyBill, "Venmo")),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.github, "GitHub".tr())),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.yelp, "Yelp".tr())),
+                        SizedBox(width: itemWidth, child: _buildSocialAddButton(FontAwesomeIcons.moneyBill, "Venmo".tr())),
                       ],
                     );
                   },
@@ -648,7 +663,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
               
               const SizedBox(height: 32),
-              _buildSectionTitle("Active Links"),
+              _buildSectionTitle("Active Links".tr()),
               
 
               const SizedBox(height: 16),
@@ -767,6 +782,70 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           fontWeight: FontWeight.w900,
           letterSpacing: -0.5,
         ),
+      ),
+    );
+  }
+
+  Widget _buildPhoneField() {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Phone Number".tr(), style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold)),
+          TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            style: TextStyle(color: Colors.white, fontSize: 16),
+            decoration: InputDecoration(
+              prefixIconConstraints: BoxConstraints(minWidth: 0, minHeight: 0),
+              prefixIcon: Container(
+                margin: const EdgeInsets.only(bottom: 4, right: 8),
+                child: CountryCodePicker(
+                onChanged: (countryCode) {
+                  if (countryCode.dialCode != null) {
+                    setState(() {
+                      _phoneCountryCode = countryCode.dialCode!;
+                    });
+                    _onFieldChanged();
+                  }
+                },
+                initialSelection: _phoneCountryCode,
+                favorite: const ['+213', '+216', '+20', '+33', '+1', '+34', '+39', '+351', '+7', '+227', '+223', '+221'],
+                countryFilter: codes.map<String>((c) => c['code']!).where((code) => code != 'IL').toList(),
+                showCountryOnly: false,
+                showOnlyCountryWhenClosed: false,
+                alignLeft: false,
+                padding: EdgeInsets.zero,
+                textStyle: TextStyle(color: Colors.white, fontSize: 16),
+                dialogTextStyle: TextStyle(color: Colors.white),
+                dialogBackgroundColor: Colors.transparent,
+                barrierColor: Colors.black87,
+                dialogSize: Size(MediaQuery.of(context).size.width * 0.85, MediaQuery.of(context).size.height * 0.7),
+                boxDecoration: BoxDecoration(
+                  color: const Color(0xFF1A1E2E),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white10),
+                ),
+                closeIcon: const Icon(Icons.close, color: Colors.white54),
+                searchStyle: const TextStyle(color: Colors.white),
+                searchDecoration: InputDecoration(
+                  hintText: "Search country".tr(),
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.05),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                ),
+              ),
+              ),
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: EventzoneTheme.primaryAction)),
+              contentPadding: const EdgeInsets.only(top: 10, bottom: 8),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -891,7 +970,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         ),
         child: ExpansionTile(
           controller: _bioExpansionController,
-          title: const Text("Professional Bio", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          title: Text("Professional Bio".tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           iconColor: Colors.white70,
           collapsedIconColor: Colors.white70,
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -958,7 +1037,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           border: Border.all(color: Colors.white10),
         ),
         child: ExpansionTile(
-          title: const Text("What I'm Looking For", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          title: Text("What I'm Looking For".tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           iconColor: Colors.white70,
           collapsedIconColor: Colors.white70,
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -1018,7 +1097,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           border: Border.all(color: Colors.white10),
         ),
         child: ExpansionTile(
-          title: const Text("Industries & Interests", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          title: Text("Industries & Interests".tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           iconColor: Colors.white70,
           collapsedIconColor: Colors.white70,
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -1027,7 +1106,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           TextField(
             style: const TextStyle(color: Colors.white, fontSize: 14),
             decoration: InputDecoration(
-              hintText: "Search areas...",
+              hintText: "Search areas...".tr(),
               hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
               prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
               fillColor: const Color(0xFF1A1E2E),

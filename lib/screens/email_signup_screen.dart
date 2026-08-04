@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import '../providers/auth_providers.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class EmailSignUpScreen extends ConsumerStatefulWidget {
   const EmailSignUpScreen({super.key});
@@ -68,8 +69,8 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("An unexpected error occurred. Please try again."),
+        SnackBar(
+          content: Text("An unexpected error occurred. Please try again.".tr()),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -94,8 +95,8 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Verification email resent!"),
+          SnackBar(
+            content: Text("Verification email resent!".tr()),
             backgroundColor: EventzoneTheme.accentSuccess,
             behavior: SnackBarBehavior.floating,
           ),
@@ -126,21 +127,21 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
         body: SafeArea(
           child: Center(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              padding: EdgeInsets.symmetric(horizontal: 24.0),
               child: GlassContainer(
                 borderRadius: 24,
-                padding: const EdgeInsets.all(32.0),
+                padding: EdgeInsets.all(32.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.mark_email_unread_outlined,
                       size: 64,
                       color: EventzoneTheme.primaryAction,
                     ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      "Check your inbox to verify your email",
+                    SizedBox(height: 24),
+                    Text(
+                      "Check your inbox to verify your email".tr(),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         
@@ -149,35 +150,35 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                         color: Colors.white,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     Text(
                       "We've sent a verification link to ${_emailController.text.trim()}. Please click the link in the email to complete your registration.",
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         
                         fontSize: 14,
                         color: Colors.white60,
                         height: 1.5,
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
                     ElevatedButton(
                       onPressed: () => context.go('/welcome'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: EventzoneTheme.primaryAction,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                        padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),
                         ),
                       ),
-                      child: const Text("Back to Sign In"),
+                      child: Text("Back to Sign In".tr()),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     GestureDetector(
                       onTap: _isLoading ? null : _resendVerificationEmail,
-                      child: const Text(
-                        "Didn't receive the email? Resend",
+                      child: Text(
+                        "Didn't receive the email? Resend".tr(),
                         style: TextStyle(
                           color: EventzoneTheme.primaryAction,
                           fontWeight: FontWeight.bold,
@@ -202,46 +203,46 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          icon: Icon(Icons.arrow_back_ios_new, color: Colors.white),
           onPressed: () => context.pop(),
         ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+          padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               Text(
-                "Create Account",
+                "Create Account".tr(),
                 style: Theme.of(context).textTheme.displayLarge?.copyWith(
                   fontSize: 32,
                   letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                "Register now to unlock event directory, networking, and meetings.",
+              SizedBox(height: 8),
+              Text(
+                "Register now to unlock event directory, networking, and meetings.".tr(),
                 style: TextStyle(
                   color: Colors.white38,
                   fontSize: 14,
                   
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
 
               Form(
                 key: _formKey,
                 child: GlassContainer(
                   borderRadius: 24,
-                  padding: const EdgeInsets.all(24.0),
+                  padding: EdgeInsets.all(24.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // Full Name Field
-                      const Text(
-                        "Full Name",
+                      Text(
+                        "Full Name".tr(),
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 13,
@@ -249,23 +250,23 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                           
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
                       TextFormField(
                         controller: _nameController,
-                        style: const TextStyle(color: Colors.white, fontSize: 14, ),
+                        style: TextStyle(color: Colors.white, fontSize: 14, ),
                         decoration: InputDecoration(
-                          hintText: "John Doe",
-                          hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-                          fillColor: const Color(0xFF1A1E2E),
+                          hintText: "John Doe".tr(),
+                          hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+                          fillColor: Color(0xFF1A1E2E),
                           filled: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
+                            borderSide: BorderSide(color: EventzoneTheme.primaryAction, width: 2),
                           ),
                         ),
                         validator: (value) {
@@ -275,11 +276,11 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
 
                       // Email Field
-                      const Text(
-                        "Email Address",
+                      Text(
+                        "Email Address".tr(),
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 13,
@@ -287,23 +288,23 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                           
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
                       TextFormField(
                         controller: _emailController,
-                        style: const TextStyle(color: Colors.white, fontSize: 14, ),
+                        style: TextStyle(color: Colors.white, fontSize: 14, ),
                         decoration: InputDecoration(
-                          hintText: "john@example.com",
-                          hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-                          fillColor: const Color(0xFF1A1E2E),
+                          hintText: "john@example.com".tr(),
+                          hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+                          fillColor: Color(0xFF1A1E2E),
                           filled: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
+                            borderSide: BorderSide(color: EventzoneTheme.primaryAction, width: 2),
                           ),
                         ),
                         validator: (value) {
@@ -317,11 +318,11 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
 
                       // Password Field
-                      const Text(
-                        "Password",
+                      Text(
+                        "Password".tr(),
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 13,
@@ -329,24 +330,24 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                           
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        style: const TextStyle(color: Colors.white, fontSize: 14, ),
+                        style: TextStyle(color: Colors.white, fontSize: 14, ),
                         decoration: InputDecoration(
-                          hintText: "Min. 8 characters",
-                          hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-                          fillColor: const Color(0xFF1A1E2E),
+                          hintText: "Min. 8 characters".tr(),
+                          hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+                          fillColor: Color(0xFF1A1E2E),
                           filled: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
+                            borderSide: BorderSide(color: EventzoneTheme.primaryAction, width: 2),
                           ),
                           suffixIcon: IconButton(
                             icon: Icon(
@@ -374,11 +375,11 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
 
                       // Confirm Password Field
-                      const Text(
-                        "Confirm Password",
+                      Text(
+                        "Confirm Password".tr(),
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 13,
@@ -386,24 +387,24 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                           
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
                       TextFormField(
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
-                        style: const TextStyle(color: Colors.white, fontSize: 14, ),
+                        style: TextStyle(color: Colors.white, fontSize: 14, ),
                         decoration: InputDecoration(
-                          hintText: "Re-enter password",
-                          hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-                          fillColor: const Color(0xFF1A1E2E),
+                          hintText: "Re-enter password".tr(),
+                          hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+                          fillColor: Color(0xFF1A1E2E),
                           filled: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
+                            borderSide: BorderSide(color: EventzoneTheme.primaryAction, width: 2),
                           ),
                           suffixIcon: IconButton(
                             icon: Icon(
@@ -428,7 +429,7 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 28),
+                      SizedBox(height: 28),
 
                       // Create Account Button
                       ElevatedButton(
@@ -436,14 +437,14 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: EventzoneTheme.primaryAction,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: EdgeInsets.symmetric(vertical: 16),
                           disabledBackgroundColor: EventzoneTheme.primaryAction.withOpacity(0.5),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
                           ),
                         ),
                         child: _isLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
@@ -451,8 +452,8 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Text(
-                                "Create Account",
+                            : Text(
+                                "Create Account".tr(),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 15,
@@ -463,14 +464,14 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
 
               // Redirect to Sign In
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    "Already have an account? ",
+                  Text(
+                    "Already have an account? ".tr(),
                     style: TextStyle(
                       color: Colors.white38,
                       fontSize: 13,
@@ -479,8 +480,8 @@ class _EmailSignUpScreenState extends ConsumerState<EmailSignUpScreen> {
                   ),
                   GestureDetector(
                     onTap: () => context.pushReplacement('/signin'),
-                    child: const Text(
-                      "Sign in",
+                    child: Text(
+                      "Sign in".tr(),
                       style: TextStyle(
                         color: EventzoneTheme.primaryAction,
                         fontSize: 13,

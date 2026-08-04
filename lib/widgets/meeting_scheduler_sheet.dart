@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import '../models/meeting_model.dart';
 import '../services/supabase_service.dart';
 import '../providers/meeting_providers.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class MeetingSchedulerSheet extends ConsumerStatefulWidget {
   final String otherUserId;
@@ -183,29 +183,29 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
     attendeeBookedSlotsAsync.whenData((slots) => combinedBookedSlots.addAll(slots));
 
     return Scaffold(
-      backgroundColor: const Color(0xFF070A13),
+      backgroundColor: Color(0xFF070A13),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(LucideIcons.x, color: Colors.white),
+          icon: Icon(LucideIcons.x, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          "Schedule a Meeting",
+        title: Text(
+          "Schedule a Meeting".tr(),
           style: TextStyle( color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        physics: BouncingScrollPhysics(),
+        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header Card
             GlassContainer(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(16),
               child: Row(
                 children: [
                   CircleAvatar(
@@ -215,21 +215,21 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                         : null,
                     backgroundColor: EventzoneTheme.primaryAction.withOpacity(0.2),
                     child: widget.otherAvatarUrl.isEmpty
-                        ? Text(widget.otherName[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                        ? Text(widget.otherName[0], style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
                         : null,
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           widget.otherName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
                         ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          "Accepted Connection",
+                        SizedBox(height: 2),
+                        Text(
+                          "Accepted Connection".tr(),
                           style: TextStyle(color: Colors.white38, fontSize: 12),
                         ),
                       ],
@@ -238,23 +238,23 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             // Mini Calendar Header
-            const Text(
-              "Select Date",
+            Text(
+              "Select Date".tr(),
               style: TextStyle( color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
 
             // Horizontal Mini Calendar List
             SizedBox(
               height: 70,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
+                physics: BouncingScrollPhysics(),
                 itemCount: _dates.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 10),
+                separatorBuilder: (context, index) => SizedBox(width: 10),
                 itemBuilder: (context, index) {
                   final date = _dates[index];
                   final isSelected = DateFormat('yyyy-MM-dd').format(date) == DateFormat('yyyy-MM-dd').format(_selectedDate);
@@ -268,10 +268,10 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                       });
                     },
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
+                      duration: Duration(milliseconds: 200),
                       width: 55,
                       decoration: BoxDecoration(
-                        color: isSelected ? EventzoneTheme.primaryAction : const Color(0xFF141927),
+                        color: isSelected ? EventzoneTheme.primaryAction : Color(0xFF141927),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isSelected ? EventzoneTheme.primaryAction : Colors.white.withOpacity(0.05),
@@ -288,7 +288,7 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          SizedBox(height: 6),
                           Text(
                             DateFormat('d').format(date),
                             style: TextStyle(
@@ -304,19 +304,19 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                 },
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             // Duration Selector Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  "Duration",
+                Text(
+                  "Duration".tr(),
                   style: TextStyle( color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                 ),
                 Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF141927),
+                    color: Color(0xFF141927),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -331,7 +331,7 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                           });
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: isSel ? EventzoneTheme.primaryAction : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
@@ -351,20 +351,20 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             // Time Slots Header
-            const Text(
-              "Select Time",
+            Text(
+              "Select Time".tr(),
               style: TextStyle( color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
 
             // Grid of Time Slots
             GridView.builder(
               shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              physics: NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 4,
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
@@ -389,13 +389,13 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                           });
                         },
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
+                    duration: Duration(milliseconds: 150),
                     decoration: BoxDecoration(
                       color: isBooked
-                          ? const Color(0xFF2A2F3E)
+                          ? Color(0xFF2A2F3E)
                           : isSelected
                               ? EventzoneTheme.primaryAction
-                              : const Color(0xFF141927),
+                              : Color(0xFF141927),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isSelected ? EventzoneTheme.primaryAction : Colors.white.withOpacity(0.03),
@@ -406,8 +406,8 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         if (isBooked) ...[
-                          const Icon(LucideIcons.lock, size: 10, color: Colors.white24),
-                          const SizedBox(width: 4),
+                          Icon(LucideIcons.lock, size: 10, color: Colors.white24),
+                          SizedBox(width: 4),
                         ],
                         Text(
                           time,
@@ -426,12 +426,12 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                 );
               },
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             // Conflict Warning Banner
             if (_conflictError != null) ...[
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.red.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -439,26 +439,26 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(LucideIcons.alertTriangle, color: Colors.redAccent, size: 16),
-                    const SizedBox(width: 10),
+                    Icon(LucideIcons.alertTriangle, color: Colors.redAccent, size: 16),
+                    SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         _conflictError!,
-                        style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
             ],
 
             // Title Input
-            const Text(
-              "Meeting Title",
+            Text(
+              "Meeting Title".tr(),
               style: TextStyle( color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.03),
@@ -467,23 +467,23 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
               ),
               child: TextField(
                 controller: _titleController,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: const InputDecoration(
-                  hintText: "e.g. Quick Intro, Partnership Discussion",
+                style: TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: "e.g. Quick Intro, Partnership Discussion".tr(),
                   hintStyle: TextStyle(color: Colors.white24, fontSize: 13),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
 
             // Location Input
-            const Text(
-              "Location",
+            Text(
+              "Location".tr(),
               style: TextStyle( color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.03),
@@ -492,23 +492,23 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
               ),
               child: TextField(
                 controller: _locationController,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: const InputDecoration(
-                  hintText: "Booth, hall, or virtual link...",
+                style: TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: "Booth, hall, or virtual link...".tr(),
                   hintStyle: TextStyle(color: Colors.white24, fontSize: 13),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
 
             // Note Input
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  "Note (Optional)",
+                Text(
+                  "Note (Optional)".tr(),
                   style: TextStyle( color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                 ),
                 ValueListenableBuilder<TextEditingValue>(
@@ -526,7 +526,7 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.03),
@@ -537,17 +537,17 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                 controller: _noteController,
                 maxLines: 3,
                 maxLength: 300,
-                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => const SizedBox.shrink(),
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: const InputDecoration(
-                  hintText: "Add a message to accompany the request...",
+                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => SizedBox.shrink(),
+                style: TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: "Add a message to accompany the request...".tr(),
                   hintStyle: TextStyle(color: Colors.white24, fontSize: 13),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
 
             // CTA Button
             SizedBox(
@@ -561,13 +561,13 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                   elevation: 0,
                 ),
                 child: _isSubmitting
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 24,
                         height: 24,
                         child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
                       )
-                    : const Text(
-                        "Send Meeting Request",
+                    : Text(
+                        "Send Meeting Request".tr(),
                         style: TextStyle(
                           
                           color: Colors.white,
@@ -577,7 +577,7 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                       ),
               ),
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
           ],
         ),
       ),

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,7 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import 'auth_providers.dart';
 
 class NoConnectionsException implements Exception {
-  const NoConnectionsException();
+  NoConnectionsException();
 }
 
 class ExportContactsNotifier extends AutoDisposeAsyncNotifier<void> {
@@ -17,7 +18,7 @@ class ExportContactsNotifier extends AutoDisposeAsyncNotifier<void> {
   }
 
   Future<void> export({List<Map<String, dynamic>>? customConnections}) async {
-    state = const AsyncValue.loading();
+    state = AsyncValue.loading();
     try {
       // Writing to getTemporaryDirectory() is app-private and requires no
       // storage permission on any Android or iOS version.
@@ -49,20 +50,20 @@ class ExportContactsNotifier extends AutoDisposeAsyncNotifier<void> {
 
       // Check if there are indeed connections to export
       if (profilesToExport.isEmpty) {
-        throw const NoConnectionsException();
+        throw NoConnectionsException();
       }
 
       // 3. Build CSV in-memory
       final List<List<dynamic>> csvRows = [
         [
-          'Full Name',
-          'Job Title',
-          'Company',
-          'Email',
+          'Full Name'.tr(),
+          'Job Title'.tr(),
+          'Company'.tr(),
+          'Email'.tr(),
           'Phone',
-          'LinkedIn',
-          'WhatsApp',
-          'GitHub',
+          'LinkedIn'.tr(),
+          'WhatsApp'.tr(),
+          'GitHub'.tr(),
           'Website',
           'Industries',
           'Interests',
@@ -139,7 +140,7 @@ class ExportContactsNotifier extends AutoDisposeAsyncNotifier<void> {
         ]);
       }
 
-      final csvString = const ListToCsvConverter().convert(csvRows);
+      final csvString = ListToCsvConverter().convert(csvRows);
 
       // 4. Save to temporary directory
       final directory = await getTemporaryDirectory();
@@ -152,7 +153,7 @@ class ExportContactsNotifier extends AutoDisposeAsyncNotifier<void> {
       // 5. Trigger share sheet
       await Share.shareXFiles([XFile(file.path)], subject: 'Exported Contacts');
 
-      state = const AsyncValue.data(null);
+      state = AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       rethrow;

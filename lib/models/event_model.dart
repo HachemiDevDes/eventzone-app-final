@@ -10,6 +10,7 @@ class EventModel {
   final String startDate;
   final String endDate;
   bool isJoined;
+  final bool isLive;
 
   EventModel({
     required this.id,
@@ -23,6 +24,7 @@ class EventModel {
     this.description = "Premium B2B networking event focused on industry-leading innovations and executive partnerships.",
     this.stats,
     this.isJoined = false,
+    this.isLive = false,
   });
 }
 
@@ -37,6 +39,7 @@ final List<EventModel> dummyEvents = [
     stats: "487 Registered • 12 Hubs",
     startDate: "Oct 12, 2024",
     endDate: "Oct 14, 2024",
+    isLive: true,
   ),
   EventModel(
     id: "7b55f6e8-2321-4f38-bc0d-7b2a0c4f8d62",

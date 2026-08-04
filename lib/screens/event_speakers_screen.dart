@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/eventzone_theme.dart';
@@ -14,22 +15,22 @@ class EventSpeakersScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 72),
+              SizedBox(height: 72),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "SPEAKERS",
+                      "SPEAKERS".tr(),
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                             color: EventzoneTheme.primaryAction,
                             letterSpacing: 2,
                           ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text(
-                      "Industry Leaders",
+                      "Industry Leaders".tr(),
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.w900,
                             fontSize: 28,
@@ -40,21 +41,21 @@ class EventSpeakersScreen extends StatelessWidget {
               ),
               Expanded(
                 child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                   itemCount: 8,
-                  separatorBuilder: (context, index) => const SizedBox(height: 16),
+                  separatorBuilder: (context, index) => SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final names = ["Dr. Elena Wright", "James Wilson", "Marcus Chen", "Sarah Rodriguez"];
-                    final titles = ["CTO @ TechFlow", "Head of AI @ Google", "Founder @ Innovate", "Design Director"];
+                    final titles = ["CTO @TechFlow", "Head of AI @Google", "Founder @Innovate", "Design Director"];
                     final name = names[index % names.length];
                     final title = titles[index % titles.length];
 
                     return GlassContainer(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.all(16),
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(2),
+                            padding: EdgeInsets.all(2),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               border: Border.all(color: EventzoneTheme.primaryAction.withOpacity(0.3), width: 2),
@@ -64,32 +65,32 @@ class EventSpeakersScreen extends StatelessWidget {
                               backgroundImage: NetworkImage("https://i.pravatar.cc/150?u=speaker$index"),
                             ),
                           ),
-                          const SizedBox(width: 20),
+                          SizedBox(width: 20),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   name,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
                                 ),
-                                const SizedBox(height: 4),
+                                SizedBox(height: 4),
                                 Text(
                                   title,
-                                  style: const TextStyle(color: Colors.white60, fontSize: 13),
+                                  style: TextStyle(color: Colors.white60, fontSize: 13),
                                 ),
-                                const SizedBox(height: 12),
+                                SizedBox(height: 12),
                                 Row(
                                   children: [
                                     _buildSocialIcon(LucideIcons.user),
-                                    const SizedBox(width: 12),
+                                    SizedBox(width: 12),
                                     _buildSocialIcon(LucideIcons.mail),
                                   ],
                                 )
                               ],
                             ),
                           ),
-                          const Icon(LucideIcons.chevronRight, color: Colors.white24),
+                          Icon(LucideIcons.chevronRight, color: Colors.white24),
                         ],
                       ),
                     );
@@ -105,7 +106,7 @@ class EventSpeakersScreen extends StatelessWidget {
 
   Widget _buildSocialIcon(IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(6),
+      padding: EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),

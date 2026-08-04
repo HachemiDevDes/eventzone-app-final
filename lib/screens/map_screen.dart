@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -20,9 +21,9 @@ class _MapScreenState extends State<MapScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 72),
+              SizedBox(height: 72),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -30,15 +31,15 @@ class _MapScreenState extends State<MapScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "VENUE",
+                          "VENUE".tr(),
                           style: Theme.of(context).textTheme.labelLarge?.copyWith(
                                 color: EventzoneTheme.primaryAction,
                                 letterSpacing: 2,
                               ),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: 8),
                         Text(
-                          "Live Floor Plan",
+                          "Live Floor Plan".tr(),
                           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 28,
@@ -47,9 +48,9 @@ class _MapScreenState extends State<MapScreen> {
                       ],
                     ),
                     GlassContainer(
-                      padding: const EdgeInsets.all(8),
+                      padding: EdgeInsets.all(8),
                       borderRadius: 12,
-                      child: const Icon(LucideIcons.locateFixed, color: EventzoneTheme.primaryAction, size: 20),
+                      child: Icon(LucideIcons.locateFixed, color: EventzoneTheme.primaryAction, size: 20),
                     ),
                   ],
                 ),
@@ -57,14 +58,14 @@ class _MapScreenState extends State<MapScreen> {
               
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
+                  padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
                   child: Stack(
                     children: [
                       GlassContainer(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
                           child: InteractiveViewer(
-                            boundaryMargin: const EdgeInsets.all(200),
+                            boundaryMargin: EdgeInsets.all(200),
                             minScale: 0.1,
                             maxScale: 5.0,
                             child: Center(
@@ -83,7 +84,7 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
             ],
           ),
         ),
@@ -118,7 +119,7 @@ class _MapScreenState extends State<MapScreen> {
                 shape: BoxShape.circle,
                 boxShadow: [BoxShadow(color: EventzoneTheme.primaryAction.withOpacity(0.5), blurRadius: 10, spreadRadius: 2)],
               ),
-              child: const Center(child: Icon(LucideIcons.navigation, size: 12, color: Colors.white)),
+              child: Center(child: Icon(LucideIcons.navigation, size: 12, color: Colors.white)),
             ),
           ),
         ],
@@ -134,7 +135,7 @@ class _MapScreenState extends State<MapScreen> {
       child: GestureDetector(
         onTap: () => setState(() => _selectedBooth = label),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: Duration(milliseconds: 200),
           width: width,
           height: height,
           decoration: BoxDecoration(
@@ -164,32 +165,32 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget _buildBoothInfo() {
-    if (_selectedBooth == "None") return const SizedBox.shrink();
+    if (_selectedBooth == "None") return SizedBox.shrink();
     return GlassContainer(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       borderRadius: 20,
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(12),
             decoration: BoxDecoration(color: EventzoneTheme.primaryAction.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-            child: const Icon(LucideIcons.info, color: EventzoneTheme.primaryAction, size: 20),
+            child: Icon(LucideIcons.info, color: EventzoneTheme.primaryAction, size: 20),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_selectedBooth, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const Text("Industry: Tech/Innovation", style: TextStyle(color: Colors.white38, fontSize: 12)),
+                Text(_selectedBooth, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text("Industry: Tech/Innovation".tr(), style: TextStyle(color: Colors.white38, fontSize: 12)),
               ],
             ),
           ),
           ElevatedButton(
             onPressed: () {},
             style: ElevatedButton.styleFrom(backgroundColor: EventzoneTheme.primaryAction, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-            child: const Text("Details"),
+            child: Text("Details".tr()),
           ),
         ],
       ),

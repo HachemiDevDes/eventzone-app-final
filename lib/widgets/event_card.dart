@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:intl/intl.dart';
+import 'dart:convert';
 import '../theme/eventzone_theme.dart';
 import 'glass_container.dart';
 import 'status_pill.dart';
@@ -10,8 +12,7 @@ class EventCard extends StatelessWidget {
   final String location;
   final String category;
   final String imageUrl;
-  final bool isJoined;
-  final VoidCallback onRegister;
+  final bool isLive;
   final VoidCallback? onViewDetails;
 
   const EventCard({
@@ -21,8 +22,7 @@ class EventCard extends StatelessWidget {
     required this.location,
     required this.category,
     required this.imageUrl,
-    required this.isJoined,
-    required this.onRegister,
+    this.isLive = false,
     this.onViewDetails,
   });
 
@@ -46,29 +46,15 @@ class EventCard extends StatelessWidget {
                     children: [
                       ClipRRect(
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                        child: Image.network(
-                          imageUrl,
-                          height: 160,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            height: 160,
-                            color: Colors.white10,
-                            child: const Icon(LucideIcons.imageOff, color: Colors.white24),
-                          ),
-                        ),
+                        child: _buildEventImage(imageUrl, 160),
                       ),
                       Positioned(
                         top: 12,
                         left: 12,
-                        child: StatusPill(label: category),
+                        child: isLive 
+                            ? StatusPill(label: "LIVE NOW", isLive: true)
+                            : StatusPill(label: category),
                       ),
-                      if (isJoined)
-                        const Positioned(
-                          top: 12,
-                          right: 12,
-                          child: StatusPill(label: "REGISTERED", isLive: true),
-                        ),
                     ],
                   ),
                   Padding(
@@ -87,11 +73,21 @@ class EventCard extends StatelessWidget {
                           children: [
                             const Icon(LucideIcons.calendar, color: Colors.white38, size: 14),
                             const SizedBox(width: 6),
-                            Text(date, style: Theme.of(context).textTheme.bodyMedium),
+                            Text(
+                              _formatDate(date), 
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
                             const SizedBox(width: 16),
                             const Icon(LucideIcons.mapPin, color: EventzoneTheme.primaryAction, size: 14),
                             const SizedBox(width: 4),
-                            Text(location, style: Theme.of(context).textTheme.bodyMedium),
+                            Expanded(
+                              child: Text(
+                                location, 
+                                style: Theme.of(context).textTheme.bodyMedium,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -106,45 +102,27 @@ class EventCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: onViewDetails ?? () {},
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.white24),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text("View Details", style: TextStyle(fontWeight: FontWeight.w600)),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: onViewDetails,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: EventzoneTheme.primaryAction,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        "View Details",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold, 
+                          color: Colors.white,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: onRegister,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: EventzoneTheme.primaryAction,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: Text(
-                            isJoined ? "ENTER HUB" : "Register Now",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold, 
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -153,5 +131,45 @@ class EventCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildEventImage(String imageUrl, double height) {
+    if (imageUrl.startsWith('data:image')) {
+      final base64String = imageUrl.split(',').last;
+      try {
+        return Image.memory(
+          base64Decode(base64String),
+          height: height,
+          width: double.infinity,
+          fit: BoxFit.cover,
+        );
+      } catch (e) {
+        return Container(
+          height: height,
+          color: Colors.white10,
+          child: const Icon(LucideIcons.imageOff, color: Colors.white24),
+        );
+      }
+    }
+    return Image.network(
+      imageUrl,
+      height: height,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => Container(
+        height: height,
+        color: Colors.white10,
+        child: const Icon(LucideIcons.imageOff, color: Colors.white24),
+      ),
+    );
+  }
+
+  String _formatDate(String dateStr) {
+    try {
+      final parsed = DateTime.parse(dateStr);
+      return DateFormat('MMM dd, yyyy').format(parsed);
+    } catch (e) {
+      return dateStr;
+    }
   }
 }

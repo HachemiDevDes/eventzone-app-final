@@ -16,9 +16,9 @@ class EventPartnersScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 72),
+              SizedBox(height: 72),
               Padding(
-                padding: const EdgeInsets.all(24.0),
+                padding: EdgeInsets.all(24.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -29,7 +29,7 @@ class EventPartnersScreen extends StatelessWidget {
                             letterSpacing: 2,
                           ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Text(
                       "$type & Partners",
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -42,8 +42,8 @@ class EventPartnersScreen extends StatelessWidget {
               ),
               Expanded(
                 child: GridView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
@@ -52,7 +52,7 @@ class EventPartnersScreen extends StatelessWidget {
                   itemCount: 8,
                   itemBuilder: (context, index) {
                     return GlassContainer(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.all(16),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -69,10 +69,10 @@ class EventPartnersScreen extends StatelessWidget {
                               size: 32
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          SizedBox(height: 12),
                           Text(
                             "${type.substring(0, type.length - 1)} ${index + 1}",
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                           ),
                           Text(
                             index < 2 ? "PLATINUM" : "GOLD",

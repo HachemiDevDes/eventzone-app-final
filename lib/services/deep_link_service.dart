@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart';
 
 class DeepLinkService {
   static final DeepLinkService _instance = DeepLinkService._internal();
@@ -33,7 +34,7 @@ class DeepLinkService {
         _processUri(initialUri);
       }
     } catch (e) {
-      print("Failed to get initial deep link: $e");
+      debugPrint("Failed to get initial deep link: $e");
     }
   }
 
@@ -57,7 +58,7 @@ class DeepLinkService {
           final profileId = text.replaceFirst('eventzone_profile_', '');
           if (profileId.isNotEmpty) {
             // Clear clipboard to avoid triggering again
-            await Clipboard.setData(const ClipboardData(text: ''));
+            await Clipboard.setData(ClipboardData(text: ''));
             if (onProfileIdFound != null) {
               onProfileIdFound!(profileId);
             }
@@ -65,7 +66,7 @@ class DeepLinkService {
         }
       }
     } catch (e) {
-      print("Failed to check clipboard for deferred deep link: $e");
+      debugPrint("Failed to check clipboard for deferred deep link: $e");
     }
   }
 

@@ -1,10 +1,10 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/status_pill.dart';
-import '../models/session_model.dart';
 import '../providers/session_providers.dart';
 import 'schedule_screen.dart';
 import 'session_detail_screen.dart';
@@ -31,11 +31,11 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 72),
+              SizedBox(height: 72),
               
               // Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -43,15 +43,15 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "SCHEDULE",
+                          "SCHEDULE".tr(),
                           style: Theme.of(context).textTheme.labelLarge?.copyWith(
                                 color: EventzoneTheme.primaryAction,
                                 letterSpacing: 2,
                               ),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: 8),
                         Text(
-                          "Sessions & Agenda",
+                          "Sessions & Agenda".tr(),
                           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 28,
@@ -60,12 +60,12 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                       ],
                     ),
                     IconButton(
-                      icon: const Icon(LucideIcons.calendarClock, color: Colors.white, size: 24),
-                      tooltip: "My Meetings",
+                      icon: Icon(LucideIcons.calendarClock, color: Colors.white, size: 24),
+                      tooltip: "My Meetings".tr(),
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const MyMeetingsScreen()),
+                          MaterialPageRoute(builder: (context) => MyMeetingsScreen()),
                         );
                       },
                     ),
@@ -76,19 +76,19 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
               // Async State Builder
               Expanded(
                 child: sessionsAsync.when(
-                  loading: () => const Center(
+                  loading: () => Center(
                     child: CircularProgressIndicator(color: EventzoneTheme.primaryAction),
                   ),
                   error: (err, stack) => Center(
                     child: Text(
                       "Error loading sessions: $err",
-                      style: const TextStyle(color: Colors.white54),
+                      style: TextStyle(color: Colors.white54),
                     ),
                   ),
                   data: (sessions) {
                     if (sessions.isEmpty) {
-                      return const Center(
-                        child: Text("No sessions scheduled for this event.", style: TextStyle(color: Colors.white38)),
+                      return Center(
+                        child: Text("No sessions scheduled for this event.".tr(), style: TextStyle(color: Colors.white38)),
                       );
                     }
 
@@ -108,7 +108,7 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                         // Day Selector Tabs
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                           child: Row(
                             children: days.map((day) {
                               final isSelected = _selectedDay == day;
@@ -119,8 +119,8 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                                   });
                                 },
                                 child: Container(
-                                  margin: const EdgeInsets.only(right: 12),
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                                  margin: EdgeInsets.only(right: 12),
+                                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 10),
                                   decoration: BoxDecoration(
                                     color: isSelected ? EventzoneTheme.primaryAction : Colors.white.withOpacity(0.05),
                                     borderRadius: BorderRadius.circular(30),
@@ -143,12 +143,12 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                         // Sessions List
                         Expanded(
                           child: filteredSessions.isEmpty
-                              ? const Center(
-                                  child: Text("No sessions on this day.", style: TextStyle(color: Colors.white38)),
+                              ? Center(
+                                  child: Text("No sessions on this day.".tr(), style: TextStyle(color: Colors.white38)),
                                 )
                               : ListView.builder(
-                                  physics: const BouncingScrollPhysics(),
-                                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                                  physics: BouncingScrollPhysics(),
+                                  padding: EdgeInsets.symmetric(horizontal: 24),
                                   itemCount: filteredSessions.length,
                                   itemBuilder: (context, index) {
                                     final session = filteredSessions[index];
@@ -159,7 +159,7 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                                     final isLive = _isSessionLive(session.startTime, session.endTime);
 
                                     return Padding(
-                                      padding: const EdgeInsets.only(bottom: 16),
+                                      padding: EdgeInsets.only(bottom: 16),
                                       child: GestureDetector(
                                         onTap: () {
                                           Navigator.push(
@@ -173,7 +173,7 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                                           });
                                         },
                                         child: GlassContainer(
-                                          padding: const EdgeInsets.all(20),
+                                          padding: EdgeInsets.all(20),
                                           child: Row(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
@@ -192,15 +192,15 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                                                       ),
                                                     ),
                                                     if (isLive) ...[
-                                                      const SizedBox(height: 8),
-                                                      const StatusPill(label: "LIVE", isLive: true),
+                                                      SizedBox(height: 8),
+                                                      StatusPill(label: "LIVE", isLive: true),
                                                     ]
                                                   ],
                                                 ),
                                               ),
-                                              const SizedBox(width: 12),
+                                              SizedBox(width: 12),
                                               Container(width: 1, height: 64, color: Colors.white10),
-                                              const SizedBox(width: 16),
+                                              SizedBox(width: 16),
                                               
                                               // Content column
                                               Expanded(
@@ -209,7 +209,7 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                                                   children: [
                                                     Text(
                                                       session.title,
-                                                      style: const TextStyle(
+                                                      style: TextStyle(
                                                         fontWeight: FontWeight.bold,
                                                         fontSize: 15,
                                                         color: Colors.white,
@@ -218,22 +218,22 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                                                       maxLines: 2,
                                                       overflow: TextOverflow.ellipsis,
                                                     ),
-                                                    const SizedBox(height: 6),
+                                                    SizedBox(height: 6),
                                                     Row(
                                                       children: [
-                                                        const Icon(LucideIcons.mapPin, size: 12, color: Colors.white38),
-                                                        const SizedBox(width: 4),
+                                                        Icon(LucideIcons.mapPin, size: 12, color: Colors.white38),
+                                                        SizedBox(width: 4),
                                                         Expanded(
                                                           child: Text(
                                                             session.location ?? "TBA",
-                                                            style: const TextStyle(fontSize: 12, color: Colors.white38),
+                                                            style: TextStyle(fontSize: 12, color: Colors.white38),
                                                             maxLines: 1,
                                                             overflow: TextOverflow.ellipsis,
                                                           ),
                                                         ),
                                                       ],
                                                     ),
-                                                    const SizedBox(height: 12),
+                                                    SizedBox(height: 12),
                                                     Row(
                                                       children: [
                                                         // Speakers avatar stack / indicator
@@ -244,23 +244,23 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                                                                 ? NetworkImage(session.speakers.first.avatarUrl)
                                                                 : null,
                                                             child: session.speakers.first.avatarUrl.isEmpty
-                                                                ? const Icon(LucideIcons.user, size: 8, color: Colors.white)
+                                                                ? Icon(LucideIcons.user, size: 8, color: Colors.white)
                                                                 : null,
                                                           ),
-                                                          const SizedBox(width: 8),
+                                                          SizedBox(width: 8),
                                                           Expanded(
                                                             child: Text(
                                                               session.speakers.first.name +
                                                                   (session.speakers.length > 1
                                                                       ? " +${session.speakers.length - 1}"
                                                                       : ""),
-                                                              style: const TextStyle(fontSize: 11, color: Colors.white70),
+                                                              style: TextStyle(fontSize: 11, color: Colors.white70),
                                                               maxLines: 1,
                                                               overflow: TextOverflow.ellipsis,
                                                             ),
                                                           ),
                                                         ] else
-                                                          const Spacer(),
+                                                          Spacer(),
                                                           
                                                         // Agenda quick-favorite toggle button
                                                         GestureDetector(

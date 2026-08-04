@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/event_model.dart';
-import '../models/connection_request_model.dart';
 import '../models/meeting_model.dart';
 import '../models/session_model.dart';
 
@@ -29,7 +28,7 @@ class SupabaseService {
           .select()
           .order('created_at', ascending: false);
       
-      return (response as List).map((data) {
+      final events = (response as List).map((data) {
         final id = data['id'] as String;
         final isJoined = registeredEventIds.contains(id);
         return EventModel(
@@ -44,12 +43,83 @@ class SupabaseService {
           startDate: data['start_date'] ?? 'TBA',
           endDate: data['end_date'] ?? data['start_date'] ?? 'TBA',
           isJoined: isJoined,
+          isLive: data['is_live'] == true || data['status'] == 'live' || _isEventLiveNow(data['start_date'] ?? data['date'], data['end_date']),
         );
       }).toList();
+
+      // Sort events: upcoming closest first, then past events, then TBA
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      events.sort((a, b) {
+        final aDate = DateTime.tryParse(a.startDate);
+        final bDate = DateTime.tryParse(b.startDate);
+
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+
+        final aIsPast = aDate.isBefore(today);
+        final bIsPast = bDate.isBefore(today);
+
+        if (aIsPast && !bIsPast) return 1;
+        if (!aIsPast && bIsPast) return -1;
+
+        // Both are upcoming or both are past.
+        // If both are upcoming, closest first.
+        // If both are past, closest first (meaning most recent first? Wait. If both are past, most recent past means largest date. We will just sort ascending for upcoming, descending for past).
+        if (aIsPast && bIsPast) {
+          return bDate.compareTo(aDate); // descending for past
+        }
+        
+        return aDate.compareTo(bDate); // ascending for upcoming
+      });
+
+      return events;
     } catch (e) {
       debugPrint('Error fetching events: $e');
       return [];
     }
+  }
+
+  bool _isEventLiveNow(String? startDateStr, String? endDateStr) {
+    if (startDateStr == null || startDateStr == 'TBA' || startDateStr.isEmpty) return false;
+    try {
+      final now = DateTime.now();
+      
+      // Try to parse ISO dates
+      final start = DateTime.tryParse(startDateStr);
+      if (start != null) {
+        final today = DateTime(now.year, now.month, now.day);
+        final startDate = DateTime(start.year, start.month, start.day);
+        
+        DateTime endDate = startDate;
+        if (endDateStr != null && endDateStr.isNotEmpty) {
+          final end = DateTime.tryParse(endDateStr);
+          if (end != null) {
+            endDate = DateTime(end.year, end.month, end.day);
+          }
+        }
+        
+        // Check if today is within the start and end dates (inclusive)
+        if (today.isAfter(startDate.subtract(const Duration(days: 1))) && 
+            today.isBefore(endDate.add(const Duration(days: 1)))) {
+          return true;
+        }
+      }
+
+      // Fallback to original string check for hardcoded legacy data
+      final todayStr1 = "${_monthAbbr(now.month)} ${now.day.toString().padLeft(2, '0')}, ${now.year}";
+      final todayStr2 = "${_monthAbbr(now.month)} ${now.day}, ${now.year}";
+      return startDateStr.contains(todayStr1) || startDateStr.contains(todayStr2);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _monthAbbr(int month) {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return months[month - 1];
   }
 
   // 📝 Register for an event
@@ -90,7 +160,7 @@ class SupabaseService {
       return response;
     } catch (e) {
       debugPrint('Error fetching profile: $e');
-      throw e; // Rethrow to let providers handle the error state
+      rethrow; // Rethrow to let providers handle the error state
     }
   }
 
@@ -101,7 +171,7 @@ class SupabaseService {
     required String jobTitle,
     required String companyName,
     String? avatarUrl,
-    String? address,
+    String? phone,
     String? bio,
     String? whatImLookingFor,
     List<String>? industries,
@@ -137,7 +207,7 @@ class SupabaseService {
         'job_title': jobTitle,
         'company_name': companyName,
         'avatar_url': avatarUrl,
-        'address': address,
+        'phone': phone,
         'metadata': finalMetadata,
       };
 
@@ -203,7 +273,7 @@ class SupabaseService {
       final todayStr = "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
       final todayDate = DateTime.parse(todayStr);
 
-      final yesterdayDate = todayDate.subtract(const Duration(days: 1));
+      final yesterdayDate = todayDate.subtract(Duration(days: 1));
 
       // If the most recent date is not today or yesterday, the streak is 0.
       if (sortedDates.first.isBefore(yesterdayDate)) {
@@ -216,7 +286,7 @@ class SupabaseService {
       for (var date in sortedDates) {
         if (date.isAtSameMomentAs(currentDateToCheck)) {
           streak++;
-          currentDateToCheck = currentDateToCheck.subtract(const Duration(days: 1));
+          currentDateToCheck = currentDateToCheck.subtract(Duration(days: 1));
         } else if (date.isBefore(currentDateToCheck)) {
           // A gap in the streak was found
           break;
@@ -235,15 +305,28 @@ class SupabaseService {
     try {
       final response = await _supabase
           .from('profiles')
-          .select('subscription_end_date')
+          .select('subscription_end_date, created_at')
           .eq('id', userId)
           .single();
       
-      final endDateStr = response['subscription_end_date'] as String?;
-      if (endDateStr == null) return false;
+      final now = DateTime.now();
 
-      final endDate = DateTime.parse(endDateStr);
-      return endDate.isAfter(DateTime.now());
+      // Check Subscription
+      final endDateStr = response['subscription_end_date'] as String?;
+      if (endDateStr != null) {
+        final endDate = DateTime.parse(endDateStr);
+        if (endDate.isAfter(now)) return true;
+      }
+
+      // Check Trial (15 days from created_at)
+      final createdAtStr = response['created_at'] as String?;
+      if (createdAtStr != null) {
+        final createdAt = DateTime.parse(createdAtStr);
+        final trialEndDate = createdAt.add(const Duration(days: 15));
+        if (trialEndDate.isAfter(now)) return true;
+      }
+
+      return false;
     } catch (e) {
       debugPrint('Error checking subscription: $e');
       return false;

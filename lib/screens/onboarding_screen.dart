@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/eventzone_theme.dart';
 import '../providers/auth_providers.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -22,6 +23,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   // Step 1: Basics
   final _step1FormKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  String _phoneCountryCode = '+1';
   final _jobController = TextEditingController();
   final _companyController = TextEditingController();
   String? _avatarUrl;
@@ -34,7 +37,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   // Step 3: Industries & Interests
   final List<String> _predefinedIndustries = [
     'Artificial Intelligence', 'Blockchain & Web3', 'Cybersecurity', 'FinTech',
-    'HealthTech', 'EdTech', 'CleanTech & Energy', 'E-Commerce', 'SaaS',
+    'HealthTech', 'EdTech', 'CleanTech & Energy', 'E-Commerce'.tr(), 'SaaS',
     'Venture Capital', 'Angel Investing', 'Product Management', 'Software Engineering',
     'UX/UI Design', 'Digital Marketing', 'Sales & Business Dev', 'Cloud Computing',
     'Data Science', 'Mobile Development', 'AR/VR', 'IoT (Internet of Things)',
@@ -45,12 +48,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final List<String> _selectedIndustries = [];
   final List<String> _selectedInterests = [];
 
-  // Step 4: Social Links
-  final _linkedinController = TextEditingController();
-  final _githubController = TextEditingController();
-  final _whatsappController = TextEditingController();
-  String _whatsappCountryCode = '+1';
-  final _websiteController = TextEditingController();
 
   @override
   void initState() {
@@ -61,6 +58,20 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       if (profile != null) {
         setState(() {
           _nameController.text = profile['full_name'] ?? '';
+          
+          String savedPhone = profile['phone'] ?? '';
+          if (savedPhone.isNotEmpty && savedPhone.contains(' ')) {
+            final parts = savedPhone.split(' ');
+            if (parts[0].startsWith('+')) {
+              _phoneCountryCode = parts[0];
+              _phoneController.text = parts.sublist(1).join(' ');
+            } else {
+              _phoneController.text = savedPhone;
+            }
+          } else {
+            _phoneController.text = savedPhone;
+          }
+
           _jobController.text = profile['job_title'] ?? '';
           _companyController.text = profile['company'] ?? profile['company_name'] ?? '';
           _avatarUrl = profile['avatar_url'];
@@ -72,13 +83,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
     _jobController.dispose();
     _companyController.dispose();
     _bioController.dispose();
-    _linkedinController.dispose();
-    _githubController.dispose();
-    _whatsappController.dispose();
-    _websiteController.dispose();
+
     super.dispose();
   }
 
@@ -109,24 +118,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   void _showImageSourceActionSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF141927),
-      shape: const RoundedRectangleBorder(
+      backgroundColor: Color(0xFF141927),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => SafeArea(
         child: Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.white70),
-              title: const Text('Photo Gallery', style: TextStyle(color: Colors.white)),
+              leading: Icon(Icons.photo_library, color: Colors.white70),
+              title: Text('Photo Gallery'.tr(), style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 _pickImage(ImageSource.gallery);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Colors.white70),
-              title: const Text('Camera', style: TextStyle(color: Colors.white)),
+              leading: Icon(Icons.camera_alt, color: Colors.white70),
+              title: Text('Camera'.tr(), style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 _pickImage(ImageSource.camera);
@@ -154,23 +163,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Future<void> _completeOnboarding() async {
     setState(() => _isSubmitting = true);
 
-    final socialLinks = {
-      if (_linkedinController.text.trim().isNotEmpty) 'linkedin': _linkedinController.text.trim(),
-      if (_githubController.text.trim().isNotEmpty) 'github': _githubController.text.trim(),
-      if (_whatsappController.text.trim().isNotEmpty) 'whatsapp': '$_whatsappCountryCode ${_whatsappController.text.trim()}',
-      if (_websiteController.text.trim().isNotEmpty) 'website': _websiteController.text.trim(),
-    };
-
     final errorMessage = await ref.read(currentUserProvider.notifier).updateProfileData(
       fullName: _nameController.text.trim(),
       jobTitle: _jobController.text.trim(),
       company: _companyController.text.trim(),
+      phone: '$_phoneCountryCode ${_phoneController.text.trim()}',
       avatarUrl: _avatarUrl,
       bio: _bioController.text.trim(),
       whatImLookingFor: _selectedLookingFor.join(', '),
       industries: _selectedIndustries,
       interests: _selectedInterests,
-      socialLinks: socialLinks,
       onboardingCompleted: true,
     );
 
@@ -184,6 +186,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         'full_name': _nameController.text.trim(),
         'job_title': _jobController.text.trim(),
         'company': _companyController.text.trim(),
+        'phone': '$_phoneCountryCode ${_phoneController.text.trim()}',
+        'avatar_url': _avatarUrl,
       });
 
       if (mounted) {
@@ -205,7 +209,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             content: Text(errorMessage),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 6),
+            duration: Duration(seconds: 6),
           ),
         );
         setState(() => _isSubmitting = false);
@@ -217,7 +221,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (_currentStep == 0) {
       if (!_step1FormKey.currentState!.validate()) return;
     }
-    if (_currentStep < 3) {
+    if (_currentStep < 2) {
       setState(() {
         _currentStep++;
       });
@@ -241,44 +245,23 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
-          "Set Up Profile",
+        title: Text(
+          "Set Up Profile".tr(),
           style: TextStyle( fontWeight: FontWeight.bold, fontSize: 20),
         ),
         centerTitle: true,
-        actions: [
-          if (_currentStep == 3) // Step 4 (Social Connections) is optional
-            TextButton(
-              onPressed: _isSubmitting
-                  ? null
-                  : () {
-                      _linkedinController.clear();
-                      _githubController.clear();
-                      _whatsappController.clear();
-                      _websiteController.clear();
-                      _completeOnboarding();
-                    },
-              child: const Text(
-                "Skip",
-                style: TextStyle(
-                  color: EventzoneTheme.primaryAction,
-                  fontWeight: FontWeight.bold,
-                  
-                ),
-              ),
-            ),
-        ],
+        actions: [],
       ),
       body: SafeArea(
         child: Column(
           children: [
             // Progress Bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: LinearProgressIndicator(
-                  value: (_currentStep + 1) / 4,
+                  value: (_currentStep + 1) / 3,
                   backgroundColor: Colors.white10,
                   color: EventzoneTheme.primaryAction,
                   minHeight: 6,
@@ -288,14 +271,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                padding: EdgeInsets.symmetric(horizontal: 24.0),
                 child: _buildCurrentStepView(),
               ),
             ),
 
             // Bottom Navigation Actions
             Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: EdgeInsets.all(24.0),
               child: Row(
                 children: [
                   if (_currentStep > 0)
@@ -304,30 +287,30 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         onPressed: _prevStep,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.white70,
-                          side: const BorderSide(color: Colors.white12),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          side: BorderSide(color: Colors.white12),
+                          padding: EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                         ),
-                        child: const Text("Back"),
+                        child: Text("Back".tr()),
                       ),
                     ),
-                  if (_currentStep > 0) const SizedBox(width: 16),
+                  if (_currentStep > 0) SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: _isSubmitting ? null : _nextStep,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: EventzoneTheme.primaryAction,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                       ),
                       child: _isSubmitting
-                          ? const SizedBox(
+                          ? SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                             )
-                          : Text(_currentStep == 3 ? "Finish" : "Next"),
+                          : Text(_currentStep == 2 ? "Finish" : "Next"),
                     ),
                   ),
                 ],
@@ -347,10 +330,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         return _buildStep2About();
       case 2:
         return _buildStep3Industries();
-      case 3:
-        return _buildStep4Socials();
       default:
-        return const SizedBox.shrink();
+        return SizedBox.shrink();
     }
   }
 
@@ -361,17 +342,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 10),
-          const Text(
-            "Profile Basics",
+          SizedBox(height: 10),
+          Text(
+            "Profile Basics".tr(),
             style: TextStyle( fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            "Help other attendees identify you at a glance.",
+          SizedBox(height: 8),
+          Text(
+            "Help other attendees identify you at a glance.".tr(),
             style: TextStyle(color: Colors.white38, fontSize: 14, ),
           ),
-          const SizedBox(height: 32),
+          SizedBox(height: 32),
 
           // Profile Photo Picker
           Center(
@@ -381,6 +362,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   radius: 55,
                   backgroundImage: _getAvatarProvider(_avatarUrl),
                   backgroundColor: Colors.white10,
+                  child: _getAvatarProvider(_avatarUrl) == null
+                      ? Icon(Icons.person, size: 55, color: Colors.white38)
+                      : null,
                 ),
                 Positioned(
                   bottom: 0,
@@ -388,83 +372,143 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   child: GestureDetector(
                     onTap: _showImageSourceActionSheet,
                     child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
                         color: EventzoneTheme.primaryAction,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                      child: Icon(Icons.camera_alt, color: Colors.white, size: 18),
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 32),
+          SizedBox(height: 32),
 
           // Full Name
-          const Text("Full Name", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
-          const SizedBox(height: 6),
+          Text("Full Name *".tr(), style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
+          SizedBox(height: 6),
           TextFormField(
             controller: _nameController,
-            style: const TextStyle(color: Colors.white, fontSize: 14, ),
+            style: TextStyle(color: Colors.white, fontSize: 14, ),
             decoration: InputDecoration(
-              hintText: "John Doe",
-              hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-              fillColor: const Color(0xFF1A1E2E),
+              hintText: "John Doe".tr(),
+              hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+              fillColor: Color(0xFF1A1E2E),
               filled: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
+                borderSide: BorderSide(color: EventzoneTheme.primaryAction, width: 2),
               ),
             ),
-            validator: (value) => value == null || value.trim().isEmpty ? 'Full Name is required' : null,
+            validator: (value) => value == null || value.trim().isEmpty ? 'Full Name is required'.tr() : null,
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
+
+          // Phone Number
+          Text("Phone Number *".tr(), style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
+          SizedBox(height: 6),
+          TextFormField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            style: TextStyle(color: Colors.white, fontSize: 14, ),
+            decoration: InputDecoration(
+              prefixIcon: Padding(
+                padding: EdgeInsets.only(left: 16.0, right: 8.0),
+                child: CountryCodePicker(
+                  onChanged: (countryCode) {
+                    if (countryCode.dialCode != null) {
+                      setState(() {
+                        _phoneCountryCode = countryCode.dialCode!;
+                      });
+                    }
+                  },
+                  initialSelection: _phoneCountryCode,
+                  favorite: const ['+213', '+216', '+20', '+33', '+1', '+34', '+39', '+351', '+7', '+227', '+223', '+221'],
+                  countryFilter: codes.map<String>((c) => c['code']!).where((code) => code != 'IL').toList(),
+                  showCountryOnly: false,
+                  showOnlyCountryWhenClosed: false,
+                  alignLeft: false,
+                  padding: EdgeInsets.zero,
+                  textStyle: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                  dialogBackgroundColor: Colors.transparent,
+                  barrierColor: Colors.black87,
+                  dialogSize: Size(MediaQuery.of(context).size.width * 0.85, MediaQuery.of(context).size.height * 0.7),
+                  boxDecoration: BoxDecoration(
+                    color: const Color(0xFF1A1E2E),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  closeIcon: const Icon(Icons.close, color: Colors.white54),
+                  searchStyle: const TextStyle(color: Colors.white),
+                  searchDecoration: InputDecoration(
+                    hintText: "Search country".tr(),
+                    hintStyle: const TextStyle(color: Colors.white38),
+                    prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  ),
+                ),
+              ),
+              hintText: "234 567 8900".tr(),
+              hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+              fillColor: Color(0xFF1A1E2E),
+              filled: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: EventzoneTheme.primaryAction, width: 2),
+              ),
+            ),
+            validator: (value) => value == null || value.trim().isEmpty ? 'Phone Number is required'.tr() : null,
+          ),
+          SizedBox(height: 20),
 
           // Job Title
-          const Text("Job Title", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
-          const SizedBox(height: 6),
+          Text("Job Title".tr(), style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
+          SizedBox(height: 6),
           TextFormField(
             controller: _jobController,
-            style: const TextStyle(color: Colors.white, fontSize: 14, ),
+            style: TextStyle(color: Colors.white, fontSize: 14, ),
             decoration: InputDecoration(
-              hintText: "Product Lead",
-              hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-              fillColor: const Color(0xFF1A1E2E),
+              hintText: "Product Lead (Optional)".tr(),
+              hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+              fillColor: Color(0xFF1A1E2E),
               filled: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
+                borderSide: BorderSide(color: EventzoneTheme.primaryAction, width: 2),
               ),
             ),
-            validator: (value) => value == null || value.trim().isEmpty ? 'Job Title is required' : null,
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
 
           // Company
-          const Text("Company", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
-          const SizedBox(height: 6),
+          Text("Company".tr(), style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
+          SizedBox(height: 6),
           TextFormField(
             controller: _companyController,
-            style: const TextStyle(color: Colors.white, fontSize: 14, ),
+            style: TextStyle(color: Colors.white, fontSize: 14, ),
             decoration: InputDecoration(
-              hintText: "TechFlow",
-              hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-              fillColor: const Color(0xFF1A1E2E),
+              hintText: "TechFlow (Optional)".tr(),
+              hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+              fillColor: Color(0xFF1A1E2E),
               filled: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
+                borderSide: BorderSide(color: EventzoneTheme.primaryAction, width: 2),
               ),
             ),
-            validator: (value) => value == null || value.trim().isEmpty ? 'Company is required' : null,
           ),
         ],
       ),
@@ -476,44 +520,44 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 10),
-        const Text(
-          "About You",
+        SizedBox(height: 10),
+        Text(
+          "About You".tr(),
           style: TextStyle( fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
         ),
-        const SizedBox(height: 8),
-        const Text(
-          "Share a short bio and what you're looking to achieve.",
+        SizedBox(height: 8),
+        Text(
+          "Share a short bio and what you're looking to achieve.".tr(),
           style: TextStyle(color: Colors.white38, fontSize: 14, ),
         ),
-        const SizedBox(height: 32),
+        SizedBox(height: 32),
 
         // Bio Field
-        const Text("Professional Bio", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
-        const SizedBox(height: 8),
+        Text("Professional Bio".tr(), style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
+        SizedBox(height: 8),
         TextFormField(
           controller: _bioController,
           maxLines: 4,
           maxLength: 300,
-          style: const TextStyle(color: Colors.white, fontSize: 14, ),
+          style: TextStyle(color: Colors.white, fontSize: 14, ),
           decoration: InputDecoration(
-            hintText: "Briefly tell us about your experience and background...",
-            hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-            fillColor: const Color(0xFF1A1E2E),
+            hintText: "Briefly tell us about your experience and background...".tr(),
+            hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+            fillColor: Color(0xFF1A1E2E),
             filled: true,
-            contentPadding: const EdgeInsets.all(16),
+            contentPadding: EdgeInsets.all(16),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
+              borderSide: BorderSide(color: EventzoneTheme.primaryAction, width: 2),
             ),
           ),
         ),
-        const SizedBox(height: 24),
+        SizedBox(height: 24),
 
         // What I'm Looking For Multi-select
-        const Text("What I'm Looking For", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
-        const SizedBox(height: 12),
+        Text("What I'm Looking For".tr(), style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
+        SizedBox(height: 12),
         Wrap(
           spacing: 10,
           runSpacing: 10,
@@ -531,7 +575,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   }
                 });
               },
-              backgroundColor: const Color(0xFF1A1E2E),
+              backgroundColor: Color(0xFF1A1E2E),
               selectedColor: EventzoneTheme.primaryAction,
               checkmarkColor: Colors.white,
               labelStyle: TextStyle(
@@ -557,29 +601,29 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 10),
-        const Text(
-          "Industries & Interests",
+        SizedBox(height: 10),
+        Text(
+          "Industries & Interests".tr(),
           style: TextStyle( fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
         ),
-        const SizedBox(height: 8),
-        const Text(
-          "Select up to 5 areas that match your expertise or interest.",
+        SizedBox(height: 8),
+        Text(
+          "Select up to 5 areas that match your expertise or interest.".tr(),
           style: TextStyle(color: Colors.white38, fontSize: 14, ),
         ),
-        const SizedBox(height: 24),
+        SizedBox(height: 24),
 
         // Search Box
         TextField(
-          style: const TextStyle(color: Colors.white, fontSize: 14, ),
+          style: TextStyle(color: Colors.white, fontSize: 14, ),
           decoration: InputDecoration(
-            hintText: "Search areas...",
-            hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-            prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
-            fillColor: const Color(0xFF1A1E2E),
+            hintText: "Search areas...".tr(),
+            hintStyle: TextStyle(color: Colors.white24, fontSize: 14),
+            prefixIcon: Icon(Icons.search, color: Colors.white38, size: 20),
+            fillColor: Color(0xFF1A1E2E),
             filled: true,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            contentPadding: EdgeInsets.symmetric(vertical: 12),
           ),
           onChanged: (val) {
             setState(() {
@@ -587,14 +631,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             });
           },
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: 20),
 
         // Selected counter
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              "Popular Tags",
+            Text(
+              "Popular Tags".tr(),
               style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 13, ),
             ),
             Text(
@@ -608,7 +652,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
 
         // Grid/Wrap of all options
         Wrap(
@@ -625,8 +669,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   } else {
                     if (_selectedIndustries.length >= 5) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("You can select up to 5 tags maximum."),
+                        SnackBar(
+                          content: Text("You can select up to 5 tags maximum.".tr()),
                           backgroundColor: Colors.amber,
                           behavior: SnackBarBehavior.floating,
                         ),
@@ -639,12 +683,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 });
               },
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                duration: Duration(milliseconds: 150),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: isSelected 
                       ? EventzoneTheme.primaryAction.withOpacity(0.2) 
-                      : const Color(0xFF1A1E2E),
+                      : Color(0xFF1A1E2E),
                   border: Border.all(
                     color: isSelected 
                         ? EventzoneTheme.primaryAction 
@@ -657,8 +701,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (isSelected) ...[
-                      const Icon(Icons.check, size: 14, color: Colors.white),
-                      const SizedBox(width: 6),
+                      Icon(Icons.check, size: 14, color: Colors.white),
+                      SizedBox(width: 6),
                     ],
                     Text(
                       option,
@@ -675,140 +719,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             );
           }).toList(),
         ),
-        const SizedBox(height: 24),
+        SizedBox(height: 24),
       ],
     );
   }
 
-  // Step 4: Social Links
-  Widget _buildStep4Socials() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 10),
-        const Text(
-          "Social Connections",
-          style: TextStyle( fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          "Add your online profiles so others can follow up with you (Optional).",
-          style: TextStyle(color: Colors.white38, fontSize: 14, ),
-        ),
-        const SizedBox(height: 32),
-
-        // LinkedIn
-        const Text("LinkedIn", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _linkedinController,
-          style: const TextStyle(color: Colors.white, fontSize: 14, ),
-          decoration: InputDecoration(
-            hintText: "linkedin.com/in/username",
-            hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-            fillColor: const Color(0xFF1A1E2E),
-            filled: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // GitHub
-        const Text("GitHub", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _githubController,
-          style: const TextStyle(color: Colors.white, fontSize: 14, ),
-          decoration: InputDecoration(
-            hintText: "github.com/username",
-            hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-            fillColor: const Color(0xFF1A1E2E),
-            filled: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // WhatsApp
-        const Text("WhatsApp Number", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _whatsappController,
-          style: const TextStyle(color: Colors.white, fontSize: 14, ),
-          keyboardType: TextInputType.phone,
-          decoration: InputDecoration(
-            prefixIcon: Padding(
-              padding: const EdgeInsets.only(left: 16.0, right: 8.0),
-              child: CountryCodePicker(
-                onChanged: (countryCode) {
-                  if (countryCode.dialCode != null) {
-                    setState(() {
-                      _whatsappCountryCode = countryCode.dialCode!;
-                    });
-                  }
-                },
-                initialSelection: _whatsappCountryCode,
-                favorite: const ['+1', '+44'],
-                showCountryOnly: false,
-                showOnlyCountryWhenClosed: false,
-                alignLeft: false,
-                padding: EdgeInsets.zero,
-                textStyle: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                dialogTextStyle: const TextStyle(color: Colors.white),
-                dialogBackgroundColor: const Color(0xFF141927),
-                searchStyle: const TextStyle(color: Colors.white),
-                searchDecoration: const InputDecoration(
-                  hintText: "Search country",
-                  hintStyle: TextStyle(color: Colors.white54),
-                  prefixIcon: Icon(Icons.search, color: Colors.white54),
-                ),
-                closeIcon: const Icon(Icons.close, color: Colors.white),
-              ),
-            ),
-            hintText: "555-5555",
-            hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-            fillColor: const Color(0xFF1A1E2E),
-            filled: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 14),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Personal/Company Website
-        const Text("Website URL", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13, )),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _websiteController,
-          style: const TextStyle(color: Colors.white, fontSize: 14, ),
-          decoration: InputDecoration(
-            hintText: "https://yourwebsite.com",
-            hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-            fillColor: const Color(0xFF1A1E2E),
-            filled: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }

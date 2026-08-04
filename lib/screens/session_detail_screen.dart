@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -31,14 +32,14 @@ class SessionDetailScreen extends ConsumerWidget {
             children: [
               // Custom Header Bar
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(LucideIcons.arrowLeft, color: Colors.white, size: 24),
+                      icon: Icon(LucideIcons.arrowLeft, color: Colors.white, size: 24),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
-                    const Spacer(),
+                    Spacer(),
                     IconButton(
                       icon: Icon(
                         isFavorite ? LucideIcons.bookmarkCheck : LucideIcons.bookmark,
@@ -54,8 +55,8 @@ class SessionDetailScreen extends ConsumerWidget {
               // Scrollable Details
               Expanded(
                 child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                  physics: BouncingScrollPhysics(),
+                  padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -65,7 +66,7 @@ class SessionDetailScreen extends ConsumerWidget {
                           label: session.track!.toUpperCase(),
                           isLive: false,
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16),
                       ],
 
                       // Session Title
@@ -78,49 +79,49 @@ class SessionDetailScreen extends ConsumerWidget {
                               height: 1.25,
                             ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: 24),
 
                       // Time & Location Card
                       GlassContainer(
-                        padding: const EdgeInsets.all(20),
+                        padding: EdgeInsets.all(20),
                         child: Column(
                           children: [
                             Row(
                               children: [
-                                const Icon(LucideIcons.calendar, color: EventzoneTheme.primaryAction, size: 18),
-                                const SizedBox(width: 16),
+                                Icon(LucideIcons.calendar, color: EventzoneTheme.primaryAction, size: 18),
+                                SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text("DATE & TIME", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                                      const SizedBox(height: 2),
+                                      Text("DATE & TIME".tr(), style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                                      SizedBox(height: 2),
                                       Text(
                                         "$dateStr, $startTimeStr - $endTimeStr",
-                                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                                        style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
                                       ),
                                     ],
                                   ),
                                 ),
                               ],
                             ),
-                            const Padding(
+                            Padding(
                               padding: EdgeInsets.symmetric(vertical: 12.0),
                               child: Divider(color: Colors.white10, height: 1),
                             ),
                             Row(
                               children: [
-                                const Icon(LucideIcons.mapPin, color: EventzoneTheme.primaryAction, size: 18),
-                                const SizedBox(width: 16),
+                                Icon(LucideIcons.mapPin, color: EventzoneTheme.primaryAction, size: 18),
+                                SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text("LOCATION", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                                      const SizedBox(height: 2),
+                                      Text("LOCATION".tr(), style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                                      SizedBox(height: 2),
                                       Text(
                                         session.location ?? "TBA",
-                                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                                        style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
                                       ),
                                     ],
                                   ),
@@ -130,48 +131,48 @@ class SessionDetailScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      SizedBox(height: 32),
 
                       // Description
                       if (session.description != null && session.description!.isNotEmpty) ...[
                         Text(
-                          "ABOUT THIS SESSION",
+                          "ABOUT THIS SESSION".tr(),
                           style: Theme.of(context).textTheme.labelLarge?.copyWith(
                                 color: EventzoneTheme.primaryAction,
                                 letterSpacing: 1.5,
                               ),
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         Text(
                           session.description!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: Colors.white70,
                             fontSize: 15,
                             height: 1.6,
                           ),
                         ),
-                        const SizedBox(height: 32),
+                        SizedBox(height: 32),
                       ],
 
                       // Speakers
                       if (session.speakers.isNotEmpty) ...[
                         Text(
-                          "SPEAKERS",
+                          "SPEAKERS".tr(),
                           style: Theme.of(context).textTheme.labelLarge?.copyWith(
                                 color: EventzoneTheme.primaryAction,
                                 letterSpacing: 1.5,
                               ),
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16),
                         ListView.separated(
                           shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
+                          physics: NeverScrollableScrollPhysics(),
                           itemCount: session.speakers.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          separatorBuilder: (context, index) => SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final speaker = session.speakers[index];
                             return GlassContainer(
-                              padding: const EdgeInsets.all(12),
+                              padding: EdgeInsets.all(12),
                               child: Row(
                                 children: [
                                   CircleAvatar(
@@ -180,24 +181,24 @@ class SessionDetailScreen extends ConsumerWidget {
                                         ? NetworkImage(speaker.avatarUrl)
                                         : null,
                                     child: speaker.avatarUrl.isEmpty
-                                        ? const Icon(LucideIcons.user, color: Colors.white38)
+                                        ? Icon(LucideIcons.user, color: Colors.white38)
                                         : null,
                                   ),
-                                  const SizedBox(width: 16),
+                                  SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           speaker.name,
-                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
                                         ),
-                                        const SizedBox(height: 2),
+                                        SizedBox(height: 2),
                                         Text(
                                           speaker.company.isNotEmpty
-                                              ? "${speaker.title} @ ${speaker.company}"
+                                              ? "${speaker.title} @${speaker.company}"
                                               : speaker.title,
-                                          style: const TextStyle(color: Colors.white60, fontSize: 12),
+                                          style: TextStyle(color: Colors.white60, fontSize: 12),
                                         ),
                                       ],
                                     ),
@@ -207,35 +208,35 @@ class SessionDetailScreen extends ConsumerWidget {
                             );
                           },
                         ),
-                        const SizedBox(height: 32),
+                        SizedBox(height: 32),
                       ],
 
                       // Sponsors / Logos
                       if (session.logos.isNotEmpty) ...[
                         Text(
-                          "SUPPORTED BY",
+                          "SUPPORTED BY".tr(),
                           style: Theme.of(context).textTheme.labelLarge?.copyWith(
                                 color: EventzoneTheme.primaryAction,
                                 letterSpacing: 1.5,
                               ),
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16),
                         Wrap(
                           spacing: 12,
                           runSpacing: 12,
                           children: session.logos.map((logo) {
                             return Chip(
                               backgroundColor: Colors.white.withOpacity(0.04),
-                              side: const BorderSide(color: Colors.white10),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              side: BorderSide(color: Colors.white10),
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               label: Text(
                                 logo,
-                                style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+                                style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
                               ),
                             );
                           }).toList(),
                         ),
-                        const SizedBox(height: 48),
+                        SizedBox(height: 48),
                       ],
                     ],
                   ),
@@ -244,8 +245,8 @@ class SessionDetailScreen extends ConsumerWidget {
 
               // Bottom Button Row
               Container(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-                decoration: const BoxDecoration(
+                padding: EdgeInsets.fromLTRB(24, 16, 24, 32),
+                decoration: BoxDecoration(
                   color: Color(0xFF070B14),
                   border: Border(top: BorderSide(color: Colors.white10, width: 0.5)),
                 ),
@@ -268,7 +269,7 @@ class SessionDetailScreen extends ConsumerWidget {
                             backgroundColor: isFavorite
                                 ? Colors.white24
                                 : EventzoneTheme.accentSuccess,
-                            duration: const Duration(seconds: 2),
+                            duration: Duration(seconds: 2),
                           ),
                         );
                       }
@@ -280,7 +281,7 @@ class SessionDetailScreen extends ConsumerWidget {
                     ),
                     label: Text(
                       isFavorite ? "ADDED TO AGENDA" : "ADD TO AGENDA",
-                      style: const TextStyle(
+                      style: TextStyle(
                         
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -290,7 +291,7 @@ class SessionDetailScreen extends ConsumerWidget {
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: isFavorite
-                          ? const Color(0xFF1E2638)
+                          ? Color(0xFF1E2638)
                           : EventzoneTheme.primaryAction,
                       foregroundColor: Colors.white,
                       elevation: 0,

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:intl/intl.dart';
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/eventzone_theme.dart';
+import '../widgets/glass_container.dart';
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 
 class LeaderboardAnalyticsScreen extends StatefulWidget {
   const LeaderboardAnalyticsScreen({super.key});
@@ -20,12 +22,55 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
   List<Map<String, dynamic>> _leaderboard = [];
   List<Map<String, dynamic>> _myConnections = [];
   bool _isLoading = true;
+  int _activityPeriodDays = 7;
+  Map<String, int?> _networkingGoals = {
+    'Daily': null,
+    'Weekly': null,
+    'Monthly': null,
+    'Yearly': null,
+  };
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadGoal();
     _fetchData();
+  }
+
+  Future<void> _loadGoal() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _networkingGoals = {
+        'Daily': prefs.getInt('networking_goal_Daily'),
+        'Weekly': prefs.getInt('networking_goal_Weekly'),
+        'Monthly': prefs.getInt('networking_goal_Monthly'),
+        'Yearly': prefs.getInt('networking_goal_Yearly'),
+      };
+      
+      // Fallback for old single goal format
+      if (_networkingGoals.values.every((v) => v == null)) {
+        int? oldGoal = prefs.getInt('networking_goal');
+        String? oldPeriod = prefs.getString('networking_goal_period');
+        if (oldGoal != null && oldPeriod != null && _networkingGoals.containsKey(oldPeriod)) {
+          _networkingGoals[oldPeriod] = oldGoal;
+        }
+      }
+    });
+  }
+
+  Future<void> _saveGoal(Map<String, int?> goals) async {
+    final prefs = await SharedPreferences.getInstance();
+    for (final entry in goals.entries) {
+      if (entry.value != null) {
+        await prefs.setInt('networking_goal_${entry.key}', entry.value!);
+      } else {
+        await prefs.remove('networking_goal_${entry.key}');
+      }
+    }
+    setState(() {
+      _networkingGoals = Map.from(goals);
+    });
   }
 
   @override
@@ -46,7 +91,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       if (userId != null) {
         connectionsResponse = await _supabase
             .from('connections')
-            .select('created_at, title, company, source')
+            .select('created_at, title, company, source, address')
             .eq('user_id', userId);
       }
 
@@ -56,7 +101,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
         _isLoading = false;
       });
     } catch (e) {
-      print('Error fetching data: $e');
+      debugPrint('Error fetching data: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to load data: $e')));
         setState(() => _isLoading = false);
@@ -70,24 +115,24 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       backgroundColor: EventzoneTheme.backgroundStart,
       appBar: AppBar(
         toolbarHeight: 100,
-        title: const Padding(
+        title: Padding(
           padding: EdgeInsets.only(top: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text("Leaderboard", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 32, color: Colors.white)),
+              Text("Leaderboard".tr(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 32, color: Colors.white)),
               SizedBox(height: 4),
-              Text("See how you rank among other professionals", style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.normal)),
+              Text("See how you rank among other professionals".tr(), style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.normal)),
             ],
           ),
         ),
         backgroundColor: EventzoneTheme.backgroundStart,
         elevation: 0,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(80),
+          preferredSize: Size.fromHeight(80),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
+            padding: EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.05),
@@ -106,14 +151,14 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
                 labelColor: EventzoneTheme.primaryAction,
                 unselectedLabelColor: Colors.white60,
                 splashBorderRadius: BorderRadius.circular(30),
-                tabs: const [
+                tabs: [
                   Tab(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(LucideIcons.trophy, size: 18),
                         SizedBox(width: 8),
-                        Text('Leaderboard', style: TextStyle(fontWeight: FontWeight.w600)),
+                        Text('Leaderboard'.tr(), style: TextStyle(fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -123,7 +168,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
                       children: [
                         Icon(LucideIcons.barChart2, size: 18),
                         SizedBox(width: 8),
-                        Text('Analytics', style: TextStyle(fontWeight: FontWeight.w600)),
+                        Text('Analytics'.tr(), style: TextStyle(fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -134,7 +179,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
         ),
       ),
       body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
+        ? Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
         : TabBarView(
             controller: _tabController,
             children: [
@@ -149,7 +194,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
 
   Widget _buildLeaderboardTab() {
     if (_leaderboard.isEmpty) {
-      return const Center(child: Text('No leaderboard data available yet.'));
+      return Center(child: Text('No leaderboard data available yet.'.tr()));
     }
 
     final top3 = _leaderboard.take(3).toList();
@@ -172,10 +217,10 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
           onRefresh: _fetchData,
           color: EventzoneTheme.primaryAction,
           child: ListView(
-            padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 100),
+            padding: EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 24),
             children: [
               _buildPodium(top3),
-              const SizedBox(height: 32),
+              SizedBox(height: 32),
               ...rest.asMap().entries.map((entry) {
                 final index = entry.key + 4; // Start at rank 4
                 final user = entry.value;
@@ -195,7 +240,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
                   BoxShadow(
                     color: EventzoneTheme.primaryAction.withOpacity(0.4),
                     blurRadius: 20,
-                    offset: const Offset(0, 4),
+                    offset: Offset(0, 4),
                   ),
                 ],
               ),
@@ -224,18 +269,18 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
   }
 
   Widget _buildPodium(List<Map<String, dynamic>> top3) {
-    if (top3.isEmpty) return const SizedBox();
+    if (top3.isEmpty) return SizedBox();
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        if (top3.length > 1) _buildPodiumPlace(top3[1], 2, const Color(0xFFC0C0C0)), // Silver
+        if (top3.length > 1) _buildPodiumPlace(top3[1], 2, Color(0xFFC0C0C0)), // Silver
         if (top3.isNotEmpty) Padding(
-          padding: const EdgeInsets.only(bottom: 24.0),
-          child: _buildPodiumPlace(top3[0], 1, const Color(0xFFFFD700)), // Gold
+          padding: EdgeInsets.only(bottom: 24.0),
+          child: _buildPodiumPlace(top3[0], 1, Color(0xFFFFD700)), // Gold
         ),
-        if (top3.length > 2) _buildPodiumPlace(top3[2], 3, const Color(0xFFCD7F32)), // Bronze
+        if (top3.length > 2) _buildPodiumPlace(top3[2], 3, Color(0xFFCD7F32)), // Bronze
       ],
     );
   }
@@ -249,7 +294,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
           clipBehavior: Clip.none,
           children: [
             Container(
-              padding: const EdgeInsets.all(4),
+              padding: EdgeInsets.all(4),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(color: color, width: rank == 1 ? 4 : 3),
@@ -266,23 +311,23 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
             Positioned(
               bottom: -10,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: color,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
-                    BoxShadow(color: color.withOpacity(0.4), blurRadius: 4, offset: const Offset(0, 2)),
+                    BoxShadow(color: color.withOpacity(0.4), blurRadius: 4, offset: Offset(0, 2)),
                   ],
                 ),
                 child: Text(
                   '#$rank',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         SizedBox(
           width: rank == 1 ? 100 : 85,
           child: Text(
@@ -297,7 +342,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: 4),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -305,8 +350,8 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
               '${user['connection_count']}',
               style: TextStyle(color: Colors.white70, fontSize: rank == 1 ? 14 : 12, fontWeight: FontWeight.w600),
             ),
-            const SizedBox(width: 4),
-            const Icon(Icons.favorite, color: Color(0xFFFF5252), size: 12),
+            SizedBox(width: 4),
+            Icon(Icons.favorite, color: Color(0xFFFF5252), size: 12),
           ],
         ),
       ],
@@ -318,7 +363,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
     final isHighlighted = isMe || isFloating;
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: isHighlighted ? EventzoneTheme.primaryAction : Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(16),
@@ -335,10 +380,14 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
                 style: TextStyle(color: isHighlighted ? Colors.white : Colors.white70, fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             CircleAvatar(
+              backgroundColor: Colors.white,
+              foregroundColor: EventzoneTheme.primaryAction,
               backgroundImage: _getAvatarProvider(user['avatar_url']),
-              child: _getAvatarProvider(user['avatar_url']) == null ? Text(user['full_name']?[0] ?? '?') : null,
+              child: _getAvatarProvider(user['avatar_url']) == null 
+                  ? Text(user['full_name']?[0] ?? '?', style: TextStyle(fontWeight: FontWeight.bold)) 
+                  : null,
             ),
           ],
         ),
@@ -350,8 +399,8 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
               '${user['connection_count']}',
               style: TextStyle(color: isHighlighted ? Colors.white : Colors.white70, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(width: 6),
-            const Icon(Icons.favorite, color: Color(0xFFFF5252), size: 16),
+            SizedBox(width: 6),
+            Icon(Icons.favorite, color: Color(0xFFFF5252), size: 16),
           ],
         ),
       ),
@@ -365,21 +414,27 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       onRefresh: _fetchData,
       color: EventzoneTheme.primaryAction,
       child: ListView(
-        padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 100),
+        padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 24),
         children: [
           _buildSummaryCards(),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           _buildActivityChart(),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           _buildSourceDonutChart(),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           _buildScannedVsScannedYouChart(),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
+          _buildStreakWidget(),
+          SizedBox(height: 24),
+          _buildGoalWidget(),
+          SizedBox(height: 24),
+          _buildBusiestDayChart(),
+          SizedBox(height: 24),
           _buildTimeOfDayChart(),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           _buildTopCompaniesChart(),
-          const SizedBox(height: 24),
-          _buildDemographicsChart(),
+          SizedBox(height: 24),
+          _buildGeoSpreadWidget(),
         ],
       ),
     );
@@ -394,16 +449,16 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       children: [
         Expanded(
           child: _buildStatCard(
-            'Total Connections',
+            'Total Connections'.tr(),
             total.toString(),
             LucideIcons.users,
             EventzoneTheme.primaryAction,
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         Expanded(
           child: _buildStatCard(
-            'Scanned (QR)',
+            'Scanned (QR)'.tr(),
             scanned.toString(),
             LucideIcons.scanLine,
             Colors.greenAccent,
@@ -415,7 +470,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
 
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [color.withOpacity(0.2), color.withOpacity(0.05)],
@@ -429,39 +484,39 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: color, size: 24),
-          const SizedBox(height: 12),
-          Text(value, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 4),
-          Text(title, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+          SizedBox(height: 12),
+          Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+          SizedBox(height: 4),
+          Text(title, style: TextStyle(fontSize: 12, color: Colors.white70)),
         ],
       ),
     );
   }
 
   Widget _buildActivityChart() {
-    // Group connections by day for the last 7 days
+    // Group connections by day for the last N days
     final now = DateTime.now();
-    final Map<int, int> connectionsByDay = { for (var i = 0; i < 7; i++) i: 0 };
+    final Map<int, int> connectionsByDay = { for (var i = 0; i < _activityPeriodDays; i++) i: 0 };
     
     for (var conn in _myConnections) {
       if (conn['created_at'] != null) {
         final date = DateTime.parse(conn['created_at']).toLocal();
         final diff = now.difference(date).inDays;
-        if (diff >= 0 && diff < 7) {
+        if (diff >= 0 && diff < _activityPeriodDays) {
           connectionsByDay[diff] = (connectionsByDay[diff] ?? 0) + 1;
         }
       }
     }
 
     final spots = connectionsByDay.entries.map((e) {
-      return FlSpot(6 - e.key.toDouble(), e.value.toDouble());
+      return FlSpot((_activityPeriodDays - 1) - e.key.toDouble(), e.value.toDouble());
     }).toList();
 
     double maxY = connectionsByDay.values.fold(1.0, (m, v) => v > m ? v.toDouble() : m);
     if (maxY < 5) maxY = 5;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(16),
@@ -469,22 +524,49 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Networking Activity (Last 7 Days)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text('Networking Activity'.tr(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              DropdownButton<int>(
+                value: _activityPeriodDays,
+                isDense: true,
+                dropdownColor: EventzoneTheme.backgroundStart,
+                borderRadius: BorderRadius.circular(16),
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+                underline: SizedBox(),
+                icon: Icon(Icons.arrow_drop_down, color: Colors.white54),
+                onChanged: (int? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _activityPeriodDays = newValue;
+                    });
+                  }
+                },
+                items: [
+                  DropdownMenuItem(value: 7, child: Text('Last 7 Days'.tr())),
+                  DropdownMenuItem(value: 30, child: Text('Last 30 Days'.tr())),
+                  DropdownMenuItem(value: 90, child: Text('Last 90 Days'.tr())),
+                ],
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
           SizedBox(
             height: 200,
             child: LineChart(
               LineChartData(
                 gridData: FlGridData(show: false),
                 titlesData: FlTitlesData(
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
                       interval: (maxY / 5).ceilToDouble(),
                       getTitlesWidget: (value, meta) {
-                        return Text(value.toInt().toString(), style: const TextStyle(color: Colors.white54, fontSize: 10));
+                        return Text(value.toInt().toString(), style: TextStyle(color: Colors.white54, fontSize: 10));
                       },
                       reservedSize: 28,
                     ),
@@ -494,10 +576,12 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
                       showTitles: true,
                       interval: 1,
                       getTitlesWidget: (value, meta) {
-                        final date = now.subtract(Duration(days: 6 - value.toInt()));
+                        final index = value.toInt();
+                        if (_activityPeriodDays > 7 && index % (_activityPeriodDays / 5).ceil() != 0 && index != _activityPeriodDays - 1) return SizedBox.shrink();
+                        final date = now.subtract(Duration(days: (_activityPeriodDays - 1) - index));
                         return Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(DateFormat('E').format(date), style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                          padding: EdgeInsets.only(top: 8.0),
+                          child: Text(_activityPeriodDays <= 7 ? DateFormat('E').format(date) : DateFormat('MMM d').format(date), style: TextStyle(color: Colors.white54, fontSize: 10)),
                         );
                       },
                     ),
@@ -505,20 +589,22 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
                 ),
                 borderData: FlBorderData(show: false),
                 minX: 0,
-                maxX: 6,
+                maxX: _activityPeriodDays.toDouble() - 1,
                 minY: 0,
                 maxY: maxY + 1,
                 lineBarsData: [
                   LineChartBarData(
                     spots: spots,
                     isCurved: true,
-                    color: EventzoneTheme.primaryAction,
+                    color: Colors.blueAccent,
                     barWidth: 3,
                     isStrokeCapRound: true,
-                    dotData: const FlDotData(show: true),
+                    dotData: FlDotData(
+                      show: _activityPeriodDays <= 30,
+                    ),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: EventzoneTheme.primaryAction.withOpacity(0.2),
+                      color: Colors.blueAccent.withOpacity(0.2),
                     ),
                   ),
                 ],
@@ -530,62 +616,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
     );
   }
 
-  Widget _buildDemographicsChart() {
-    // Top Titles
-    final Map<String, int> titles = {};
-    for (var conn in _myConnections) {
-      final title = conn['title']?.toString().trim();
-      if (title != null && title.isNotEmpty && title.toLowerCase() != 'unknown' && title.toLowerCase() != 'null') {
-        titles[title] = (titles[title] ?? 0) + 1;
-      }
-    }
 
-    if (titles.isEmpty) return const SizedBox();
-
-    final sortedTitles = titles.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    final top5 = sortedTitles.take(5).toList();
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Top Connection Roles', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 16),
-          ...top5.map((entry) {
-            final percentage = entry.value / _myConnections.length;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(child: Text(entry.key, style: const TextStyle(color: Colors.white70), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                      Text('${entry.value}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  LinearProgressIndicator(
-                    value: percentage,
-                    backgroundColor: Colors.white12,
-                    color: EventzoneTheme.accentSuccess,
-                    minHeight: 6,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
 
   Widget _buildSourceDonutChart() {
     final Map<String, int> sources = {};
@@ -594,7 +625,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       sources[source] = (sources[source] ?? 0) + 1;
     }
 
-    if (sources.isEmpty) return const SizedBox();
+    if (sources.isEmpty) return SizedBox();
 
     final colors = [EventzoneTheme.primaryAction, Colors.purpleAccent, Colors.orangeAccent, Colors.greenAccent, Colors.redAccent];
     int colorIndex = 0;
@@ -606,12 +637,12 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
         value: entry.value.toDouble(),
         title: '${entry.value}',
         radius: 40,
-        titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+        titleStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
       );
     }).toList();
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(16),
@@ -619,8 +650,8 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Contact Sources', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 24),
+          Text('Contact Sources'.tr(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+          SizedBox(height: 24),
           SizedBox(
             height: 160,
             child: Row(
@@ -641,13 +672,13 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
                     children: sources.entries.map((entry) {
                       final color = colors[sources.keys.toList().indexOf(entry.key) % colors.length];
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
+                        padding: EdgeInsets.only(bottom: 8.0),
                         child: Row(
                           children: [
                             Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-                            const SizedBox(width: 8),
+                            SizedBox(width: 8),
                             Expanded(
-                              child: Text(entry.key, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis),
+                              child: Text(entry.key.tr(), style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis),
                             ),
                           ],
                         ),
@@ -682,10 +713,10 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       }
     }
 
-    if (scannedByMe == 0 && scannedMe == 0) return const SizedBox();
+    if (scannedByMe == 0 && scannedMe == 0) return SizedBox();
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(16),
@@ -693,12 +724,12 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Scan vs Manual', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 16),
+          Text('Scan vs Manual'.tr(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+          SizedBox(height: 16),
           Row(
             children: [
               Expanded(child: _buildComparisonBar('Scans', scannedByMe, EventzoneTheme.accentSuccess, Icons.qr_code_scanner)),
-              const SizedBox(width: 16),
+              SizedBox(width: 16),
               Expanded(child: _buildComparisonBar('Manual', scannedMe, Colors.orangeAccent, Icons.edit_document)),
             ],
           )
@@ -709,7 +740,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
 
   Widget _buildComparisonBar(String label, int value, Color color, IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
@@ -718,9 +749,9 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       child: Column(
         children: [
           Icon(icon, color: color),
-          const SizedBox(height: 8),
-          Text('$value', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          SizedBox(height: 8),
+          Text('$value', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+          Text(label, style: TextStyle(color: Colors.white70, fontSize: 12)),
         ],
       ),
     );
@@ -750,10 +781,10 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       }
     }
 
-    if (timeOfDay.values.every((v) => v == 0)) return const SizedBox();
+    if (timeOfDay.values.every((v) => v == 0)) return SizedBox();
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(16),
@@ -761,8 +792,8 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Networking Time-of-Day', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 16),
+          Text('Networking Time-of-Day'.tr(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+          SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -771,8 +802,8 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
               final height = (entry.value / maxVal) * 80.0;
               return Column(
                 children: [
-                  Text('${entry.value}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
+                  Text('${entry.value}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 4),
                   Container(
                     width: 30,
                     height: height == 0 ? 4 : height,
@@ -781,11 +812,67 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(entry.key.substring(0, 3), style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                  SizedBox(height: 8),
+                  Text(entry.key.tr(), style: TextStyle(color: Colors.white54, fontSize: 10), maxLines: 1, overflow: TextOverflow.visible),
                 ],
               );
             }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBusiestDayChart() {
+    final Map<int, int> weekdayCounts = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0};
+    for (var conn in _myConnections) {
+      if (conn['created_at'] != null) {
+        try {
+          final dt = DateTime.parse(conn['created_at']).toLocal();
+          weekdayCounts[dt.weekday] = (weekdayCounts[dt.weekday] ?? 0) + 1;
+        } catch (_) {}
+      }
+    }
+    
+    if (weekdayCounts.values.every((v) => v == 0)) return SizedBox();
+
+    final maxVal = weekdayCounts.values.fold(1, (m, v) => v > m ? v : m);
+    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Busiest Networking Days'.tr(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+          SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: List.generate(7, (index) {
+              final val = weekdayCounts[index + 1] ?? 0;
+              final height = (val / maxVal) * 80.0;
+              return Column(
+                children: [
+                  Text('$val', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 4),
+                  Container(
+                    width: 25,
+                    height: height == 0 ? 4 : height,
+                    decoration: BoxDecoration(
+                      color: Colors.blueAccent,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(days[index].tr(), style: TextStyle(color: Colors.white54, fontSize: 10)),
+                ],
+              );
+            }),
           ),
         ],
       ),
@@ -801,13 +888,13 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       }
     }
 
-    if (companies.isEmpty) return const SizedBox();
+    if (companies.isEmpty) return SizedBox();
 
     final sortedCompanies = companies.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     final top5 = sortedCompanies.take(5).toList();
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.03),
         borderRadius: BorderRadius.circular(16),
@@ -815,27 +902,385 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Top Companies', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 16),
+          Text('Top Companies'.tr(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+          SizedBox(height: 16),
           ...top5.map((entry) {
             final percentage = entry.value / _myConnections.length;
             return Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
+              padding: EdgeInsets.only(bottom: 12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(child: Text(entry.key, style: const TextStyle(color: Colors.white70), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                      Text('${entry.value}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      Expanded(child: Text(entry.key, style: TextStyle(color: Colors.white70), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      Text('${entry.value}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4),
                   LinearProgressIndicator(
                     value: percentage,
                     backgroundColor: Colors.white12,
                     color: Colors.purpleAccent,
+                    minHeight: 6,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStreakWidget() {
+    if (_myConnections.isEmpty) return SizedBox();
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Extract unique dates
+    final Set<DateTime> connectionDates = {};
+    for (var conn in _myConnections) {
+      if (conn['created_at'] != null) {
+        try {
+          final dt = DateTime.parse(conn['created_at']).toLocal();
+          connectionDates.add(DateTime(dt.year, dt.month, dt.day));
+        } catch (_) {}
+      }
+    }
+
+    int currentStreak = 0;
+    DateTime checkDate = today;
+    
+    // Allow the streak to remain if they haven't connected today yet, but did yesterday
+    if (!connectionDates.contains(today) && connectionDates.contains(today.subtract(Duration(days: 1)))) {
+      checkDate = today.subtract(Duration(days: 1));
+    }
+
+    while (connectionDates.contains(checkDate)) {
+      currentStreak++;
+      checkDate = checkDate.subtract(Duration(days: 1));
+    }
+
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.orangeAccent.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(LucideIcons.flame, color: Colors.orangeAccent, size: 24),
+              ),
+              SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Connection Streak'.tr(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  SizedBox(height: 4),
+                  Text('Consecutive days networking'.tr(), style: TextStyle(color: Colors.white54, fontSize: 12)),
+                ],
+              ),
+            ],
+          ),
+          Text('$currentStreak', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGoalWidget() {
+    // Check if any goals are set
+    bool hasAnyGoal = _networkingGoals.values.any((v) => v != null && v! > 0);
+
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text('Networking Goals'.tr(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              InkWell(
+                onTap: () {
+                  _showGoalEditDialog();
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: EdgeInsets.all(4.0),
+                  child: Icon(LucideIcons.edit2, size: 16, color: Colors.white54),
+                ),
+              ),
+            ],
+          ),
+          if (!hasAnyGoal) ...[
+            SizedBox(height: 12),
+            Text('No goals set. Tap the edit icon to set your daily, weekly, monthly, or yearly goals!'.tr(), 
+              style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.4)),
+          ],
+          if (hasAnyGoal) SizedBox(height: 16),
+          ..._networkingGoals.entries.map((entry) {
+            final period = entry.key;
+            final goal = entry.value;
+            
+            if (goal == null || goal <= 0) return SizedBox.shrink();
+
+            final now = DateTime.now();
+            int currentProgress = 0;
+            
+            for (var conn in _myConnections) {
+              if (conn['created_at'] != null) {
+                try {
+                  final dt = DateTime.parse(conn['created_at']).toLocal();
+                  bool matches = false;
+                  
+                  if (period == 'Daily') {
+                    matches = dt.year == now.year && dt.month == now.month && dt.day == now.day;
+                  } else if (period == 'Weekly') {
+                    int daysFromMonday = now.weekday - 1;
+                    DateTime startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: daysFromMonday));
+                    matches = dt.isAfter(startOfWeek) || dt.isAtSameMomentAs(startOfWeek);
+                  } else if (period == 'Monthly') {
+                    matches = dt.year == now.year && dt.month == now.month;
+                  } else if (period == 'Yearly') {
+                    matches = dt.year == now.year;
+                  }
+                  
+                  if (matches) currentProgress++;
+                } catch (_) {}
+              }
+            }
+
+            final double progressPercent = (currentProgress / goal).clamp(0.0, 1.0);
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('$period Goal'.tr(), style: TextStyle(color: Colors.white70, fontSize: 13)),
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Text('$currentProgress / $goal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: progressPercent,
+                    backgroundColor: Colors.white12,
+                    color: progressPercent >= 1.0 ? Colors.greenAccent : EventzoneTheme.primaryAction,
+                    minHeight: 8,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  if (progressPercent >= 1.0)
+                    Padding(
+                      padding: EdgeInsets.only(top: 6.0),
+                      child: Text('Goal reached! Incredible work.'.tr(), style: TextStyle(color: Colors.greenAccent, fontSize: 11)),
+                    ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  void _showGoalEditDialog() {
+    Map<String, int?> tempGoals = Map.from(_networkingGoals);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: GlassContainer(
+                borderRadius: 32,
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 32),
+                      Text(
+                        'Set Networking Goals'.tr(),
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 24,
+                              color: Colors.white,
+                            ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Leave a field empty to disable that goal.',
+                        style: TextStyle(color: Colors.white54, fontSize: 14),
+                      ),
+                      SizedBox(height: 32),
+                      ...['Daily', 'Weekly', 'Monthly', 'Yearly'].map((period) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 24.0),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 80,
+                                child: Text('$period:', style: TextStyle(color: Colors.white70)),
+                              ),
+                              Expanded(
+                                child: TextFormField(
+                                  initialValue: tempGoals[period]?.toString() ?? '',
+                                  keyboardType: TextInputType.number,
+                                  style: TextStyle(color: Colors.white),
+                                  decoration: InputDecoration(
+                                    hintText: 'Number of connections',
+                                    hintStyle: TextStyle(color: Colors.white30),
+                                    enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                                    focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: EventzoneTheme.primaryAction)),
+                                  ),
+                                  onChanged: (val) {
+                                    if (val.trim().isEmpty) {
+                                      tempGoals[period] = null;
+                                    } else {
+                                      tempGoals[period] = int.tryParse(val);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                            ),
+                            child: Text('Cancel', style: TextStyle(color: Colors.white54)),
+                          ),
+                          SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: () {
+                              _saveGoal(tempGoals);
+                              Navigator.pop(context);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: EventzoneTheme.primaryAction,
+                              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                            ),
+                            child: Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildGeoSpreadWidget() {
+    final Map<String, int> locations = {};
+    for (var conn in _myConnections) {
+      String address = conn['address']?.toString().trim() ?? '';
+      if (address.isNotEmpty) {
+        // Just use the last part of the address as a rough "city/country"
+        final parts = address.split(',');
+        final city = parts.last.trim();
+        if (city.isNotEmpty && city.toLowerCase() != 'unknown' && city.toLowerCase() != 'null') {
+          locations[city] = (locations[city] ?? 0) + 1;
+        }
+      }
+    }
+
+    if (locations.isEmpty) return SizedBox();
+
+    final sortedLocations = locations.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final top5 = sortedLocations.take(5).toList();
+
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Geographic Spread'.tr(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+          SizedBox(height: 16),
+          ...top5.map((entry) {
+            final percentage = entry.value / _myConnections.length;
+            return Padding(
+              padding: EdgeInsets.only(bottom: 12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(LucideIcons.mapPin, size: 14, color: Colors.white54),
+                          SizedBox(width: 8),
+                          Text(entry.key, style: TextStyle(color: Colors.white70), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                      Text('${entry.value}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  LinearProgressIndicator(
+                    value: percentage,
+                    backgroundColor: Colors.white12,
+                    color: Colors.redAccent,
                     minHeight: 6,
                     borderRadius: BorderRadius.circular(10),
                   ),

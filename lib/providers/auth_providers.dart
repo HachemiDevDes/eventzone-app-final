@@ -1,9 +1,10 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
+import 'settings_providers.dart';
 
 final supabaseProvider = Provider<SupabaseClient>((ref) {
   return Supabase.instance.client;
@@ -25,18 +26,41 @@ class CurrentUserNotifier extends AsyncNotifier<Map<String, dynamic>?> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return null;
 
-    final profile = await _service.fetchProfile(user.id);
+    final prefs = ref.read(sharedPreferencesProvider);
+    final cachedStr = prefs.getString('cached_profile_${user.id}');
+    
+    if (cachedStr != null) {
+      try {
+        final cachedProfile = jsonDecode(cachedStr) as Map<String, dynamic>;
+        // Kick off background refresh
+        _fetchAndCacheProfile(user.id, prefs).then((freshProfile) {
+          if (freshProfile != null) {
+            state = AsyncValue.data(freshProfile);
+          }
+        });
+        return cachedProfile;
+      } catch (e) {
+        debugPrint('Error parsing cached profile: $e');
+      }
+    }
+
+    return await _fetchAndCacheProfile(user.id, prefs);
+  }
+
+  Future<Map<String, dynamic>?> _fetchAndCacheProfile(String userId, prefs) async {
+    final profile = await _service.fetchProfile(userId);
+    if (profile != null) {
+      await prefs.setString('cached_profile_$userId', jsonEncode(profile));
+    }
     return profile;
   }
 
   Future<void> refresh() async {
-    // Don't set loading state — that causes onboardingStatusProvider to
-    // momentarily flip to false, which rebuilds GoRouter and forces
-    // navigation back to /onboarding.
     final result = await AsyncValue.guard(() async {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return null;
-      return await _service.fetchProfile(user.id);
+      final prefs = ref.read(sharedPreferencesProvider);
+      return await _fetchAndCacheProfile(user.id, prefs);
     });
     state = result;
   }
@@ -48,6 +72,12 @@ class CurrentUserNotifier extends AsyncNotifier<Map<String, dynamic>?> {
         ...updates,
       };
       state = AsyncValue.data(newProfile);
+      
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final prefs = ref.read(sharedPreferencesProvider);
+        prefs.setString('cached_profile_${user.id}', jsonEncode(newProfile));
+      }
     });
   }
 
@@ -61,6 +91,7 @@ class CurrentUserNotifier extends AsyncNotifier<Map<String, dynamic>?> {
     required String company,
     String? avatarUrl,
     String? bio,
+    String? phone,
     List<String>? industries,
     List<String>? interests,
     String? whatImLookingFor,
@@ -84,6 +115,7 @@ class CurrentUserNotifier extends AsyncNotifier<Map<String, dynamic>?> {
 
       if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
       if (bio != null) updates['bio'] = bio;
+      if (phone != null) updates['phone'] = phone;
       if (industries != null) updates['industries'] = industries;
       if (interests != null) updates['interests'] = interests;
       if (whatImLookingFor != null) updates['what_im_looking_for'] = whatImLookingFor;
@@ -117,10 +149,8 @@ final onboardingStatusProvider = Provider<bool>((ref) {
     return true; 
   }
   
-  return profileAsync.maybeWhen(
-    data: (profile) => profile != null && profile['onboarding_completed'] == true,
-    orElse: () => false,
-  );
+  final profile = profileAsync.valueOrNull;
+  return profile != null && profile['onboarding_completed'] == true;
 });
 
 class SubscriptionStatus {
@@ -164,13 +194,19 @@ final subscriptionStatusProvider = StreamProvider<SubscriptionStatus>((ref) {
                 daysRemaining: subEndDate.difference(now).inDays,
                 isTrial: false,
               );
+            } else {
+              return SubscriptionStatus(
+                isActive: false,
+                daysRemaining: 0,
+                isTrial: false,
+              );
             }
           }
 
           // Check Trial (15 days from created_at)
           if (createdAtStr != null) {
             final createdAt = DateTime.parse(createdAtStr);
-            final trialEndDate = createdAt.add(const Duration(days: 15));
+            final trialEndDate = createdAt.add(Duration(days: 15));
             if (trialEndDate.isAfter(now)) {
               return SubscriptionStatus(
                 isActive: true,

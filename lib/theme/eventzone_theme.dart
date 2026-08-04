@@ -14,58 +14,100 @@ class EventzoneTheme {
   static const Color glassBackground = Color(0x0AFFFFFF); 
   static const Color glassBorder = Color(0x1AFFFFFF);
 
-  static ThemeData get darkTheme {
+  static ThemeData getTheme(String languageCode) {
+    final bool isArabic = languageCode == 'ar';
     final baseTheme = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      fontFamily: GoogleFonts.spaceGrotesk().fontFamily,
+      fontFamily: isArabic ? GoogleFonts.changa().fontFamily : GoogleFonts.spaceGrotesk().fontFamily,
     );
+
+    TextTheme buildTextTheme(TextTheme base) {
+      if (isArabic) {
+        return GoogleFonts.changaTextTheme(base).copyWith(
+          displayLarge: GoogleFonts.changa(
+            color: textPrimary,
+            fontSize: 34,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -1.0,
+          ),
+          headlineMedium: GoogleFonts.changa(
+            color: textPrimary,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.5,
+          ),
+          titleLarge: GoogleFonts.changa(
+            color: textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+          bodyLarge: GoogleFonts.changa(
+            color: textPrimary,
+            fontSize: 16,
+            height: 1.6,
+          ),
+          bodyMedium: GoogleFonts.changa(
+            color: textSecondary,
+            fontSize: 14,
+            height: 1.5,
+          ),
+          labelLarge: GoogleFonts.changa(
+            color: textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+          ),
+        );
+      } else {
+        return GoogleFonts.spaceGroteskTextTheme(base).copyWith(
+          displayLarge: GoogleFonts.spaceGrotesk(
+            color: textPrimary,
+            fontSize: 34,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -1.0,
+          ),
+          headlineMedium: GoogleFonts.spaceGrotesk(
+            color: textPrimary,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.5,
+          ),
+          titleLarge: GoogleFonts.spaceGrotesk(
+            color: textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+          bodyLarge: GoogleFonts.spaceGrotesk(
+            color: textPrimary,
+            fontSize: 16,
+            height: 1.6,
+          ),
+          bodyMedium: GoogleFonts.spaceGrotesk(
+            color: textSecondary,
+            fontSize: 14,
+            height: 1.5,
+          ),
+          labelLarge: GoogleFonts.spaceGrotesk(
+            color: textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+          ),
+        );
+      }
+    }
 
     return baseTheme.copyWith(
       primaryColor: primaryAction,
       scaffoldBackgroundColor: backgroundEnd,
-      colorScheme: const ColorScheme.dark(
+      colorScheme: ColorScheme.dark(
         primary: primaryAction,
         secondary: accentSuccess,
         surface: cardColor,
         onSurface: textPrimary,
       ),
-      // Apply Space Grotesk globally to all text
-      textTheme: GoogleFonts.spaceGroteskTextTheme(baseTheme.textTheme).copyWith(
-        displayLarge: GoogleFonts.spaceGrotesk(
-          color: textPrimary,
-          fontSize: 34,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -1.0,
-        ),
-        headlineMedium: GoogleFonts.spaceGrotesk(
-          color: textPrimary,
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
-          letterSpacing: -0.5,
-        ),
-        titleLarge: GoogleFonts.spaceGrotesk(
-          color: textPrimary,
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-        ),
-        bodyLarge: GoogleFonts.spaceGrotesk(
-          color: textPrimary,
-          fontSize: 16,
-          height: 1.6,
-        ),
-        bodyMedium: GoogleFonts.spaceGrotesk(
-          color: textSecondary,
-          fontSize: 14,
-          height: 1.5,
-        ),
-        labelLarge: GoogleFonts.spaceGrotesk(
-          color: textSecondary,
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.2,
-        ),
-      ),
+      textTheme: buildTextTheme(baseTheme.textTheme),
     );
   }
 
@@ -73,7 +115,7 @@ class EventzoneTheme {
     return Container(
       width: double.infinity,
       height: double.infinity,
-      decoration: const BoxDecoration(color: backgroundStart),
+      decoration: BoxDecoration(color: backgroundStart),
       child: Stack(
         children: [
           Positioned(
@@ -121,7 +163,7 @@ class EventzoneTheme {
     );
   }
 
-  static BoxDecoration get mainGradient => const BoxDecoration(
+  static BoxDecoration get mainGradient => BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../theme/eventzone_theme.dart';
 import '../../../widgets/glass_container.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class ContactScreen extends ConsumerStatefulWidget {
   const ContactScreen({super.key});
@@ -45,26 +46,26 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(LucideIcons.checkCircle2, color: EventzoneTheme.accentSuccess, size: 60),
-              const SizedBox(height: 16),
-              const Text(
-                'Message sent!',
+              Icon(LucideIcons.checkCircle2, color: EventzoneTheme.accentSuccess, size: 60),
+              SizedBox(height: 16),
+              Text(
+                'Message sent!'.tr(),
                 style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                "We'll get back to you within 24 hours.",
+              SizedBox(height: 8),
+              Text(
+                "We'll get back to you within 24 hours.".tr(),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white70),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: EventzoneTheme.primaryAction,
-                  minimumSize: const Size(double.infinity, 48),
+                  minimumSize: Size(double.infinity, 48),
                 ),
-                child: const Text('Close', style: TextStyle(color: Colors.white)),
+                child: Text('Close'.tr(), style: TextStyle(color: Colors.white)),
               ),
             ],
           ),
@@ -72,7 +73,7 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
       );
     } else if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to send message. Please try again.')),
+        SnackBar(content: Text('Failed to send message. Please try again.'.tr())),
       );
     }
   }
@@ -82,7 +83,7 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open link')),
+          SnackBar(content: Text('Could not open link'.tr())),
         );
       }
     }
@@ -98,33 +99,33 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
+          icon: Icon(LucideIcons.arrowLeft, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Contact Us', style: TextStyle(fontWeight: FontWeight.w600)),
+        title: Text('Contact Us'.tr(), style: TextStyle(fontWeight: FontWeight.w600)),
         centerTitle: true,
       ),
       body: EventzoneTheme.buildPlayfulBackground(
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24),
+            padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 GlassContainer(
-                  padding: const EdgeInsets.all(24),
+                  padding: EdgeInsets.all(24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Send us a message',
+                      Text(
+                        'Send us a message'.tr(),
                         style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                      const SizedBox(height: 24),
-                      const Text('Subject', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 24),
+                      Text('Subject'.tr(), style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+                      SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.05),
                           borderRadius: BorderRadius.circular(12),
@@ -134,10 +135,10 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                             value: _selectedSubject,
                             isExpanded: true,
                             dropdownColor: EventzoneTheme.cardColor,
-                            icon: const Icon(LucideIcons.chevronDown, color: Colors.white54),
+                            icon: Icon(LucideIcons.chevronDown, color: Colors.white54),
                             items: _subjects.map((s) => DropdownMenuItem(
                               value: s,
-                              child: Text(s, style: const TextStyle(color: Colors.white)),
+                              child: Text(s.tr(), style: TextStyle(color: Colors.white)),
                             )).toList(),
                             onChanged: (val) {
                               if (val != null) setState(() => _selectedSubject = val);
@@ -145,9 +146,9 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      const Text('Message', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 20),
+                      Text('Message'.tr(), style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+                      SizedBox(height: 8),
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.05),
@@ -158,9 +159,9 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                           maxLines: 5,
                           minLines: 3,
                           maxLength: 1000,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
-                            hintText: 'How can we help you?',
+                          style: TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'How can we help you?'.tr(),
                             hintStyle: TextStyle(color: Colors.white24),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.all(16),
@@ -168,7 +169,7 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -180,40 +181,40 @@ class _ContactScreenState extends ConsumerState<ContactScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           child: isSubmitting
-                              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                              : const Text('Send Message', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : Text('Send Message'.tr(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 32),
-                const Text(
-                  'Direct Contact',
+                SizedBox(height: 32),
+                Text(
+                  'Direct Contact'.tr(),
                   style: TextStyle(color: Colors.white54, fontSize: 14, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), shape: BoxShape.circle),
-                    child: const Icon(LucideIcons.mail, color: EventzoneTheme.primaryAction),
+                    child: Icon(LucideIcons.mail, color: EventzoneTheme.primaryAction),
                   ),
-                  title: const Text('Email', style: TextStyle(color: Colors.white54, fontSize: 13)),
-                  subtitle: const Text('contact@eventzone.pro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  title: Text('Email'.tr(), style: TextStyle(color: Colors.white54, fontSize: 13)),
+                  subtitle: Text('contact@eventzone.pro'.tr(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                   onTap: () => _launchUrl('mailto:contact@eventzone.pro'),
                 ),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), shape: BoxShape.circle),
-                    child: const Icon(LucideIcons.messageCircle, color: EventzoneTheme.accentSuccess),
+                    child: Icon(LucideIcons.messageCircle, color: EventzoneTheme.accentSuccess),
                   ),
-                  title: const Text('WhatsApp', style: TextStyle(color: Colors.white54, fontSize: 13)),
-                  subtitle: const Text('+1234567890', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                  onTap: () => _launchUrl('https://wa.me/1234567890'),
+                  title: Text('WhatsApp'.tr(), style: TextStyle(color: Colors.white54, fontSize: 13)),
+                  subtitle: Text('+213 781 45 75 11'.tr(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                  onTap: () => _launchUrl('https://wa.me/213781457511'),
                 ),
               ],
             ),

@@ -14,7 +14,7 @@ final sessionsProvider = FutureProvider.family<List<SessionModel>, String>((ref,
 class SessionFavoritesNotifier extends StateNotifier<AsyncValue<List<String>>> {
   final SupabaseService _service;
 
-  SessionFavoritesNotifier(this._service) : super(const AsyncValue.loading()) {
+  SessionFavoritesNotifier(this._service) : super(AsyncValue.loading()) {
     loadFavorites();
   }
 

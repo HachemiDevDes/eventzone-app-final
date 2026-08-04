@@ -1,7 +1,7 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:intl/intl.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import '../models/meeting_model.dart';
@@ -94,7 +94,7 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
         
         return GlassContainer(
           borderRadius: 24,
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,64 +109,64 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               Text(
                 meeting.title,
-                style: const TextStyle( color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                style: TextStyle( color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               
               // Date & Time Row
               Row(
                 children: [
-                  const Icon(LucideIcons.calendar, color: EventzoneTheme.primaryAction, size: 16),
-                  const SizedBox(width: 8),
+                  Icon(LucideIcons.calendar, color: EventzoneTheme.primaryAction, size: 16),
+                  SizedBox(width: 8),
                   Text(
                     "${meeting.date}  •  ${meeting.startTime} - ${meeting.endTime}",
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               
               // Location Row
               Row(
                 children: [
-                  const Icon(LucideIcons.mapPin, color: EventzoneTheme.primaryAction, size: 16),
-                  const SizedBox(width: 8),
+                  Icon(LucideIcons.mapPin, color: EventzoneTheme.primaryAction, size: 16),
+                  SizedBox(width: 8),
                   Text(
                     meeting.location ?? "Virtual / To be agreed",
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               
               // Status Row
               Row(
                 children: [
-                  const Text("Status: ", style: TextStyle(color: Colors.white38, fontSize: 13)),
+                  Text("Status: ".tr(), style: TextStyle(color: Colors.white38, fontSize: 13)),
                   _buildStatusBadge(meeting.status),
                 ],
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
 
               if (meeting.note != null && meeting.note!.isNotEmpty) ...[
-                const Text("Note / Message:", style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
+                Text("Note / Message:".tr(), style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold)),
+                SizedBox(height: 6),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.03),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     meeting.note!,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
               ],
 
               // Actions
@@ -187,28 +187,28 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
                           ),
                         );
                       },
-                      icon: const Icon(LucideIcons.messageSquare, size: 16, color: Colors.white),
-                      label: const Text("Message", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      icon: Icon(LucideIcons.messageSquare, size: 16, color: Colors.white),
+                      label: Text("Message".tr(), style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: EventzoneTheme.primaryAction,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   ),
                   if (meeting.status == 'accepted') ...[
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () {
                           Navigator.pop(context);
                           _updateStatus(meeting.id, 'cancelled');
                         },
-                        icon: const Icon(LucideIcons.calendarX, size: 16, color: Colors.redAccent),
-                        label: const Text("Cancel Meeting", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                        icon: Icon(LucideIcons.calendarX, size: 16, color: Colors.redAccent),
+                        label: Text("Cancel Meeting".tr(), style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.redAccent),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(color: Colors.redAccent),
+                          padding: EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
@@ -216,7 +216,7 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
                   ],
                 ],
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
             ],
           ),
         );
@@ -242,7 +242,7 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(6),
@@ -271,14 +271,14 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
       onTap: () => _showMeetingDetails(meeting),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF141927),
+          color: Color(0xFF141927),
           borderRadius: BorderRadius.circular(16),
           border: Border(
             left: BorderSide(color: leftBorderColor, width: 4),
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -292,25 +292,25 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
                         : null,
                     backgroundColor: EventzoneTheme.primaryAction.withOpacity(0.1),
                     child: meeting.otherAvatarUrl == null || meeting.otherAvatarUrl!.isEmpty
-                        ? Text(meeting.otherName?[0] ?? 'A', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                        ? Text(meeting.otherName?[0] ?? 'A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
                         : null,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           meeting.otherName ?? "Attendee",
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
                         ),
                         if (meeting.otherTitle != null || meeting.otherCompany != null) ...[
-                          const SizedBox(height: 2),
+                          SizedBox(height: 2),
                           Text(
                             meeting.otherCompany != null 
-                                ? "${meeting.otherTitle ?? 'Attendee'} @ ${meeting.otherCompany}"
+                                ? "${meeting.otherTitle ?? 'Attendee'} @${meeting.otherCompany}"
                                 : meeting.otherTitle!,
-                            style: const TextStyle(color: Colors.white38, fontSize: 11),
+                            style: TextStyle(color: Colors.white38, fontSize: 11),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -321,24 +321,24 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
                   _buildStatusBadge(meeting.status),
                 ],
               ),
-              const Divider(color: Colors.white10, height: 24),
+              Divider(color: Colors.white10, height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
-                      const Icon(LucideIcons.calendar, color: Colors.white54, size: 13),
-                      const SizedBox(width: 6),
+                      Icon(LucideIcons.calendar, color: Colors.white54, size: 13),
+                      SizedBox(width: 6),
                       Text(
                         meeting.date,
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
                       ),
                     ],
                   ),
                   Row(
                     children: [
-                      const Icon(LucideIcons.clock, color: Colors.white54, size: 13),
-                      const SizedBox(width: 6),
+                      Icon(LucideIcons.clock, color: Colors.white54, size: 13),
+                      SizedBox(width: 6),
                       Text(
                         "${meeting.startTime} - ${meeting.endTime}",
                         style: TextStyle(
@@ -353,15 +353,15 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(LucideIcons.mapPin, color: Colors.white38, size: 13),
-                  const SizedBox(width: 6),
+                  Icon(LucideIcons.mapPin, color: Colors.white38, size: 13),
+                  SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       meeting.location ?? "Virtual / To be agreed",
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      style: TextStyle(color: Colors.white54, fontSize: 12),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -371,31 +371,31 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
               
               // Handle Pending Actions for recipient
               if (meeting.status == 'pending' && !isOrganizer) ...[
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => _updateStatus(meeting.id, 'declined'),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.redAccent),
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          side: BorderSide(color: Colors.redAccent),
+                          padding: EdgeInsets.symmetric(vertical: 8),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text("Decline", style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                        child: Text("Decline".tr(), style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () => _updateStatus(meeting.id, 'accepted'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: EventzoneTheme.accentSuccess,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          padding: EdgeInsets.symmetric(vertical: 8),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text("Accept", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        child: Text("Accept".tr(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -404,13 +404,13 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
               
               // Handle Pending status display for organizer
               if (meeting.status == 'pending' && isOrganizer) ...[
-                const SizedBox(height: 12),
-                const Row(
+                SizedBox(height: 12),
+                Row(
                   children: [
                     Icon(LucideIcons.clock, color: EventzoneTheme.accentWarning, size: 12),
                     SizedBox(width: 6),
                     Text(
-                      "Awaiting confirmation",
+                      "Awaiting confirmation".tr(),
                       style: TextStyle(color: EventzoneTheme.accentWarning, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ],
@@ -430,9 +430,9 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(LucideIcons.calendarX, size: 48, color: Colors.white.withOpacity(0.1)),
-            const SizedBox(height: 16),
-            const Text(
-              "No meetings scheduled",
+            SizedBox(height: 16),
+            Text(
+              "No meetings scheduled".tr(),
               style: TextStyle(color: Colors.white38, fontSize: 14),
             ),
           ],
@@ -441,10 +441,10 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
     }
 
     return ListView.separated(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 24),
+      physics: BouncingScrollPhysics(),
+      padding: EdgeInsets.only(bottom: 24),
       itemCount: meetings.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => SizedBox(height: 12),
       itemBuilder: (context, index) => _buildMeetingCard(meetings[index]),
     );
   }
@@ -463,27 +463,27 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
           controller: _tabController,
           children: [
             Padding(
-              padding: const EdgeInsets.only(top: 16.0),
+              padding: EdgeInsets.only(top: 16.0),
               child: _buildMeetingsList(upcoming),
             ),
             Padding(
-              padding: const EdgeInsets.only(top: 16.0),
+              padding: EdgeInsets.only(top: 16.0),
               child: _buildMeetingsList(pending),
             ),
             Padding(
-              padding: const EdgeInsets.only(top: 16.0),
+              padding: EdgeInsets.only(top: 16.0),
               child: _buildMeetingsList(past),
             ),
           ],
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction)),
-      error: (e, _) => Center(child: Text("Error: $e", style: const TextStyle(color: Colors.redAccent))),
+      loading: () => Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction)),
+      error: (e, _) => Center(child: Text("Error: $e", style: TextStyle(color: Colors.redAccent))),
     );
 
     if (widget.embedMode) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+        padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
         child: Column(
           children: [
             // Inner mini tab selector for meetings
@@ -498,8 +498,8 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
                 indicatorColor: EventzoneTheme.primaryAction,
                 labelColor: EventzoneTheme.primaryAction,
                 unselectedLabelColor: Colors.white24,
-                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, ),
-                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, ),
+                labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, ),
+                unselectedLabelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, ),
                 dividerColor: Colors.transparent,
                 tabs: const [
                   Tab(text: "Upcoming"),
@@ -517,12 +517,12 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF060913),
+      backgroundColor: Color(0xFF060913),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
-          "My Meetings",
+        title: Text(
+          "My Meetings".tr(),
           style: TextStyle( color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -531,7 +531,7 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
           indicatorColor: EventzoneTheme.primaryAction,
           labelColor: EventzoneTheme.primaryAction,
           unselectedLabelColor: Colors.white38,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: const [
             Tab(text: "Upcoming"),
             Tab(text: "Pending"),
@@ -541,7 +541,7 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: EdgeInsets.all(24.0),
           child: tabContent,
         ),
       ),

@@ -1,0 +1,166 @@
+const fs = require('fs');
+
+const missingBase = [
+  'Events',
+  'Upcoming Events',
+  'Search events by name or keyword...',
+  'No events available right now.',
+  'No events match your search.',
+  'Edit Profile',
+  'Saved',
+  'Personal Details',
+  'Full Name',
+  'Job Title',
+  'Company',
+  'Phone Number',
+  'About Me',
+  'Professional Bio',
+  'What I\'m Looking For',
+  'Industries & Interests',
+  'Social Links',
+  'Link',
+  'Email',
+  'LinkedIn',
+  'Company Website',
+  'Address',
+  'Calendly',
+  'X',
+  'Instagram',
+  'YouTube',
+  'Threads',
+  'Facebook',
+  'TikTok',
+  'Snapchat',
+  'WhatsApp',
+  'Venmo',
+  'Yelp',
+  'GitHub',
+  'Active Links',
+  'Export Contacts',
+  'All Time',
+  'Today',
+  'Last 15 Days',
+  '...Search areas',
+  'Purchased 6 Month(s) Subscription via Chargily Pay',
+  'Purchased 1 Month(s) Subscription via Chargily Pay',
+  'Organisateur',
+  'E-Commerce',
+  'Client Eventzone'
+];
+
+const paths = {
+  en: 'assets/translations/en.json',
+  fr: 'assets/translations/fr.json',
+  ar: 'assets/translations/ar.json'
+};
+
+const frTranslations = {
+  'Events': 'Événements',
+  'Upcoming Events': 'Événements à venir',
+  'Search events by name or keyword...': 'Rechercher des événements par nom ou mot-clé...',
+  'No events available right now.': 'Aucun événement disponible pour le moment.',
+  'No events match your search.': 'Aucun événement ne correspond à votre recherche.',
+  'Edit Profile': 'Modifier le profil',
+  'Saved': 'Enregistré',
+  'Personal Details': 'Détails personnels',
+  'Full Name': 'Nom complet',
+  'Job Title': 'Titre du poste',
+  'Company': 'Entreprise',
+  'Phone Number': 'Numéro de téléphone',
+  'About Me': 'À propos de moi',
+  'Professional Bio': 'Biographie professionnelle',
+  'What I\'m Looking For': 'Ce que je recherche',
+  'Industries & Interests': 'Secteurs & Intérêts',
+  'Social Links': 'Liens sociaux',
+  'Link': 'Lien',
+  'Email': 'E-mail',
+  'LinkedIn': 'LinkedIn',
+  'Company Website': 'Site Web de l\'entreprise',
+  'Address': 'Adresse',
+  'Calendly': 'Calendly',
+  'X': 'X',
+  'Instagram': 'Instagram',
+  'YouTube': 'YouTube',
+  'Threads': 'Threads',
+  'Facebook': 'Facebook',
+  'TikTok': 'TikTok',
+  'Snapchat': 'Snapchat',
+  'WhatsApp': 'WhatsApp',
+  'Venmo': 'Venmo',
+  'Yelp': 'Yelp',
+  'GitHub': 'GitHub',
+  'Active Links': 'Liens actifs',
+  'Export Contacts': 'Exporter les contacts',
+  'All Time': 'Tout le temps',
+  'Today': 'Aujourd\'hui',
+  'Last 15 Days': 'Les 15 derniers jours',
+  '...Search areas': '...Rechercher des domaines',
+  'Purchased 6 Month(s) Subscription via Chargily Pay': 'Abonnement de 6 mois acheté via Chargily Pay',
+  'Purchased 1 Month(s) Subscription via Chargily Pay': 'Abonnement d\'un mois acheté via Chargily Pay',
+  'Organisateur': 'Organisateur',
+  'E-Commerce': 'E-Commerce',
+  'Client Eventzone': 'Client Eventzone'
+};
+
+const arTranslations = {
+  'Events': 'الفعاليات',
+  'Upcoming Events': 'الفعاليات القادمة',
+  'Search events by name or keyword...': 'البحث عن الفعاليات بالاسم أو الكلمة الرئيسية...',
+  'No events available right now.': 'لا توجد فعاليات متاحة حالياً.',
+  'No events match your search.': 'لا توجد فعاليات تطابق بحثك.',
+  'Edit Profile': 'تعديل الملف الشخصي',
+  'Saved': 'تم الحفظ',
+  'Personal Details': 'التفاصيل الشخصية',
+  'Full Name': 'الاسم الكامل',
+  'Job Title': 'المسمى الوظيفي',
+  'Company': 'الشركة',
+  'Phone Number': 'رقم الهاتف',
+  'About Me': 'نبذة عني',
+  'Professional Bio': 'السيرة المهنية',
+  'What I\'m Looking For': 'ما أبحث عنه',
+  'Industries & Interests': 'الصناعات والاهتمامات',
+  'Social Links': 'روابط التواصل الاجتماعي',
+  'Link': 'رابط',
+  'Email': 'البريد الإلكتروني',
+  'LinkedIn': 'لينكد إن',
+  'Company Website': 'موقع الشركة',
+  'Address': 'العنوان',
+  'Calendly': 'كاليندلي',
+  'X': 'إكس',
+  'Instagram': 'إنستغرام',
+  'YouTube': 'يوتيوب',
+  'Threads': 'ثريدز',
+  'Facebook': 'فيسبوك',
+  'TikTok': 'تيك توك',
+  'Snapchat': 'سناب شات',
+  'WhatsApp': 'واتساب',
+  'Venmo': 'فينمو',
+  'Yelp': 'يلب',
+  'GitHub': 'جيت هاب',
+  'Active Links': 'الروابط النشطة',
+  'Export Contacts': 'تصدير جهات الاتصال',
+  'All Time': 'كل الوقت',
+  'Today': 'اليوم',
+  'Last 15 Days': 'آخر 15 يوماً',
+  '...Search areas': '...البحث عن مجالات',
+  'Purchased 6 Month(s) Subscription via Chargily Pay': 'تم شراء اشتراك لمدة 6 أشهر عبر Chargily Pay',
+  'Purchased 1 Month(s) Subscription via Chargily Pay': 'تم شراء اشتراك لمدة شهر عبر Chargily Pay',
+  'Organisateur': 'منظم',
+  'E-Commerce': 'تجارة إلكترونية',
+  'Client Eventzone': 'عميل إيفنت زون'
+};
+
+for (const lang of ['en', 'fr', 'ar']) {
+  const file = paths[lang];
+  const obj = JSON.parse(fs.readFileSync(file, 'utf8'));
+  for (const key of missingBase) {
+    if (!obj[key]) {
+      if (lang === 'en') obj[key] = key;
+      if (lang === 'fr') obj[key] = frTranslations[key] || key;
+      if (lang === 'ar') obj[key] = arTranslations[key] || key;
+    }
+  }
+  fs.writeFileSync(file, JSON.stringify(obj, null, 2));
+}
+
+console.log('Translations updated successfully.');

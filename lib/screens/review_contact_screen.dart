@@ -6,8 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
-import 'my_network_screen.dart';
-import 'scan_qr_screen.dart' as scan_qr;
+import 'package:easy_localization/easy_localization.dart';
 
 class ReviewContactScreen extends StatefulWidget {
   final String initialName;
@@ -85,8 +84,8 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
     final picker = ImagePicker();
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0F1322),
-      shape: const RoundedRectangleBorder(
+      backgroundColor: Color(0xFF0F1322),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
@@ -95,8 +94,8 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(LucideIcons.camera, color: Colors.white70),
-                title: const Text("Take Photo", style: TextStyle(color: Colors.white)),
+                leading: Icon(LucideIcons.camera, color: Colors.white70),
+                title: Text("Take Photo".tr(), style: TextStyle(color: Colors.white)),
                 onTap: () async {
                   Navigator.pop(context);
                   final file = await picker.pickImage(
@@ -111,8 +110,8 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(LucideIcons.image, color: Colors.white70),
-                title: const Text("Choose from Gallery", style: TextStyle(color: Colors.white)),
+                leading: Icon(LucideIcons.image, color: Colors.white70),
+                title: Text("Choose from Gallery".tr(), style: TextStyle(color: Colors.white)),
                 onTap: () async {
                   Navigator.pop(context);
                   final file = await picker.pickImage(
@@ -159,15 +158,15 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
       
       if (!isActive && profileRes['created_at'] != null) {
         final createdAt = DateTime.parse(profileRes['created_at']);
-        final trialEnd = createdAt.add(const Duration(days: 15));
+        final trialEnd = createdAt.add(Duration(days: 15));
         if (trialEnd.isAfter(now)) isActive = true;
       }
 
       if (!isActive) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Your trial/subscription has expired. Please upgrade to save contacts."),
+            SnackBar(
+              content: Text("Your trial/subscription has expired. Please upgrade to save contacts.".tr()),
               backgroundColor: Colors.redAccent,
             ),
           );
@@ -250,14 +249,14 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF060913),
+      backgroundColor: Color(0xFF060913),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF060913),
+        backgroundColor: Color(0xFF060913),
         elevation: 0,
-        title: const Text("Review Scanned Contact", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text("Review Scanned Contact".tr(), style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(LucideIcons.x, color: Colors.white),
+          icon: Icon(LucideIcons.x, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -267,8 +266,8 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
           children: [
             Expanded(
               child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                physics: BouncingScrollPhysics(),
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -284,52 +283,52 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
                                 ? FileImage(_selectedImage!)
                                 : null,
                             child: _selectedImage == null
-                                ? const Icon(LucideIcons.user, size: 48, color: Colors.white54)
+                                ? Icon(LucideIcons.user, size: 48, color: Colors.white54)
                                 : null,
                           ),
                           Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(
+                            padding: EdgeInsets.all(8),
+                            decoration: BoxDecoration(
                               color: EventzoneTheme.primaryAction,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(LucideIcons.camera, size: 16, color: Colors.white),
+                            child: Icon(LucideIcons.camera, size: 16, color: Colors.white),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24),
 
-                    _buildSectionHeader("Contact Info"),
-                    const SizedBox(height: 8),
-                    _buildTextField("Full Name", _nameController, LucideIcons.user, fieldKey: 'name', validator: (v) {
+                    _buildSectionHeader("Contact Info".tr()),
+                    SizedBox(height: 8),
+                    _buildTextField("Full Name".tr(), _nameController, LucideIcons.user, fieldKey: 'name', validator: (v) {
                       if (v == null || v.trim().isEmpty) return "Name is required";
                       return null;
                     }),
-                    _buildTextField("Job Title", _titleController, LucideIcons.briefcase, fieldKey: 'title', validator: (v) {
+                    _buildTextField("Job Title".tr(), _titleController, LucideIcons.briefcase, fieldKey: 'title', validator: (v) {
                       if (v == null || v.trim().isEmpty) return "Job title is required";
                       return null;
                     }),
-                    _buildTextField("Company", _companyController, LucideIcons.building2, fieldKey: 'company'),
+                    _buildTextField("Company".tr(), _companyController, LucideIcons.building2, fieldKey: 'company'),
                     _buildTextField("Department", _departmentController, LucideIcons.layers, fieldKey: 'department'),
                     _buildTextField("Email Address", _emailController, LucideIcons.mail, fieldKey: 'email', keyboardType: TextInputType.emailAddress),
-                    _buildTextField("Phone Number", _phoneController, LucideIcons.phone, fieldKey: 'phone', keyboardType: TextInputType.phone),
+                    _buildTextField("Phone Number".tr(), _phoneController, LucideIcons.phone, fieldKey: 'phone', keyboardType: TextInputType.phone),
                     _buildTextField("Website", _websiteController, LucideIcons.globe, fieldKey: 'website', keyboardType: TextInputType.url),
-                    _buildTextField("Address", _addressController, LucideIcons.mapPin, fieldKey: 'address'),
+                    _buildTextField("Address".tr(), _addressController, LucideIcons.mapPin, fieldKey: 'address'),
                     
-                    const SizedBox(height: 16),
-                    _buildSectionHeader("Notes & Tags"),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 16),
+                    _buildSectionHeader("Notes & Tags".tr()),
+                    SizedBox(height: 8),
                     _buildTextField("Reminder Notes", _notesController, LucideIcons.fileText, fieldKey: 'notes', maxLines: 3),
-                    const SizedBox(height: 40),
+                    SizedBox(height: 40),
                   ],
                 ),
               ),
             ),
 
             Container(
-              padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(
+              padding: EdgeInsets.all(24),
+              decoration: BoxDecoration(
                 color: Color(0xFF090C16),
                 border: Border(top: BorderSide(color: Colors.white10)),
               ),
@@ -347,9 +346,9 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
                       elevation: 4,
                     ),
                     child: _isSaving
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text(
-                            "Save Contact",
+                        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : Text(
+                            "Save Contact".tr(),
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           ),
                   ),
@@ -367,7 +366,7 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
       alignment: Alignment.centerLeft,
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white54,
           fontSize: 10,
           fontWeight: FontWeight.bold,
@@ -387,21 +386,21 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
     String? Function(String?)? validator,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
+      padding: EdgeInsets.only(bottom: 16.0),
       child: GlassContainer(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         child: TextFormField(
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
           validator: validator,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
+          style: TextStyle(color: Colors.white, fontSize: 14),
           decoration: InputDecoration(
             icon: Icon(icon, color: Colors.white54, size: 18),
             labelText: label,
-            labelStyle: const TextStyle(color: Colors.white30, fontSize: 13),
+            labelStyle: TextStyle(color: Colors.white30, fontSize: 13),
             border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            contentPadding: EdgeInsets.symmetric(vertical: 8),
           ),
         ),
       ),

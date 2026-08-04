@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/eventzone_theme.dart';
+import '../widgets/subscription_expired_bottom_sheet.dart';
 import '../widgets/glass_container.dart';
 import 'my_network_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -116,12 +117,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
       final hasSub = await service.hasActiveSubscription(currentUserId);
       if (!hasSub) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("An active subscription is required to add connections!"),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
+          SubscriptionExpiredBottomSheet.show(context);
         }
         return;
       }

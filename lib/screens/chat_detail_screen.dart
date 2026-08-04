@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import 'professional_profile_screen.dart';
 import '../utils/avatar_helper.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String contactName;
@@ -223,7 +223,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   void _subscribeRealtime() {
     _channel = _supabase
-        .channel('chat_${_recipientId}')
+        .channel('chat_$_recipientId')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
@@ -300,20 +300,20 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1F2937),
-        title: const Text("Delete Message", style: TextStyle(color: Colors.white)),
-        content: const Text("Are you sure you want to delete this message?", style: TextStyle(color: Colors.white70)),
+        backgroundColor: Color(0xFF1F2937),
+        title: Text("Delete Message".tr(), style: TextStyle(color: Colors.white)),
+        content: Text("Are you sure you want to delete this message?".tr(), style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Colors.white54)),
+            child: Text("Cancel".tr(), style: TextStyle(color: Colors.white54)),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _deleteMessage(messageId);
             },
-            child: const Text("Delete", style: TextStyle(color: Colors.redAccent)),
+            child: Text("Delete".tr(), style: TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
@@ -345,7 +345,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
           child: GlassContainer(
             borderRadius: 32,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -357,30 +357,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 Text(
-                  "Delete Chat",
+                  "Delete Chat".tr(),
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.w900,
                         fontSize: 24,
                       ),
                 ),
-                const SizedBox(height: 16),
-                const Text(
-                  "Are you sure you want to delete this conversation? This cannot be undone.",
+                SizedBox(height: 16),
+                Text(
+                  "Are you sure you want to delete this conversation? This cannot be undone.".tr(),
                   style: TextStyle(color: Colors.white70, fontSize: 16),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 Row(
                   children: [
                     Expanded(
                       child: TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text("Cancel", style: TextStyle(color: Colors.white38, fontSize: 16)),
+                        child: Text("Cancel".tr(), style: TextStyle(color: Colors.white38, fontSize: 16)),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () async {
@@ -402,10 +402,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.redAccent,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        child: const Text("Delete", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        child: Text("Delete".tr(), style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -423,7 +423,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
       }
@@ -458,16 +458,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 radius: 18,
                 backgroundImage: getAvatarProvider(widget.avatarUrl),
                 child: getAvatarProvider(widget.avatarUrl) == null
-                    ? const Icon(LucideIcons.user, size: 14, color: Colors.white)
+                    ? Icon(LucideIcons.user, size: 14, color: Colors.white)
                     : null,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     widget.contactName, 
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)
                   ),
                   Text(
                     _canMessage ? "Online" : "Offline Contact", 
@@ -482,30 +482,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
         ),
         leading: IconButton(
-          icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
+          icon: Icon(LucideIcons.chevronLeft, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           Theme(
             data: Theme.of(context).copyWith(
-              cardColor: const Color(0xFF1F2937),
+              cardColor: Color(0xFF1F2937),
             ),
             child: PopupMenuButton<String>(
-              icon: const Icon(LucideIcons.moreVertical, color: Colors.white),
-              offset: const Offset(0, 45),
+              icon: Icon(LucideIcons.moreVertical, color: Colors.white),
+              offset: Offset(0, 45),
               onSelected: (value) {
                 if (value == 'delete') {
                   _showDeleteChatDialog();
                 }
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                const PopupMenuItem<String>(
+                PopupMenuItem<String>(
                   value: 'delete',
                   child: Row(
                     children: [
                       Icon(LucideIcons.trash2, color: Colors.redAccent, size: 18),
                       SizedBox(width: 8),
-                      Text('Delete Chat', style: TextStyle(color: Colors.redAccent)),
+                      Text('Delete Chat'.tr(), style: TextStyle(color: Colors.redAccent)),
                     ],
                   ),
                 ),
@@ -519,17 +519,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           children: [
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
+                  ? Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
                   : _messages.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
-                            "No messages yet. Send a message to start!", 
+                            "No messages yet. Send a message to start!".tr(), 
                             style: TextStyle(color: Colors.white24, fontSize: 13)
                           ),
                         )
                       : ListView.builder(
                           controller: _scrollController,
-                          padding: const EdgeInsets.all(24),
+                          padding: EdgeInsets.all(24),
                           itemCount: _messages.length,
                           itemBuilder: (context, index) {
                             final message = _messages[index];
@@ -551,8 +551,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                               return Align(
                                 alignment: Alignment.center,
                                 child: Container(
-                                  margin: const EdgeInsets.only(bottom: 16),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  margin: EdgeInsets.only(bottom: 16),
+                                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withOpacity(0.03),
                                     borderRadius: BorderRadius.circular(12),
@@ -560,7 +560,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                   ),
                                   child: Text(
                                     message['content'] ?? '',
-                                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+                                    style: TextStyle(color: Colors.white38, fontSize: 11),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
@@ -576,16 +576,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                               child: Align(
                                 alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                                 child: Container(
-                                  margin: const EdgeInsets.only(bottom: 16),
-                                  padding: const EdgeInsets.all(16),
+                                  margin: EdgeInsets.only(bottom: 16),
+                                  padding: EdgeInsets.all(16),
                                   constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
                                   decoration: BoxDecoration(
                                     color: isMe 
                                         ? EventzoneTheme.primaryAction 
                                         : Colors.white.withOpacity(0.05),
                                     borderRadius: BorderRadius.only(
-                                      topLeft: const Radius.circular(16),
-                                      topRight: const Radius.circular(16),
+                                      topLeft: Radius.circular(16),
+                                      topRight: Radius.circular(16),
                                       bottomLeft: Radius.circular(isMe ? 16 : 0),
                                       bottomRight: Radius.circular(isMe ? 0 : 16),
                                     ),
@@ -598,14 +598,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                     children: [
                                       Text(
                                         message['content'] ?? '', 
-                                        style: const TextStyle(color: Colors.white, fontSize: 14)
+                                        style: TextStyle(color: Colors.white, fontSize: 14)
                                       ),
-                                      const SizedBox(height: 6),
+                                      SizedBox(height: 6),
                                       Align(
                                         alignment: Alignment.bottomRight,
                                         child: Text(
                                           timeStr,
-                                          style: const TextStyle(color: Colors.white30, fontSize: 10),
+                                          style: TextStyle(color: Colors.white30, fontSize: 10),
                                         ),
                                       ),
                                     ],
@@ -618,19 +618,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
             SafeArea(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 color: EventzoneTheme.backgroundStart,
                 child: Row(
                   children: [
                     Expanded(
                       child: GlassContainer(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                         borderRadius: 30,
                         child: TextField(
                           controller: _messageController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
-                            hintText: "Type your message...",
+                          style: TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: "Type your message...".tr(),
                             hintStyle: TextStyle(color: Colors.white38),
                             border: InputBorder.none,
                           ),
@@ -638,11 +638,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     CircleAvatar(
                       backgroundColor: EventzoneTheme.primaryAction,
                       child: IconButton(
-                        icon: const Icon(LucideIcons.send, color: Colors.white, size: 18),
+                        icon: Icon(LucideIcons.send, color: Colors.white, size: 18),
                         onPressed: _sendMessage,
                       ),
                     ),

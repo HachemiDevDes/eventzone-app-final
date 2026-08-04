@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../services/supabase_service.dart';
 import 'auth_providers.dart';
 
 // --- Language Provider ---
@@ -23,7 +22,7 @@ class LanguageNotifier extends Notifier<Locale> {
       return Locale(savedCode);
     }
     // Default to English
-    return const Locale('en');
+    return Locale('en');
   }
 
   Future<void> setLanguage(Locale locale) async {
@@ -95,7 +94,7 @@ class SupportMessagesNotifier extends AsyncNotifier<void> {
   FutureOr<void> build() {}
 
   Future<bool> submitMessage(String subject, String message) async {
-    state = const AsyncValue.loading();
+    state = AsyncValue.loading();
     
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
@@ -104,19 +103,29 @@ class SupportMessagesNotifier extends AsyncNotifier<void> {
     }
 
     try {
+      final profileResponse = await Supabase.instance.client
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle();
+      
+      final String name = profileResponse?['full_name'] ?? user.userMetadata?['full_name'] ?? user.email ?? 'Unknown User';
+
       await Supabase.instance.client.from('support_messages').insert({
         'user_id': user.id,
+        'name': name,
+        'email': user.email ?? 'unknown@example.com',
         'subject': subject,
         'message': message,
       });
-      state = const AsyncValue.data(null);
+      state = AsyncValue.data(null);
       return true;
     } catch (e, st) {
       debugPrint('Error submitting support message (Table might not exist): $e');
       // Mock success if table doesn't exist yet for testing purposes
       if (e.toString().contains('relation "support_messages" does not exist')) {
-        await Future.delayed(const Duration(milliseconds: 800));
-        state = const AsyncValue.data(null);
+        await Future.delayed(Duration(milliseconds: 800));
+        state = AsyncValue.data(null);
         return true;
       }
       
@@ -128,4 +137,21 @@ class SupportMessagesNotifier extends AsyncNotifier<void> {
 
 final supportMessagesProvider = AsyncNotifierProvider<SupportMessagesNotifier, void>(() {
   return SupportMessagesNotifier();
+});
+
+// --- App Config Provider ---
+
+final appConfigProvider = FutureProvider<Map<String, String>>((ref) async {
+  final supabase = ref.watch(supabaseProvider);
+  try {
+    final response = await supabase.from('app_config').select('*');
+    final Map<String, String> config = {};
+    for (var row in response) {
+      config[row['key'] as String] = row['value'] as String;
+    }
+    return config;
+  } catch (e) {
+    debugPrint('Error fetching app_config: $e');
+    return {};
+  }
 });

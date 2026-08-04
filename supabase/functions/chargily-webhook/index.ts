@@ -45,15 +45,18 @@ serve(async (req) => {
 
       let userId = null;
       let planMonthsRaw = null;
+      let promoCode = null;
 
       if (Array.isArray(metadata)) {
         for (const item of metadata) {
           if (item.user_id) userId = item.user_id;
           if (item.plan_months) planMonthsRaw = item.plan_months;
+          if (item.promo_code) promoCode = item.promo_code;
         }
       } else if (metadata && typeof metadata === 'object') {
         userId = metadata.user_id;
         planMonthsRaw = metadata.plan_months;
+        promoCode = metadata.promo_code;
       }
 
       if (userId && planMonthsRaw) {
@@ -100,6 +103,11 @@ serve(async (req) => {
 
         if (insertError) {
           throw new Error(`Insert error: ${insertError.message}`)
+        }
+
+        if (promoCode) {
+          const { error: promoError } = await supabase.rpc('increment_promo_code_usage', { p_code: promoCode })
+          if (promoError) console.error(`Failed to increment promo code usage: ${promoError.message}`)
         }
 
         console.log(`WEBHOOK: Successfully processed ${planMonths} month(s) subscription for user ${userId}`)

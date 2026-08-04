@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
@@ -5,16 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../theme/eventzone_theme.dart';
 import '../models/event_model.dart';
-import '../widgets/qr_action_sheet.dart';
 import 'edit_profile_screen.dart';
-import 'scan_qr_screen.dart';
-import 'my_qr_code_screen.dart';
 import '../services/supabase_service.dart';
 import '../widgets/glass_container.dart';
 import '../providers/auth_providers.dart';
+import '../widgets/animated_gradient_avatar.dart';
 
 class DiscoveryScreen extends ConsumerStatefulWidget {
   final List<EventModel> events;
@@ -68,10 +66,46 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
     return NetworkImage(url);
   }
 
+  int _calculateProfileCompletion(Map<String, dynamic>? data) {
+    if (data == null) return 0;
+    int score = 0;
+
+    final String fullName = data['full_name'] ?? "";
+    final String jobTitle = data['job_title'] ?? "";
+    final String companyName = data['company_name'] ?? "";
+    
+    // Personal details
+    if (fullName.isNotEmpty && jobTitle.isNotEmpty && companyName.isNotEmpty) {
+      score += 33;
+    } else if (fullName.isNotEmpty || jobTitle.isNotEmpty || companyName.isNotEmpty) {
+      score += 15;
+    }
+
+    // About Me
+    final String bio = data['bio'] ?? "";
+    final String lookingFor = data['what_im_looking_for'] ?? "";
+    if (bio.isNotEmpty || lookingFor.isNotEmpty) {
+      score += 33;
+    }
+
+    // Social Links
+    final metadata = data['metadata'] as Map<String, dynamic>?;
+    if (metadata != null && metadata['socials'] != null) {
+      final socials = metadata['socials'] as List;
+      if (socials.length >= 2) {
+        score += 34;
+      } else if (socials.isNotEmpty) {
+        score += 17;
+      }
+    }
+
+    return score > 100 ? 100 : score;
+  }
+
   @override
   Widget build(BuildContext context) {
     final profileState = ref.watch(currentUserProvider);
-    final data = profileState.value;
+    final data = profileState.valueOrNull;
     final isLoading = profileState.isLoading && data == null;
 
     final String fullName = data?['full_name'] ?? "Attendee";
@@ -81,7 +115,7 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
 
     final String userData = "https://profile.eventzone.pro/?id=$_userId";
     final subtitle = companyName.isNotEmpty 
-        ? "$jobTitle @ $companyName"
+        ? "$jobTitle @$companyName"
         : jobTitle;
 
     return Scaffold(
@@ -91,7 +125,7 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
             children: [
               // Top Header
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                padding: EdgeInsets.fromLTRB(24, 24, 24, 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -100,7 +134,7 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "Welcome back,",
+                            "Welcome back,".tr(),
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: Colors.white60,
                                   fontWeight: FontWeight.w500,
@@ -112,34 +146,70 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                   fontWeight: FontWeight.w900,
-                                  fontSize: 28,
+                                  fontSize: 24,
                                 ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                          MaterialPageRoute(builder: (context) => EditProfileScreen()),
                         );
                       },
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: EventzoneTheme.primaryAction, width: 2),
-                        ),
-                        child: CircleAvatar(
-                          radius: 24,
-                          backgroundColor: Colors.white10,
-                          backgroundImage: avatarUrl.isNotEmpty ? _getAvatarProvider(avatarUrl) : null,
-                          child: avatarUrl.isEmpty
-                              ? const Icon(Icons.person, size: 24, color: Colors.white54)
-                              : null,
-                        ),
+                      child: Builder(
+                        builder: (context) {
+                          final completion = _calculateProfileCompletion(data);
+                          final indicatorColor = completion == 100 ? EventzoneTheme.accentSuccess : EventzoneTheme.primaryAction;
+                          
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            alignment: Alignment.center,
+                            children: [
+                              SizedBox(
+                                width: 60,
+                                height: 60,
+                                child: CircularProgressIndicator(
+                                  value: completion / 100.0,
+                                  strokeWidth: 3,
+                                  backgroundColor: Colors.white10,
+                                  valueColor: AlwaysStoppedAnimation<Color>(indicatorColor),
+                                ),
+                              ),
+                              AnimatedGradientAvatar(
+                                radius: 26,
+                                strokeWidth: 2.5,
+                                color: indicatorColor,
+                                backgroundImage: avatarUrl.isNotEmpty ? _getAvatarProvider(avatarUrl) : null,
+                                child: avatarUrl.isEmpty
+                                    ? const Icon(Icons.person, size: 26, color: Colors.white54)
+                                    : null,
+                              ),
+                              Positioned(
+                                bottom: -6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: indicatorColor,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: EventzoneTheme.backgroundStart, width: 2),
+                                  ),
+                                  child: Text(
+                                    '$completion%',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }
                       ),
                     ),
                   ],
@@ -149,17 +219,18 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
               // QR Code Body
               Expanded(
                 child: isLoading 
-                  ? const Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
-                  : Center(
+                  ? Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
+                  : Align(
+                      alignment: Alignment(0, -0.15),
                       child: SingleChildScrollView(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
+                          padding: EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                           children: [
 
                             GlassContainer(
-                              padding: const EdgeInsets.all(32),
+                              padding: EdgeInsets.all(32),
                               borderRadius: 32,
                               child: Column(
                                 children: [
@@ -168,27 +239,27 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                                     backgroundColor: Colors.white10,
                                     backgroundImage: avatarUrl.isNotEmpty ? _getAvatarProvider(avatarUrl) : null,
                                     child: avatarUrl.isEmpty
-                                        ? const Icon(Icons.person, size: 35, color: Colors.white54)
+                                        ? Icon(Icons.person, size: 35, color: Colors.white54)
                                         : null,
                                   ),
-                                  const SizedBox(height: 16),
+                                  SizedBox(height: 16),
                                   Text(
                                     fullName,
-                                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
+                                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
                                     textAlign: TextAlign.center,
                                   ),
                                   if (subtitle.isNotEmpty)
                                     Padding(
-                                      padding: const EdgeInsets.only(top: 4.0),
+                                      padding: EdgeInsets.only(top: 4.0),
                                       child: Text(
                                         subtitle,
-                                        style: const TextStyle(fontSize: 14, color: Colors.white38),
+                                        style: TextStyle(fontSize: 14, color: Colors.white38),
                                         textAlign: TextAlign.center,
                                       ),
                                     ),
-                                  const SizedBox(height: 32),
+                                  SizedBox(height: 32),
                                   Container(
-                                    padding: const EdgeInsets.all(16),
+                                    padding: EdgeInsets.all(16),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       borderRadius: BorderRadius.circular(20),
@@ -197,11 +268,11 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                                       data: userData,
                                       version: QrVersions.auto,
                                       size: 180.0,
-                                      eyeStyle: const QrEyeStyle(
+                                      eyeStyle: QrEyeStyle(
                                         eyeShape: QrEyeShape.square,
                                         color: Color(0xFF0B0F19),
                                       ),
-                                      dataModuleStyle: const QrDataModuleStyle(
+                                      dataModuleStyle: QrDataModuleStyle(
                                         dataModuleShape: QrDataModuleShape.square,
                                         color: Color(0xFF0B0F19),
                                       ),
@@ -212,13 +283,15 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                             ),
                             // Actions Row
                             Padding(
-                              padding: const EdgeInsets.only(top: 24),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                              padding: EdgeInsets.only(top: 24),
+                              child: Wrap(
+                                alignment: WrapAlignment.center,
+                                spacing: 12,
+                                runSpacing: 12,
                                 children: [
                                   // Corporate Streak Badge
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withOpacity(0.05),
                                       borderRadius: BorderRadius.circular(20),
@@ -227,11 +300,11 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(LucideIcons.flame, size: 16, color: Colors.white70),
-                                        const SizedBox(width: 8),
+                                        Icon(LucideIcons.flame, size: 16, color: Colors.white70),
+                                        SizedBox(width: 8),
                                         Text(
-                                          "$_dailyStreak Day Streak",
-                                          style: const TextStyle(
+                                          "day_streak".tr(args: [_dailyStreak.toString()]),
+                                          style: TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.w600,
                                             fontSize: 14,
@@ -240,15 +313,13 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  
                                   // Share Card Button
                                   InkWell(
                                     onTap: () {
                                       Clipboard.setData(ClipboardData(text: userData));
                                       ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text("Profile link copied to clipboard!", style: TextStyle(fontWeight: FontWeight.bold)),
+                                        SnackBar(
+                                          content: Text("Profile link copied to clipboard!".tr(), style: TextStyle(fontWeight: FontWeight.bold)),
                                           backgroundColor: EventzoneTheme.primaryAction,
                                           behavior: SnackBarBehavior.floating,
                                         ),
@@ -256,7 +327,7 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                                     },
                                     borderRadius: BorderRadius.circular(20),
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                       decoration: BoxDecoration(
                                         color: EventzoneTheme.primaryAction.withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(20),
@@ -265,10 +336,10 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(LucideIcons.share2, size: 16, color: EventzoneTheme.primaryAction),
-                                          const SizedBox(width: 8),
-                                          const Text(
-                                            "Share Card",
+                                          Icon(LucideIcons.share2, size: 16, color: EventzoneTheme.primaryAction),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            "Share Card".tr(),
                                             style: TextStyle(
                                               color: EventzoneTheme.primaryAction,
                                               fontWeight: FontWeight.bold,

@@ -8,8 +8,9 @@ import '../providers/auth_providers.dart';
 import '../providers/settings_providers.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
-import '../services/supabase_service.dart';
 import 'edit_profile_screen.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'desktop_crm_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -19,7 +20,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final _supabaseService = SupabaseService();
 
   ImageProvider _getAvatarProvider(String url) {
     if (url.startsWith("data:image")) {
@@ -42,54 +42,84 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: SafeArea(
           child: profileAsync.when(
             data: (profile) {
-              if (profile == null) return const Center(child: Text("Not logged in", style: TextStyle(color: Colors.white)));
+              if (profile == null) return Center(child: Text("Not logged in".tr(), style: TextStyle(color: Colors.white)));
               return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildProfileHeader(profile),
-                    const SizedBox(height: 32),
-                    _buildSection("Preferences", [
+                    SizedBox(height: 32),
+                    _buildSection("Preferences".tr(), [
                       _buildNavigationTile(
                         LucideIcons.languages, 
-                        "Language", 
+                        "Language".tr(), 
                         trailingText: locale.languageCode == 'ar' ? 'العربية' : locale.languageCode == 'fr' ? 'Français' : 'English',
                         onTap: () => context.push('/settings/language'),
                       ),
                       _buildNavigationTile(
                         LucideIcons.crown, 
-                        "Subscription", 
+                        "Subscription".tr(), 
                         trailingText: subStatusAsync.valueOrNull?.isActive == true 
-                            ? (subStatusAsync.valueOrNull!.isTrial ? "${subStatusAsync.valueOrNull!.daysRemaining} Days (Trial)" : "Active")
-                            : "Expired",
+                            ? (subStatusAsync.valueOrNull!.isTrial ? "{} Days (Trial)".tr(args: [subStatusAsync.valueOrNull!.daysRemaining.toString()]) : "Active".tr())
+                            : "Expired".tr(),
                         onTap: () => context.push('/settings/subscription'),
                       ),
                     ]),
-                    const SizedBox(height: 24),
-                    _buildSection("Information", [
-                      _buildNavigationTile(LucideIcons.info, "About us", onTap: () => context.push('/settings/about')),
-                      _buildNavigationTile(LucideIcons.mail, "Contact us", onTap: () => context.push('/settings/contact')),
+
+                    SizedBox(height: 24),
+                    _buildSection("Information".tr(), [
+                      _buildNavigationTile(LucideIcons.info, "About us".tr(), onTap: () => context.push('/settings/about')),
+                      _buildNavigationTile(LucideIcons.mail, "Contact us".tr(), onTap: () => context.push('/settings/contact')),
                     ]),
-                    const SizedBox(height: 24),
-                    _buildSection("Account", [
-                      _buildNavigationTile(LucideIcons.helpCircle, "Support", onTap: () => context.push('/settings/support')),
-                      _buildNavigationTile(LucideIcons.shield, "Terms and Privacy Policy", onTap: () => context.push('/settings/terms')),
+                    // Temporarily hiding CRM Integrations for a future update
+                    // SizedBox(height: 24),
+                    // _buildSection("Integrations".tr(), [
+                    //   _buildNavigationTile(
+                    //     LucideIcons.plug, 
+                    //     "CRM Integrations".tr(), 
+                    //     trailingText: "${ref.watch(crmConnectionsProvider).values.where((v) => v).length} connected",
+                    //     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CrmIntegrationsScreen())),
+                    //   ),
+                    // ]),
+                    SizedBox(height: 24),
+                    _buildSection("Tools", [
+                      _buildNavigationTile(
+                        LucideIcons.monitor,
+                        "Desktop CRM",
+                        trailingText: "Login code",
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const DesktopCrmScreen()),
+                        ),
+                      ),
+                    ]),
+                    SizedBox(height: 24),
+                    _buildSection("Account".tr(), [
+                      _buildNavigationTile(LucideIcons.helpCircle, "Support".tr(), onTap: () => context.push('/settings/support')),
+                      _buildNavigationTile(LucideIcons.shield, "Terms and Privacy Policy".tr(), onTap: () => context.push('/settings/terms')),
+                      _buildNavigationTile(
+                        LucideIcons.trash2, 
+                        "Delete Account".tr(), 
+                        textColor: Colors.redAccent, 
+                        iconColor: Colors.redAccent,
+                        onTap: _showDeleteAccountDialog,
+                      ),
                       _buildNavigationTile(
                         LucideIcons.logOut, 
-                        "Logout", 
+                        "Logout".tr(), 
                         textColor: Colors.redAccent, 
                         iconColor: Colors.redAccent,
                         onTap: _showSignOutDialog,
                       ),
                     ]),
-                    const SizedBox(height: 60),
+                    SizedBox(height: 60),
                   ],
                 ),
               );
             },
-            loading: () => const Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction)),
-            error: (_, __) => const Center(child: Text("Error loading profile", style: TextStyle(color: Colors.redAccent))),
+            loading: () => Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction)),
+            error: (_, _) => Center(child: Text("Error loading profile".tr(), style: TextStyle(color: Colors.redAccent))),
           ),
         ),
       ),
@@ -105,7 +135,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       onTap: () async {
         await Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+          MaterialPageRoute(builder: (context) => EditProfileScreen()),
         );
       },
       child: Row(
@@ -116,13 +146,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: EventzoneTheme.primaryAction.withOpacity(0.5),
+                color: EventzoneTheme.primaryAction.withValues(alpha: 0.5),
                 width: 2,
               ),
             ),
             child: ClipOval(
               child: avatarUrl.isEmpty
-                  ? const CircleAvatar(
+                  ? CircleAvatar(
                       backgroundColor: Colors.white10,
                       child: Icon(Icons.person, size: 35, color: Colors.white54),
                     )
@@ -134,14 +164,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   fullName.isEmpty ? "No Name" : fullName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -149,22 +179,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 Text(
                   email,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white54,
                     fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
                         color: EventzoneTheme.primaryAction,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
-                        "Edit profile",
+                      child: Text(
+                        "Edit profile".tr(),
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 12,
@@ -187,10 +217,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 12),
+          padding: EdgeInsets.only(bottom: 12),
           child: Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white54,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -207,7 +237,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   child,
                   if (!isLast)
-                    const Divider(color: Colors.white10, height: 1, indent: 16, endIndent: 16),
+                    Divider(color: Colors.white10, height: 1, indent: 16, endIndent: 16),
                 ],
               );
             }).toList(),
@@ -220,11 +250,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _buildNavigationTile(IconData icon, String title, {String? trailingText, Color? textColor, Color? iconColor, VoidCallback? onTap}) {
     return ListTile(
       onTap: onTap ?? () {},
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
-        padding: const EdgeInsets.all(8),
+        padding: EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: iconColor ?? Colors.white70, size: 20),
@@ -242,44 +272,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           if (trailingText != null)
             Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Text(
-                trailingText,
-                style: const TextStyle(color: Colors.white38, fontSize: 13),
+              padding: EdgeInsets.only(right: 8),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 100),
+                child: Text(
+                  trailingText,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.white38, fontSize: 13),
+                ),
               ),
             ),
           if (title != "Logout")
-            const Icon(LucideIcons.chevronRight, color: Colors.white24, size: 18),
+            Icon(LucideIcons.chevronRight, color: Colors.white24, size: 18),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSwitchTile(IconData icon, String title, bool value, ValueChanged<bool> onChanged) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: Colors.white70, size: 20),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeColor: EventzoneTheme.primaryAction,
-        inactiveThumbColor: Colors.white54,
-        inactiveTrackColor: Colors.white10,
       ),
     );
   }
@@ -290,34 +295,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => GlassContainer(
         borderRadius: 24,
-        padding: const EdgeInsets.all(24.0),
+        padding: EdgeInsets.all(24.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              "Sign Out",
+            Text(
+              "Sign Out".tr(),
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              "Are you sure you want to sign out? Your session will be ended.",
+            SizedBox(height: 16),
+            Text(
+              "Are you sure you want to sign out? Your session will be ended.".tr(),
               style: TextStyle(color: Colors.white70, fontSize: 15),
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
             Row(
               children: [
                 Expanded(
                   child: TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text("Cancel", style: TextStyle(color: Colors.white70)),
+                    child: Text("Cancel".tr(), style: TextStyle(color: Colors.white70)),
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () async {
@@ -327,15 +332,84 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.redAccent,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     ),
-                    child: const Text("Sign Out", style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: Text("Sign Out".tr(), style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showDeleteAccountDialog() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => GlassContainer(
+        borderRadius: 24,
+        padding: EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              "Delete Account".tr(),
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 16),
+            Text(
+              "Are you sure you want to permanently delete your account? This action cannot be undone and all your data will be lost.".tr(),
+              style: TextStyle(color: Colors.white70, fontSize: 15),
+            ),
+            SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text("Cancel".tr(), style: TextStyle(color: Colors.white70)),
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      Navigator.pop(context); // Close dialog
+                      try {
+                        final user = Supabase.instance.client.auth.currentUser;
+                        if (user != null) {
+                          await Supabase.instance.client.rpc('delete_user_account');
+                          await Supabase.instance.client.auth.signOut();
+                        }
+                      } catch (e) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text('Failed to delete account. Please contact support.'.tr())),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    child: Text("Delete".tr(), style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16),
           ],
         ),
       ),

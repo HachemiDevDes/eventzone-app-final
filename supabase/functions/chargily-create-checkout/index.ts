@@ -17,8 +17,28 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
     if (userError || !user) throw new Error('Unauthorized')
 
-    const { amount, plan_months } = await req.json()
+    const { amount, plan_months, promo_code } = await req.json()
     if (!amount || !plan_months) throw new Error('Amount and plan_months are required')
+
+    let finalAmount = amount
+    let appliedPromoCode = null
+
+    if (promo_code) {
+      const { data: promoData, error: promoError } = await supabaseClient
+        .from('promo_codes')
+        .select('code, discount_percentage')
+        .eq('code', promo_code.toString().trim())
+        .eq('is_active', true)
+        .maybeSingle()
+
+      if (promoError || !promoData) {
+        throw new Error('Invalid or inactive promo code')
+      }
+
+      appliedPromoCode = promoData.code
+      const discount = finalAmount * (promoData.discount_percentage / 100)
+      finalAmount = Math.max(100, Math.round(finalAmount - discount)) // Ensure amount meets minimum requirement
+    }
 
     const CHARGILY_SECRET_KEY = Deno.env.get('CHARGILY_SECRET_KEY')
     if (!CHARGILY_SECRET_KEY) throw new Error('Chargily Secret Key not configured')
@@ -36,14 +56,15 @@ serve(async (req) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        amount: amount,
+        amount: finalAmount,
         currency: 'dzd',
         success_url: 'https://eventzone.pro/payment/success',
         failure_url: 'https://eventzone.pro/payment/failure',
         webhook_endpoint: 'https://awkreadldqmidcrrqukm.supabase.co/functions/v1/chargily-webhook',
         metadata: [
           { user_id: user.id },
-          { plan_months: plan_months }
+          { plan_months: plan_months },
+          ...(appliedPromoCode ? [{ promo_code: appliedPromoCode }] : [])
         ]
       })
     })

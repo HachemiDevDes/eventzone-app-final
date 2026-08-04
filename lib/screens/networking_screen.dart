@@ -6,6 +6,7 @@ import '../widgets/glass_container.dart';
 import '../services/supabase_service.dart';
 import '../providers/connection_providers.dart';
 import 'professional_profile_screen.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class NetworkingScreen extends ConsumerStatefulWidget {
   final String? eventId;
@@ -80,28 +81,28 @@ class _NetworkingScreenState extends ConsumerState<NetworkingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 72),
+              SizedBox(height: 72),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("COMMUNITY", style: Theme.of(context).textTheme.labelLarge?.copyWith(color: EventzoneTheme.primaryAction)),
-                    const SizedBox(height: 8),
-                    Text("Attendee Directory", style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 28, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 16),
+                    Text("COMMUNITY".tr(), style: Theme.of(context).textTheme.labelLarge?.copyWith(color: EventzoneTheme.primaryAction)),
+                    SizedBox(height: 8),
+                    Text("Attendee Directory".tr(), style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 28, fontWeight: FontWeight.w900)),
+                    SizedBox(height: 16),
                     GlassContainer(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       borderRadius: 30,
                       child: TextField(
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(color: Colors.white),
                         onChanged: (val) {
                           setState(() {
                             _searchQuery = val;
                           });
                         },
-                        decoration: const InputDecoration(
-                          hintText: "Search by name or company...",
+                        decoration: InputDecoration(
+                          hintText: "Search by name or company...".tr(),
                           hintStyle: TextStyle(color: Colors.white38),
                           border: InputBorder.none,
                           icon: Icon(LucideIcons.search, color: Colors.white38, size: 20),
@@ -113,35 +114,35 @@ class _NetworkingScreenState extends ConsumerState<NetworkingScreen> {
               ),
               Expanded(
                 child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
+                    ? Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
                     : filteredProfiles.isEmpty
-                        ? const Center(child: Text("No profiles found", style: TextStyle(color: Colors.white38)))
+                        ? Center(child: Text("No profiles found".tr(), style: TextStyle(color: Colors.white38)))
                         : ListView.separated(
-                            physics: const BouncingScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
+                            physics: BouncingScrollPhysics(),
+                            padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
                             itemCount: filteredProfiles.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 12),
+                            separatorBuilder: (context, index) => SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final profile = filteredProfiles[index];
                               final String userId = profile['id'];
                               final name = profile['full_name'] ?? 'Attendee';
                               final jobTitle = profile['job_title'] ?? '';
                               final companyName = profile['company_name'] ?? '';
-                              final title = companyName.isNotEmpty ? "$jobTitle @ $companyName" : jobTitle;
+                              final title = companyName.isNotEmpty ? "$jobTitle @$companyName" : jobTitle;
 
                               return GestureDetector(
                                 onTap: () => _navigateToProfile(userId, profile),
                                 child: GlassContainer(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: EdgeInsets.all(16),
                                   child: Row(
                                     children: [
                                       _buildAvatar(name, profile['avatar_url']),
-                                      const SizedBox(width: 16),
+                                      SizedBox(width: 16),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                                            Text(name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
                                             Text(title, style: Theme.of(context).textTheme.bodyMedium),
                                           ],
                                         ),
@@ -181,7 +182,7 @@ class _NetworkingScreenState extends ConsumerState<NetworkingScreen> {
           ? Center(
               child: Text(
                 name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').join(),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             )
           : null,
@@ -195,17 +196,17 @@ class _NetworkingScreenState extends ConsumerState<NetworkingScreen> {
         final status = statusAsync.value ?? 'none';
         
         if (status == 'accepted') {
-          return const Icon(LucideIcons.checkCircle, color: EventzoneTheme.accentSuccess);
+          return Icon(LucideIcons.checkCircle, color: EventzoneTheme.accentSuccess);
 
         } else {
           return TextButton(
             onPressed: () => _navigateToProfile(userId, profile),
             style: TextButton.styleFrom(
               backgroundColor: EventzoneTheme.primaryAction.withOpacity(0.1),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: EdgeInsets.symmetric(horizontal: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text("Connect", style: TextStyle(color: EventzoneTheme.primaryAction, fontWeight: FontWeight.bold)),
+            child: Text("Connect".tr(), style: TextStyle(color: EventzoneTheme.primaryAction, fontWeight: FontWeight.bold)),
           );
         }
       },

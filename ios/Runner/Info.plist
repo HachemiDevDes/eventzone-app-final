@@ -79,6 +79,14 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Eventzone needs access to your camera to scan QR codes for tickets, badges, and networking.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Location access is needed to find nearby users when you use Shake to Connect.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Eventzone needs access to your photo library to allow you to upload a profile picture and share images in chats.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Eventzone needs access to your microphone for video recording and voice features.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>mailto</string>

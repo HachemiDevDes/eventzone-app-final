@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
-import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import 'my_network_screen.dart';
 import 'add_contact_screen.dart';
+import '../widgets/subscription_expired_bottom_sheet.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:google_mlkit_entity_extraction/google_mlkit_entity_extraction.dart';
@@ -113,8 +115,10 @@ class ScanQRScreen extends StatefulWidget {
 
 class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderStateMixin {
   bool _isConnecting = false;
+  bool _isSwitchingCamera = false;
   late String _scanType; // "QR Code", "Business Card", "Event Badge"
-  final MobileScannerController _controller = MobileScannerController();
+  final BarcodeScanner _barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.qrCode]);
+  bool _isProcessingBarcode = false;
   bool _isFlashOn = false;
   
   late AnimationController _laserController;
@@ -138,7 +142,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
-    _controller.dispose();
+    _barcodeScanner.close();
     _laserController.dispose();
 
     super.dispose();
@@ -154,34 +158,99 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
     return match?.group(0);
   }
 
-  void _handleCapture(BarcodeCapture capture) {
+  void _handleQRData(String rawValue) {
     if (_isConnecting) return;
     if (_scanType != "QR Code") return;
-    final List<Barcode> barcodes = capture.barcodes;
-    if (barcodes.isNotEmpty) {
-      final String rawValue = barcodes.first.rawValue ?? "";
+
+    if (_scanType == "QR Code") {
+      // Validate if it is a valid Eventzone QR profile (must contain a UUID)
+      final uuid = _extractUuid(rawValue);
       
-      if (_scanType == "QR Code") {
-        // Validate if it is a valid Eventzone QR profile (must contain a UUID)
-        final uuid = _extractUuid(rawValue);
-        
-        if (uuid == null) {
-          final now = DateTime.now();
-          if (_lastErrorTime == null || now.difference(_lastErrorTime!) > const Duration(seconds: 3)) {
-            _lastErrorTime = now;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Error: Not a valid Eventzone Profile QR code."),
-                backgroundColor: Colors.redAccent,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          }
-          return;
+      if (uuid == null) {
+        final now = DateTime.now();
+        if (_lastErrorTime == null || now.difference(_lastErrorTime!) > const Duration(seconds: 3)) {
+          _lastErrorTime = now;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("scan_qr_error_invalid_code".tr()),
+              backgroundColor: Colors.redAccent,
+              duration: Duration(seconds: 2),
+            ),
+          );
         }
+        return;
+      }
+    }
+    
+    _processScanData(rawValue);
+  }
+
+  Future<void> _processAnalysisImage(AnalysisImage image) async {
+    if (_scanType != "QR Code" || _isConnecting || _isProcessingBarcode) return;
+    _isProcessingBarcode = true;
+    
+    try {
+      final Size size = image.size;
+      
+      InputImageRotation imageRotation = InputImageRotation.rotation0deg;
+      switch (image.rotation) {
+        case InputAnalysisImageRotation.rotation90deg:
+          imageRotation = InputImageRotation.rotation90deg;
+          break;
+        case InputAnalysisImageRotation.rotation180deg:
+          imageRotation = InputImageRotation.rotation180deg;
+          break;
+        case InputAnalysisImageRotation.rotation270deg:
+          imageRotation = InputImageRotation.rotation270deg;
+          break;
+        default:
+          imageRotation = InputImageRotation.rotation0deg;
+          break;
       }
       
-      _processScanData(rawValue);
+      InputImage? inputImage;
+
+      image.when(
+        nv21: (Nv21Image nv21) {
+          final metadata = InputImageMetadata(
+            size: size,
+            rotation: imageRotation,
+            format: InputImageFormat.nv21,
+            bytesPerRow: nv21.planes.first.bytesPerRow,
+          );
+          inputImage = InputImage.fromBytes(bytes: nv21.bytes, metadata: metadata);
+          return null;
+        },
+        bgra8888: (Bgra8888Image bgra) {
+          final metadata = InputImageMetadata(
+            size: size,
+            rotation: imageRotation,
+            format: InputImageFormat.bgra8888,
+            bytesPerRow: bgra.planes.first.bytesPerRow,
+          );
+          inputImage = InputImage.fromBytes(bytes: bgra.bytes, metadata: metadata);
+          return null;
+        },
+        yuv420: (Yuv420Image yuv) => null,
+        jpeg: (JpegImage jpeg) => null,
+      );
+      
+      if (inputImage == null) {
+        _isProcessingBarcode = false;
+        return;
+      }
+      
+      final List<Barcode> barcodes = await _barcodeScanner.processImage(inputImage!);
+      if (barcodes.isNotEmpty) {
+        final rawValue = barcodes.first.rawValue;
+        if (rawValue != null && rawValue.isNotEmpty) {
+           _handleQRData(rawValue);
+        }
+      }
+    } catch (e) {
+      debugPrint('Barcode scanning error: $e');
+    } finally {
+      if (mounted) _isProcessingBarcode = false;
     }
   }
 
@@ -190,7 +259,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
     
     setState(() {
       _isConnecting = true;
-      _ocrStatus = "Detecting contact alignment...";
+      _ocrStatus = "scan_qr_detecting_alignment".tr();
       _ocrProgress = 0.1;
     });
     
@@ -211,7 +280,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
     // Check if it is a UUID (Eventzone Profile)
     if (uuid != null) {
       setState(() {
-        _ocrStatus = "Fetching profile from database...";
+        _ocrStatus = "scan_qr_fetching_profile".tr();
         _ocrProgress = 0.4;
       });
       
@@ -230,8 +299,8 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
             _laserController.stop();
             setState(() => _isConnecting = false);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("You cannot connect with yourself!"),
+              SnackBar(
+                content: Text("scan_qr_error_connect_self".tr()),
                 backgroundColor: Colors.redAccent,
               ),
             );
@@ -252,7 +321,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
               final String existingName = profile["full_name"] ?? "this user";
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text("You are already connected with $existingName!"),
+                  content: Text("scan_qr_error_already_connected".tr(args: [existingName])),
                   backgroundColor: const Color(0xFFEAB308), // Yellow warning
                 ),
               );
@@ -260,7 +329,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
                 context,
                 MaterialPageRoute(
                   builder: (context) => ProfessionalProfileScreen(
-                    name: profile["full_name"] ?? "Eventzone User",
+                    name: profile["full_name"] ?? "scan_qr_eventzone_user".tr(),
                     title: profile["job_title"] ?? "",
                     avatarUrl: profile["avatar_url"] ?? "",
                     source: "QR Code",
@@ -281,12 +350,12 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
             }
           }
 
-          name = profile["full_name"] ?? "Eventzone User";
+          name = profile["full_name"] ?? "scan_qr_eventzone_user".tr();
           final String job = profile["job_title"] ?? "";
           final String comp = profile["company_name"] ?? "";
           title = job.isNotEmpty 
-              ? (comp.isNotEmpty ? "$job at $comp" : job)
-              : (comp.isNotEmpty ? "Professional at $comp" : "Attendee");
+              ? (comp.isNotEmpty ? "scan_qr_job_at_comp".tr(args: [job, comp]) : job)
+              : (comp.isNotEmpty ? "scan_qr_professional_at_comp".tr(args: [comp]) : "scan_qr_attendee".tr());
           avatarUrl = profile["avatar_url"] ?? "";
           email = profile["email"];
           phone = profile["phone"];
@@ -297,8 +366,8 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
           _laserController.stop();
           setState(() => _isConnecting = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Error: Eventzone Profile not found in database."),
+            SnackBar(
+              content: Text("scan_qr_error_profile_not_found".tr()),
               backgroundColor: Colors.redAccent,
             ),
           );
@@ -309,8 +378,8 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
         _laserController.stop();
         setState(() => _isConnecting = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Error communicating with database."),
+          SnackBar(
+            content: Text("scan_qr_error_db".tr()),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -319,7 +388,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
     } else {
       // Not a UUID: Parse structured details (for Business Card / Event Badge QR codes or input text)
       setState(() {
-        _ocrStatus = "Extracting contact fields...";
+        _ocrStatus = "scan_qr_extracting_fields".tr();
         _ocrProgress = 0.5;
       });
       
@@ -334,7 +403,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
     Future.delayed(const Duration(milliseconds: 600), () {
       if (!mounted) return;
       setState(() {
-        _ocrStatus = "Structuring connection info...";
+        _ocrStatus = "scan_qr_structuring_info".tr();
         _ocrProgress = 0.8;
       });
       
@@ -342,7 +411,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
       Future.delayed(const Duration(milliseconds: 600), () async {
         if (!mounted) return;
         setState(() {
-          _ocrStatus = "Verification successful!";
+          _ocrStatus = "scan_qr_verification_success".tr();
           _ocrProgress = 1.0;
         });
         
@@ -366,7 +435,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
             _laserController.stop();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text("Added $name ($title) to contacts!"),
+                content: Text("scan_qr_added_contact".tr(args: [name, title])),
                 backgroundColor: EventzoneTheme.accentSuccess,
               ),
             );
@@ -401,13 +470,18 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
           if (mounted) {
             _laserController.stop();
             setState(() => _isConnecting = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(e.toString().replaceAll('Exception: ', '')),
-                backgroundColor: Colors.redAccent,
-                duration: const Duration(seconds: 3),
-              ),
-            );
+            final errStr = e.toString();
+            if (errStr.contains("expired") || errStr.contains("subscription") || errStr.contains("trial")) {
+              SubscriptionExpiredBottomSheet.show(context);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(errStr.replaceAll('Exception: ', '')),
+                  backgroundColor: Colors.redAccent,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            }
           }
         }
       });
@@ -495,7 +569,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
     
     if (_cameraAwesomeState == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Camera not initialized yet.")),
+        SnackBar(content: Text("Camera not initialized yet.")),
       );
       return;
     }
@@ -515,7 +589,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
           } else {
             setState(() => _isConnecting = false);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Capture failed: Path is null"), backgroundColor: Colors.redAccent),
+              SnackBar(content: Text("Capture failed: Path is null"), backgroundColor: Colors.redAccent),
             );
           }
         },
@@ -544,8 +618,8 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
     setState(() {
       _isConnecting = true;
       _ocrStatus = isCameraCapture 
-          ? "Image captured! You can move your phone." 
-          : "Analyzing image...";
+          ? "Image captured! You can move your phone.".tr() 
+          : "Analyzing image...".tr();
       _ocrProgress = 0.1;
     });
     
@@ -675,7 +749,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
         _laserController.stop();
         setState(() => _isConnecting = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text("No text detected on card/badge. Please try a clearer image."),
             backgroundColor: Colors.redAccent,
           ),
@@ -1127,7 +1201,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
       final String cleanDept = "";
 
       setState(() {
-        _ocrStatus = "Extracting contact metadata...";
+        _ocrStatus = "scan_qr_extracting_metadata".tr();
         _ocrProgress = 0.8;
       });
       
@@ -1137,7 +1211,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
       if (!mounted) return;
       
       setState(() {
-        _ocrStatus = "Scan successful!";
+        _ocrStatus = "scan_qr_scan_successful".tr();
         _ocrProgress = 1.0;
       });
       
@@ -1285,16 +1359,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
   }
 
   Future<void> _toggleCameraFlash() async {
-    if (_scanType == "QR Code") {
-      try {
-        await _controller.toggleTorch();
-        setState(() {
-          _isFlashOn = !_isFlashOn;
-        });
-      } catch (e) {
-        debugPrint("Error toggling mobile_scanner torch: $e");
-      }
-    } else if (_cameraAwesomeState != null) {
+    if (_cameraAwesomeState != null) {
       try {
         _isFlashOn = !_isFlashOn;
         // With CameraAwesome, sensor config manages the flash
@@ -1317,11 +1382,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
         final bool isOcrModeBefore = _scanType != "QR Code";
 
         // Turn off torch/flash when switching modes
-        if (_scanType == "QR Code") {
-          try {
-            await _controller.toggleTorch();
-          } catch (_) {}
-        } else if (_cameraAwesomeState != null) {
+        if (_cameraAwesomeState != null) {
           try {
             _cameraAwesomeState!.sensorConfig.setFlashMode(FlashMode.none);
           } catch (_) {}
@@ -1331,16 +1392,6 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
           _scanType = type;
           _isFlashOn = false;
         });
-        
-        if (type == "QR Code") {
-          // Run hardware switch asynchronously to avoid tap freeze
-          _controller.start().catchError((_) {});
-        } else {
-          // If we were already in an OCR mode, reuse the initialized CameraController
-          if (!isOcrModeBefore || _cameraAwesomeState == null) {
-            // CameraAwesome handles initialization automatically when rebuilt
-          }
-        }
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -1359,7 +1410,9 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
             Icon(icon, color: Colors.white, size: 14),
             const SizedBox(width: 6),
             Text(
-              type,
+              type == "QR Code" 
+                ? "scan_qr_tab_qr".tr() 
+                : (type == "Business Card" ? "scan_qr_tab_card".tr() : "scan_qr_tab_badge".tr()),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 11,
@@ -1401,24 +1454,26 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
         children: [
           // 1. Camera View
           Positioned.fill(
-            child: _scanType == "QR Code"
-                ? MobileScanner(
-                    controller: _controller,
-                    onDetect: _handleCapture,
-                  )
-                : CameraAwesomeBuilder.custom(
-                    saveConfig: SaveConfig.photo(
-                      pathBuilder: (sensors) async {
-                        final Directory extDir = await getTemporaryDirectory();
-                        final testDir = await Directory('${extDir.path}/camerawesome').create(recursive: true);
-                        return SingleCaptureRequest('${testDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg', sensors.first);
-                      },
-                    ),
-                    builder: (cameraState, preview) {
-                      _cameraAwesomeState = cameraState;
-                      return const SizedBox.shrink(); // Transparent background so the stack shows our custom UI
-                    },
-                  ),
+            child: CameraAwesomeBuilder.custom(
+              saveConfig: SaveConfig.photo(
+                pathBuilder: (sensors) async {
+                  final Directory extDir = await getTemporaryDirectory();
+                  final testDir = await Directory('${extDir.path}/camerawesome').create(recursive: true);
+                  return SingleCaptureRequest('${testDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg', sensors.first);
+                },
+              ),
+              onImageForAnalysis: _processAnalysisImage,
+              imageAnalysisConfig: AnalysisConfig(
+                androidOptions: const AndroidAnalysisOptions.nv21(
+                  width: 1024,
+                ),
+                maxFramesPerSecond: 10,
+              ),
+              builder: (cameraState, preview) {
+                _cameraAwesomeState = cameraState;
+                return const SizedBox.shrink(); // Transparent background so the stack shows our custom UI
+              },
+            ),
           ),
           
           // 2. Smoothly animated mask and corner overlays
@@ -1570,7 +1625,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
                           );
                         },
                         icon: const Icon(LucideIcons.pen, size: 14, color: Colors.white),
-                        label: const Text("Enter manually", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                        label: Text("Enter manually".tr(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           backgroundColor: Colors.white.withOpacity(0.1),
@@ -1611,7 +1666,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            "Position the $_scanType within the frame",
+                            _scanType == "QR Code" ? "scan_qr_instruction".tr() : "scan_qr_align_card".tr(),
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.white70),
                           ),
