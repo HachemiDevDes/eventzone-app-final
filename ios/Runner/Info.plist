@@ -87,6 +87,8 @@
 	<string>Eventzone needs access to your photo library to allow you to upload a profile picture and share images in chats.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Eventzone needs access to your microphone for video recording and voice features.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Eventzone needs access to your contacts to save scanned business cards to your address book.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>mailto</string>

@@ -10,10 +10,11 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/eventzone_theme.dart';
+import '../theme/profile_material_finish.dart';
 import '../widgets/glass_container.dart';
+import '../widgets/material_finish_selector.dart';
 import '../services/supabase_service.dart';
 import 'schedule_screen.dart';
-import 'my_network_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_providers.dart';
 
@@ -33,7 +34,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _bioController = TextEditingController();
   final ExpansionTileController _bioExpansionController = ExpansionTileController();
 
-  final List<String> _lookingForOptions = ['Investors', 'Clients', 'Partners', 'Talent', 'Opportunities', 'Mentorship', 'Networking', 'Co-founders', 'Freelancers', 'Knowledge Sharing', 'Distributors', 'Sponsors', 'Job Opportunities', 'Internships', 'Venture Capital', 'Dev Partners', 'Brand Ambassadors', 'Content Creators', 'Influencers'];
+  final List<String> _lookingForOptions = [
+    'Investors', 'Clients', 'Partners', 'Talent', 'Opportunities', 'Mentorship',
+    'Networking', 'Co-founders', 'Freelancers', 'Knowledge Sharing', 'Distributors',
+    'Sponsors', 'Job Opportunities', 'Internships', 'Venture Capital', 'Dev Partners',
+    'Brand Ambassadors', 'Content Creators', 'Influencers'
+  ];
   List<String> _selectedLookingFor = [];
 
   final List<String> _predefinedIndustries = [
@@ -51,6 +57,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   final _supabaseService = SupabaseService();
   String _avatarUrl = "";
+  ProfileMaterialFinish _selectedFinish = ProfileMaterialFinish.cyberViolet;
 
   List<Map<String, dynamic>> _socialLinks = [];
 
@@ -124,6 +131,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       interests: _selectedInterests,
       metadata: {
         "socials": _socialLinks,
+        "material_finish": _selectedFinish.id,
       },
     );
     
@@ -139,8 +147,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         'what_im_looking_for': _selectedLookingFor.join(', '),
         'industries': _selectedIndustries,
         'interests': _selectedInterests,
+        'material_finish': _selectedFinish.id,
         'metadata': {
           "socials": _socialLinks,
+          "material_finish": _selectedFinish.id,
         },
       });
     }
@@ -210,11 +220,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       } else {
         _socialLinks = [];
       }
+      _selectedFinish = ProfileMaterialFinish.fromProfile(data);
       _isLoaded = true;
     });
   }
-
-
 
   Future<void> _pickImage() async {
     try {
@@ -313,7 +322,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         selectedCode = parts[0];
         initialValue = parts.sublist(1).join(' ');
       } else if (initialValue.startsWith('+')) {
-        // Fallback if not separated by space
         selectedCode = '+1'; 
       }
     }
@@ -538,7 +546,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             )
           else if (_isLoaded)
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
                   const Icon(LucideIcons.cloudCheck, color: Colors.white24, size: 18),
@@ -569,9 +577,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: EventzoneTheme.primaryAction.withOpacity(0.5),
-                            width: 2,
+                            color: _selectedFinish.primaryColor.withOpacity(0.6),
+                            width: 2.5,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _selectedFinish.glowColor,
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: ClipOval(
                           child: _avatarUrl.isEmpty
@@ -589,8 +604,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       ),
                       Container(
                         padding: const EdgeInsets.all(8),
-                        decoration: const BoxDecoration(
-                          color: EventzoneTheme.primaryAction,
+                        decoration: BoxDecoration(
+                          color: _selectedFinish.primaryColor,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(LucideIcons.pencil, size: 16, color: Colors.white),
@@ -599,6 +614,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 28),
+
+              // 🎨 MATERIAL FINISH CUSTOMIZATION
+              MaterialFinishSelector(
+                selectedFinish: _selectedFinish,
+                onFinishChanged: (finish) {
+                  setState(() {
+                    _selectedFinish = finish;
+                  });
+                  _autoSaveProfile();
+                },
+              ),
+
               const SizedBox(height: 32),
               _buildSectionTitle("Personal Details".tr()),
               _buildTextField("Full Name".tr(), _nameController),
@@ -665,7 +693,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               const SizedBox(height: 32),
               _buildSectionTitle("Active Links".tr()),
               
-
               const SizedBox(height: 16),
               
               if (_socialLinks.isEmpty)
@@ -752,7 +779,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () async {
-                      Navigator.pop(context); // Close dialog
+                      Navigator.pop(context);
                       await Supabase.instance.client.auth.signOut();
                     },
                     style: ElevatedButton.styleFrom(
@@ -766,7 +793,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 16), // SafeArea padding
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -788,60 +815,60 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   Widget _buildPhoneField() {
     return Padding(
-      padding: EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Phone Number".tr(), style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold)),
+          Text("Phone Number".tr(), style: const TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold)),
           TextField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
-            style: TextStyle(color: Colors.white, fontSize: 16),
+            style: const TextStyle(color: Colors.white, fontSize: 16),
             decoration: InputDecoration(
-              prefixIconConstraints: BoxConstraints(minWidth: 0, minHeight: 0),
+              prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
               prefixIcon: Container(
                 margin: const EdgeInsets.only(bottom: 4, right: 8),
                 child: CountryCodePicker(
-                onChanged: (countryCode) {
-                  if (countryCode.dialCode != null) {
-                    setState(() {
-                      _phoneCountryCode = countryCode.dialCode!;
-                    });
-                    _onFieldChanged();
-                  }
-                },
-                initialSelection: _phoneCountryCode,
-                favorite: const ['+213', '+216', '+20', '+33', '+1', '+34', '+39', '+351', '+7', '+227', '+223', '+221'],
-                countryFilter: codes.map<String>((c) => c['code']!).where((code) => code != 'IL').toList(),
-                showCountryOnly: false,
-                showOnlyCountryWhenClosed: false,
-                alignLeft: false,
-                padding: EdgeInsets.zero,
-                textStyle: TextStyle(color: Colors.white, fontSize: 16),
-                dialogTextStyle: TextStyle(color: Colors.white),
-                dialogBackgroundColor: Colors.transparent,
-                barrierColor: Colors.black87,
-                dialogSize: Size(MediaQuery.of(context).size.width * 0.85, MediaQuery.of(context).size.height * 0.7),
-                boxDecoration: BoxDecoration(
-                  color: const Color(0xFF1A1E2E),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white10),
-                ),
-                closeIcon: const Icon(Icons.close, color: Colors.white54),
-                searchStyle: const TextStyle(color: Colors.white),
-                searchDecoration: InputDecoration(
-                  hintText: "Search country".tr(),
-                  hintStyle: const TextStyle(color: Colors.white38),
-                  prefixIcon: const Icon(Icons.search, color: Colors.white54),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  onChanged: (countryCode) {
+                    if (countryCode.dialCode != null) {
+                      setState(() {
+                        _phoneCountryCode = countryCode.dialCode!;
+                      });
+                      _onFieldChanged();
+                    }
+                  },
+                  initialSelection: _phoneCountryCode,
+                  favorite: const ['+213', '+216', '+20', '+33', '+1', '+34', '+39', '+351', '+7', '+227', '+223', '+221'],
+                  countryFilter: codes.map<String>((c) => c['code']!).where((code) => code != 'IL').toList(),
+                  showCountryOnly: false,
+                  showOnlyCountryWhenClosed: false,
+                  alignLeft: false,
+                  padding: EdgeInsets.zero,
+                  textStyle: const TextStyle(color: Colors.white, fontSize: 16),
+                  dialogTextStyle: const TextStyle(color: Colors.white),
+                  dialogBackgroundColor: Colors.transparent,
+                  barrierColor: Colors.black87,
+                  dialogSize: Size(MediaQuery.of(context).size.width * 0.85, MediaQuery.of(context).size.height * 0.7),
+                  boxDecoration: BoxDecoration(
+                    color: const Color(0xFF1A1E2E),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  closeIcon: const Icon(Icons.close, color: Colors.white54),
+                  searchStyle: const TextStyle(color: Colors.white),
+                  searchDecoration: InputDecoration(
+                    hintText: "Search country".tr(),
+                    hintStyle: const TextStyle(color: Colors.white38),
+                    prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  ),
                 ),
               ),
-              ),
-              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
-              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: EventzoneTheme.primaryAction)),
+              enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+              focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: EventzoneTheme.primaryAction)),
               contentPadding: const EdgeInsets.only(top: 10, bottom: 8),
             ),
           ),
@@ -861,10 +888,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             controller: controller,
             maxLines: maxLines,
             style: const TextStyle(color: Colors.white, fontSize: 16),
-            decoration: const InputDecoration(
-              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
-              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: EventzoneTheme.primaryAction)),
-              contentPadding: EdgeInsets.symmetric(vertical: 8),
+            decoration: InputDecoration(
+              enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: _selectedFinish.primaryColor)),
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
             ),
           ),
         ],
@@ -879,9 +906,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: EventzoneTheme.primaryAction,
+            decoration: BoxDecoration(
+              color: _selectedFinish.primaryColor,
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: _selectedFinish.glowColor,
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: FaIcon(icon, color: Colors.white, size: 22),
           ),
@@ -915,10 +949,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: EventzoneTheme.primaryAction.withOpacity(0.1),
+                  color: _selectedFinish.primaryColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: FaIcon(icon, color: EventzoneTheme.primaryAction, size: 18),
+                child: FaIcon(icon, color: _selectedFinish.primaryColor, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -958,6 +992,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       ),
     );
   }
+
   Widget _buildCollapsibleBio() {
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -990,7 +1025,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
+                  borderSide: BorderSide(color: _selectedFinish.primaryColor, width: 2),
                 ),
               ),
             ),
@@ -1011,11 +1046,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ),
                   );
                 },
-                icon: const Icon(LucideIcons.checkCircle2, color: EventzoneTheme.primaryAction, size: 16),
-                label: const Text("Save Bio", style: TextStyle(color: EventzoneTheme.primaryAction, fontWeight: FontWeight.bold)),
+                icon: Icon(LucideIcons.checkCircle2, color: _selectedFinish.primaryColor, size: 16),
+                label: Text("Save Bio", style: TextStyle(color: _selectedFinish.primaryColor, fontWeight: FontWeight.bold)),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  backgroundColor: EventzoneTheme.primaryAction.withOpacity(0.1),
+                  backgroundColor: _selectedFinish.primaryColor.withOpacity(0.12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 ),
               ),
@@ -1043,41 +1078,41 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
           children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: _lookingForOptions.map((option) {
-                final isSelected = _selectedLookingFor.contains(option);
-                return FilterChip(
-                  label: Text(option),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedLookingFor.add(option);
-                      } else {
-                        _selectedLookingFor.remove(option);
-                      }
-                    });
-                    _onFieldChanged();
-                  },
-                  backgroundColor: const Color(0xFF1A1E2E),
-                  selectedColor: EventzoneTheme.primaryAction,
-                  checkmarkColor: Colors.white,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : Colors.white70,
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide.none),
-                );
-              }).toList(),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: _lookingForOptions.map((option) {
+                  final isSelected = _selectedLookingFor.contains(option);
+                  return FilterChip(
+                    label: Text(option),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedLookingFor.add(option);
+                        } else {
+                          _selectedLookingFor.remove(option);
+                        }
+                      });
+                      _onFieldChanged();
+                    },
+                    backgroundColor: const Color(0xFF1A1E2E),
+                    selectedColor: _selectedFinish.primaryColor,
+                    checkmarkColor: Colors.white,
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : Colors.white70,
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide.none),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -1103,93 +1138,93 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
           children: [
-          TextField(
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-            decoration: InputDecoration(
-              hintText: "Search areas...".tr(),
-              hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
-              prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
-              fillColor: const Color(0xFF1A1E2E),
-              filled: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            TextField(
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: "Search areas...".tr(),
+                hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
+                prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
+                fillColor: const Color(0xFF1A1E2E),
+                filled: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onChanged: (val) {
+                setState(() {
+                  _industrySearchQuery = val;
+                });
+              },
             ),
-            onChanged: (val) {
-              setState(() {
-                _industrySearchQuery = val;
-              });
-            },
-          ),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: filteredOptions.map((option) {
-                final isSelected = _selectedIndustries.contains(option);
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      if (isSelected) {
-                        _selectedIndustries.remove(option);
-                        _selectedInterests.remove(option);
-                      } else {
-                        if (_selectedIndustries.length >= 5) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("You can select up to 5 tags maximum."),
-                              backgroundColor: Colors.amber,
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                          return;
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: filteredOptions.map((option) {
+                  final isSelected = _selectedIndustries.contains(option);
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedIndustries.remove(option);
+                          _selectedInterests.remove(option);
+                        } else {
+                          if (_selectedIndustries.length >= 5) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("You can select up to 5 tags maximum."),
+                                backgroundColor: Colors.amber,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            return;
+                          }
+                          _selectedIndustries.add(option);
+                          _selectedInterests.add(option);
                         }
-                        _selectedIndustries.add(option);
-                        _selectedInterests.add(option);
-                      }
-                    });
-                    _onFieldChanged();
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isSelected 
-                          ? EventzoneTheme.primaryAction.withOpacity(0.2) 
-                          : const Color(0xFF1A1E2E),
-                      border: Border.all(
+                      });
+                      _onFieldChanged();
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
                         color: isSelected 
-                            ? EventzoneTheme.primaryAction 
-                            : Colors.white10,
-                        width: 1.5,
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isSelected) ...[
-                          const Icon(Icons.check, size: 14, color: Colors.white),
-                          const SizedBox(width: 6),
-                        ],
-                        Text(
-                          option,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.white70,
-                            fontSize: 13,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
+                            ? _selectedFinish.primaryColor.withOpacity(0.2) 
+                            : const Color(0xFF1A1E2E),
+                        border: Border.all(
+                          color: isSelected 
+                              ? _selectedFinish.primaryColor 
+                              : Colors.white10,
+                          width: 1.5,
                         ),
-                      ],
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isSelected) ...[
+                            const Icon(Icons.check, size: 14, color: Colors.white),
+                            const SizedBox(width: 6),
+                          ],
+                          Text(
+                            option,
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.white70,
+                              fontSize: 13,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }

@@ -24,6 +24,7 @@ import 'dart:math' as math;
 import 'package:image/image.dart' as img;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'professional_profile_screen.dart';
+import '../services/business_card_scanner_service.dart';
 
 // Top-level function for Isolate to prevent UI freezing during heavy image manipulation
 Future<Map<String, dynamic>> _processImageInIsolate(Map<String, dynamic> args) async {
@@ -673,6 +674,93 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
           _ocrStatus = "Processing text recognition...";
           _ocrProgress = 0.4;
         });
+      }
+
+      // ── Step 1.5: High-Fidelity AI Business Card Scan with GPT-4o-mini ──
+      if (_scanType == "Business Card" || _scanType == "Event Badge") {
+        if (mounted) {
+          setState(() {
+            _ocrStatus = "Scanning with AI...".tr();
+            _ocrProgress = 0.45;
+          });
+        }
+
+        try {
+          final aiResult = await BusinessCardScannerService().scanCardImage(File(ocrImagePath));
+
+          if (aiResult.isNotBusinessCard) {
+            _laserController.stop();
+            if (mounted) {
+              setState(() => _isConnecting = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(aiResult.errorMessage ?? "No business card detected."),
+                  backgroundColor: Colors.redAccent,
+                ),
+              );
+            }
+            if (isCameraCapture) {
+              try {
+                await File(ocrImagePath).delete();
+              } catch (_) {}
+            }
+            return;
+          }
+
+          if (aiResult.isSuccess && aiResult.card != null && !aiResult.card!.isEmpty) {
+            final card = aiResult.card!;
+            if (mounted) {
+              setState(() {
+                _ocrStatus = "scan_qr_extracting_metadata".tr();
+                _ocrProgress = 0.85;
+              });
+              await Future.delayed(const Duration(milliseconds: 300));
+            }
+
+            if (mounted) {
+              setState(() {
+                _ocrStatus = "scan_qr_scan_successful".tr();
+                _ocrProgress = 1.0;
+              });
+              await Future.delayed(const Duration(milliseconds: 500));
+            }
+
+            if (mounted) {
+              _laserController.stop();
+              setState(() => _isConnecting = false);
+
+              if (isCameraCapture) {
+                try {
+                  File(ocrImagePath).deleteSync();
+                } catch (_) {}
+              }
+
+              if (!mounted) return;
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ReviewContactScreen(
+                    initialName: card.name,
+                    initialTitle: card.title,
+                    initialEmail: card.email,
+                    initialPhone: card.phone,
+                    initialWebsite: card.website,
+                    initialCompany: card.company,
+                    initialDepartment: card.department,
+                    initialAddress: card.address,
+                    initialNotes: card.notes.isNotEmpty ? card.notes : null,
+                    source: _scanType,
+                  ),
+                ),
+              );
+              return;
+            }
+          } else {
+            debugPrint("AI card scan non-critical fallback: ${aiResult.errorMessage}");
+          }
+        } catch (aiErr) {
+          debugPrint("AI scan error, falling back to local OCR: $aiErr");
+        }
       }
 
       // ── Step 2: Primary OCR pass on the cropped/focused image ──

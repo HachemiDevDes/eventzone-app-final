@@ -22,7 +22,7 @@ serve(async (req: Request) => {
       )
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://awkreadldqmidcrrqukm.supabase.co'
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://gknglowozpewwrtjumuc.supabase.co'
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
     if (!serviceRoleKey) {
@@ -41,7 +41,7 @@ serve(async (req: Request) => {
     const cleanToken = token.trim().toUpperCase()
     const { data: profile, error: profileError } = await adminClient
       .from('profiles')
-      .select('id')
+      .select('id, email')
       .eq('crm_token', cleanToken)
       .maybeSingle()
 
@@ -52,12 +52,28 @@ serve(async (req: Request) => {
       )
     }
 
-    // 2. Fetch user email
-    const { data: { user }, error: userError } = await adminClient.auth.admin.getUserById(profile.id)
+    // 2. Fetch or auto-provision auth user
+    let user: any = null
+    const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(profile.id)
+    if (userData?.user) {
+      user = userData.user
+    } else if (profile.email) {
+      // Auto-provision auth user with matching profile id so user can log in immediately
+      const { data: createdData, error: createError } = await adminClient.auth.admin.createUser({
+        id: profile.id,
+        email: profile.email,
+        email_confirm: true,
+      })
+      if (!createError && createdData?.user) {
+        user = createdData.user
+      } else {
+        console.error('createUser error:', createError)
+      }
+    }
 
-    if (userError || !user || !user.email) {
+    if (!user || !user.email) {
       return new Response(
-        JSON.stringify({ error: 'User account not found' }),
+        JSON.stringify({ error: 'User account not found', details: userError?.message }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

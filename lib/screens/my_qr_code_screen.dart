@@ -6,6 +6,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import '../services/supabase_service.dart';
+import '../theme/profile_material_finish.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/services.dart';
 class MyQRCodeScreen extends StatefulWidget {
@@ -23,6 +24,7 @@ class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
   String _companyName = "";
   String _avatarUrl = "";
   int _dailyStreak = 0;
+  ProfileMaterialFinish _finish = ProfileMaterialFinish.cyberViolet;
 
   String _userId = "";
 
@@ -50,6 +52,7 @@ class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
         _companyName = data['company_name'] ?? '';
         _avatarUrl = data['avatar_url'] ?? "";
         _dailyStreak = streak;
+        _finish = ProfileMaterialFinish.fromProfile(data);
         _isLoading = false;
       });
     } else {
@@ -97,29 +100,52 @@ class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
                 : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      GlassContainer(
-                        padding: const EdgeInsets.all(32),
-                        borderRadius: 32,
-                        child: Column(
-                          children: [
-                            CircleAvatar(
-                              radius: 35,
-                              backgroundColor: Colors.white10,
-                              backgroundImage: _avatarUrl.isNotEmpty ? _getAvatarProvider(_avatarUrl) : null,
-                              child: _avatarUrl.isEmpty
-                                  ? const Icon(Icons.person, size: 35, color: Colors.white54)
-                                  : null,
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(32),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _finish.glowColor,
+                              blurRadius: 30,
+                              spreadRadius: -10,
+                              offset: const Offset(0, 10),
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _fullName,
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
-                            ),
-                            if (subtitle.isNotEmpty)
-                              Text(
-                                subtitle,
-                                style: const TextStyle(fontSize: 14, color: Colors.white38),
+                          ],
+                        ),
+                        child: GlassContainer(
+                          padding: const EdgeInsets.all(32),
+                          borderRadius: 32,
+                          borderColor: _finish.cardBorderColor,
+                          borderWidth: 1.5,
+                          child: Column(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: _finish.primaryColor.withOpacity(0.5),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: CircleAvatar(
+                                  radius: 35,
+                                  backgroundColor: Colors.white10,
+                                  backgroundImage: _avatarUrl.isNotEmpty ? _getAvatarProvider(_avatarUrl) : null,
+                                  child: _avatarUrl.isEmpty
+                                      ? const Icon(Icons.person, size: 35, color: Colors.white54)
+                                      : null,
+                                ),
                               ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _fullName,
+                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
+                              ),
+                              if (subtitle.isNotEmpty)
+                                Text(
+                                  subtitle,
+                                  style: const TextStyle(fontSize: 14, color: Colors.white38),
+                                ),
                             const SizedBox(height: 32),
                             Container(
                               padding: const EdgeInsets.all(16),
@@ -145,10 +171,11 @@ class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
                             Text(
                               "Scan to connect instantly".tr(),
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: EventzoneTheme.primaryAction, fontWeight: FontWeight.bold),
+                              style: TextStyle(color: _finish.primaryColor, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
+                      ),
                       ),
                       const SizedBox(height: 40),
                       OutlinedButton.icon(
@@ -157,18 +184,16 @@ class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text("Profile link copied to clipboard!".tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
-                              backgroundColor: EventzoneTheme.primaryAction,
-                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: _finish.primaryColor,
                             ),
                           );
                         },
-                        icon: const Icon(LucideIcons.share, size: 18),
-                        label: Text("Share Pass".tr()),
+                        icon: Icon(LucideIcons.share2, size: 18, color: _finish.primaryColor),
+                        label: Text("Share Card".tr(), style: TextStyle(color: _finish.primaryColor, fontWeight: FontWeight.bold)),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: const BorderSide(color: Colors.white10),
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          side: BorderSide(color: _finish.primaryColor),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                         ),
                       ),
                     ],

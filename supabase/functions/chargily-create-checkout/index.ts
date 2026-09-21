@@ -60,7 +60,7 @@ serve(async (req) => {
         currency: 'dzd',
         success_url: 'https://eventzone.pro/payment/success',
         failure_url: 'https://eventzone.pro/payment/failure',
-        webhook_endpoint: 'https://awkreadldqmidcrrqukm.supabase.co/functions/v1/chargily-webhook',
+        webhook_endpoint: `${Deno.env.get('SUPABASE_URL') || 'https://gknglowozpewwrtjumuc.supabase.co'}/functions/v1/chargily-webhook`,
         metadata: [
           { user_id: user.id },
           { plan_months: plan_months },

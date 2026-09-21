@@ -13,6 +13,7 @@ import '../services/supabase_service.dart';
 import '../widgets/glass_container.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/animated_gradient_avatar.dart';
+import '../theme/profile_material_finish.dart';
 
 class DiscoveryScreen extends ConsumerStatefulWidget {
   final List<EventModel> events;
@@ -112,6 +113,7 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
     final String avatarUrl = data?['avatar_url'] ?? "";
     final String jobTitle = data?['job_title'] ?? "";
     final String companyName = data?['company_name'] ?? "";
+    final finish = ProfileMaterialFinish.fromProfile(data);
 
     final String userData = "https://profile.eventzone.pro/?id=$_userId";
     final subtitle = companyName.isNotEmpty 
@@ -163,7 +165,7 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                       child: Builder(
                         builder: (context) {
                           final completion = _calculateProfileCompletion(data);
-                          final indicatorColor = completion == 100 ? EventzoneTheme.accentSuccess : EventzoneTheme.primaryAction;
+                          final indicatorColor = completion == 100 ? EventzoneTheme.accentSuccess : finish.primaryColor;
                           
                           return Stack(
                             clipBehavior: Clip.none,
@@ -229,19 +231,42 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                           children: [
 
-                            GlassContainer(
-                              padding: EdgeInsets.all(32),
-                              borderRadius: 32,
-                              child: Column(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 35,
-                                    backgroundColor: Colors.white10,
-                                    backgroundImage: avatarUrl.isNotEmpty ? _getAvatarProvider(avatarUrl) : null,
-                                    child: avatarUrl.isEmpty
-                                        ? Icon(Icons.person, size: 35, color: Colors.white54)
-                                        : null,
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(32),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: finish.glowColor,
+                                    blurRadius: 30,
+                                    spreadRadius: -10,
+                                    offset: const Offset(0, 10),
                                   ),
+                                ],
+                              ),
+                              child: GlassContainer(
+                                padding: const EdgeInsets.all(32),
+                                borderRadius: 32,
+                                borderColor: finish.cardBorderColor,
+                                borderWidth: 1.5,
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: finish.primaryColor.withOpacity(0.5),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: CircleAvatar(
+                                        radius: 35,
+                                        backgroundColor: Colors.white10,
+                                        backgroundImage: avatarUrl.isNotEmpty ? _getAvatarProvider(avatarUrl) : null,
+                                        child: avatarUrl.isEmpty
+                                            ? const Icon(Icons.person, size: 35, color: Colors.white54)
+                                            : null,
+                                      ),
+                                    ),
                                   SizedBox(height: 16),
                                   Text(
                                     fullName,
@@ -281,6 +306,7 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                                 ],
                               ),
                             ),
+                            ),
                             // Actions Row
                             Padding(
                               padding: EdgeInsets.only(top: 24),
@@ -319,29 +345,29 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                                       Clipboard.setData(ClipboardData(text: userData));
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
-                                          content: Text("Profile link copied to clipboard!".tr(), style: TextStyle(fontWeight: FontWeight.bold)),
-                                          backgroundColor: EventzoneTheme.primaryAction,
+                                          content: Text("Profile link copied to clipboard!".tr(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          backgroundColor: finish.primaryColor,
                                           behavior: SnackBarBehavior.floating,
                                         ),
                                       );
                                     },
                                     borderRadius: BorderRadius.circular(20),
                                     child: Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                       decoration: BoxDecoration(
-                                        color: EventzoneTheme.primaryAction.withOpacity(0.1),
+                                        color: finish.primaryColor.withOpacity(0.12),
                                         borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(color: EventzoneTheme.primaryAction.withOpacity(0.3)),
+                                        border: Border.all(color: finish.primaryColor.withOpacity(0.35)),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(LucideIcons.share2, size: 16, color: EventzoneTheme.primaryAction),
-                                          SizedBox(width: 8),
+                                          Icon(LucideIcons.share2, size: 16, color: finish.primaryColor),
+                                          const SizedBox(width: 8),
                                           Text(
                                             "Share Card".tr(),
                                             style: TextStyle(
-                                              color: EventzoneTheme.primaryAction,
+                                              color: finish.primaryColor,
                                               fontWeight: FontWeight.bold,
                                               fontSize: 14,
                                             ),
@@ -358,7 +384,7 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                       ),
                     ),
                   ),
-            ),
+                ),
             ],
           ),
         ),

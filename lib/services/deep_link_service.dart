@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DeepLinkService {
   static final DeepLinkService _instance = DeepLinkService._internal();
@@ -38,7 +39,27 @@ class DeepLinkService {
     }
   }
 
-  void _processUri(Uri uri) {
+  void _processUri(Uri uri) async {
+    // 1. Auth callback handling
+    final isAuthCallback = uri.scheme == 'eventzone' && (
+      uri.host.contains('callback') ||
+      uri.path.contains('callback') ||
+      uri.queryParameters.containsKey('code') ||
+      uri.fragment.contains('access_token') ||
+      uri.fragment.contains('error')
+    );
+
+    if (isAuthCallback || uri.path.contains('login-callback') || uri.path.contains('oauth-callback')) {
+      try {
+        debugPrint("Processing deep link auth callback: $uri");
+        await Supabase.instance.client.auth.getSessionFromUrl(uri);
+      } catch (e) {
+        debugPrint("DeepLinkService: Error recovering session from URL: $e");
+      }
+      return;
+    }
+
+    // 2. Profile deep link handling
     if (uri.path.contains('/profile')) {
       final profileId = uri.queryParameters['id'];
       if (profileId != null && profileId.isNotEmpty) {

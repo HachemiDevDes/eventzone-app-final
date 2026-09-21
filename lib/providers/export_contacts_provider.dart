@@ -140,7 +140,7 @@ class ExportContactsNotifier extends AutoDisposeAsyncNotifier<void> {
         ]);
       }
 
-      final csvString = ListToCsvConverter().convert(csvRows);
+      final csvString = const CsvEncoder().convert(csvRows);
 
       // 4. Save to temporary directory
       final directory = await getTemporaryDirectory();

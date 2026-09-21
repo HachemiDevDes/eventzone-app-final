@@ -3,8 +3,8 @@ import 'dart:convert';
 
 void main() async {
   await Supabase.initialize(
-    url: 'https://awkreadldqmidcrrqukm.supabase.co',
-    publishableKey: 'sb_publishable_MluMrwkWs5-YedITa6ggNw_imK2nv8z',
+    url: 'https://gknglowozpewwrtjumuc.supabase.co',
+    publishableKey: 'sb_publishable_0bdK2TAGnlyUKCnloX1Dug_Sg5uedKc',
   );
 
   try {

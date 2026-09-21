@@ -2,8 +2,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 void main() async {
-  final url = 'https://awkreadldqmidcrrqukm.supabase.co/rest/v1/support_messages';
-  final key = 'sb_publishable_MluMrwkWs5-YedITa6ggNw_imK2nv8z';
+  final url = 'https://gknglowozpewwrtjumuc.supabase.co/rest/v1/support_messages';
+  final key = 'sb_publishable_0bdK2TAGnlyUKCnloX1Dug_Sg5uedKc';
   
   try {
     final response = await http.post(

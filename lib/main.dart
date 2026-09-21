@@ -32,7 +32,6 @@ import 'services/supabase_service.dart';
 import 'services/notification_service.dart';
 import 'screens/settings_screen.dart';
 import 'package:go_router/go_router.dart';
-import 'screens/splash_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/email_signin_screen.dart';
 import 'screens/email_signup_screen.dart';
@@ -109,8 +108,8 @@ void main() {
   _appInitFuture = Future.wait([
     EasyLocalization.ensureInitialized(),   // parse translation JSON files
     Supabase.initialize(                     // set up Supabase client + restore session
-      url: 'https://awkreadldqmidcrrqukm.supabase.co',
-      publishableKey: 'sb_publishable_MluMrwkWs5-YedITa6ggNw_imK2nv8z',
+      url: 'https://gknglowozpewwrtjumuc.supabase.co',
+      publishableKey: 'sb_publishable_0bdK2TAGnlyUKCnloX1Dug_Sg5uedKc',
     ),
     SharedPreferences.getInstance(),         // read cached prefs from disk
   ]);
@@ -129,7 +128,10 @@ void main() {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   Firebase.initializeApp().then((_) {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  }).catchError((e) => debugPrint("Firebase not configured: $e"));
+  }).catchError((e) {
+    debugPrint("Firebase not configured: $e");
+    return null;
+  });
   NotificationService().initialize().then((_) {
     NotificationService().scheduleDailyStreakNotifications();
   });

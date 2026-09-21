@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 void main() async {
-  final url = Uri.parse('https://awkreadldqmidcrrqukm.supabase.co/rest/v1/events');
+  final url = Uri.parse('https://gknglowozpewwrtjumuc.supabase.co/rest/v1/events');
   final client = HttpClient();
   
   final dummyEvents = [
@@ -41,8 +41,8 @@ void main() async {
   try {
     print('Inserting/upserting events...');
     final request = await client.postUrl(url);
-    request.headers.set('apikey', 'sb_publishable_J1CFgtCFJGkKpdFqU6UFUg_fF7S_2Pc');
-    request.headers.set('Authorization', 'Bearer sb_publishable_J1CFgtCFJGkKpdFqU6UFUg_fF7S_2Pc');
+    request.headers.set('apikey', 'sb_publishable_0bdK2TAGnlyUKCnloX1Dug_Sg5uedKc');
+    request.headers.set('Authorization', 'Bearer sb_publishable_0bdK2TAGnlyUKCnloX1Dug_Sg5uedKc');
     request.headers.set('Content-Type', 'application/json');
     request.headers.set('Prefer', 'resolution=merge-duplicates');
     

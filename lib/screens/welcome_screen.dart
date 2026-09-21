@@ -67,6 +67,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> with SingleTicker
         await ref.read(supabaseProvider).auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: 'eventzone://login-callback',
+          authScreenLaunchMode: LaunchMode.externalApplication,
         );
       } catch (err) {
         if (mounted) {

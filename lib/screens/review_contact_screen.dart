@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../services/device_contacts_service.dart';
 
 class ReviewContactScreen extends StatefulWidget {
   final String initialName;
@@ -17,6 +18,7 @@ class ReviewContactScreen extends StatefulWidget {
   final String initialCompany;
   final String initialDepartment;
   final String initialAddress;
+  final String? initialNotes;
   final String source;
 
   const ReviewContactScreen({
@@ -29,6 +31,7 @@ class ReviewContactScreen extends StatefulWidget {
     required this.initialCompany,
     required this.initialDepartment,
     required this.initialAddress,
+    this.initialNotes,
     required this.source,
   });
 
@@ -51,6 +54,7 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
 
   File? _selectedImage;
   bool _isSaving = false;
+  bool _saveToPhoneAlso = false;
 
   @override
   void initState() {
@@ -63,7 +67,7 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
     _phoneController = TextEditingController(text: widget.initialPhone);
     _websiteController = TextEditingController(text: widget.initialWebsite);
     _addressController = TextEditingController(text: widget.initialAddress);
-    _notesController = TextEditingController();
+    _notesController = TextEditingController(text: widget.initialNotes ?? "");
   }
 
   @override
@@ -219,12 +223,28 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
 
       await Supabase.instance.client.from('connections').insert(newConnection);
 
-      // Connection saved successfully
-      
+      // Also save to device contacts if option enabled
+      if (_saveToPhoneAlso) {
+        await DeviceContactsService.saveContactToDevice(
+          name: _nameController.text.trim(),
+          title: _titleController.text.trim(),
+          company: _companyController.text.trim(),
+          department: _departmentController.text.trim(),
+          email: _emailController.text.trim(),
+          phone: _phoneController.text.trim(),
+          website: _websiteController.text.trim(),
+          address: _addressController.text.trim(),
+          notes: _notesController.text.trim(),
+        );
+      }
+
       if (mounted) {
+        final successMsg = _saveToPhoneAlso
+            ? "Saved ${_nameController.text.trim()} to App & Phone contacts!".tr()
+            : "Successfully saved ${_nameController.text.trim()}!".tr();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Successfully saved ${_nameController.text.trim()}!"),
+            content: Text(successMsg),
             backgroundColor: EventzoneTheme.accentSuccess,
           ),
         );
@@ -235,6 +255,66 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Error saving contact: $e"),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  Future<void> _saveToDeviceOnly() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Name is required to save to contacts.".tr()),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final success = await DeviceContactsService.saveContactToDevice(
+        name: name,
+        title: _titleController.text.trim(),
+        company: _companyController.text.trim(),
+        department: _departmentController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        website: _websiteController.text.trim(),
+        address: _addressController.text.trim(),
+        notes: _notesController.text.trim(),
+      );
+
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Saved to phone contacts successfully!".tr()),
+              backgroundColor: EventzoneTheme.accentSuccess,
+            ),
+          );
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Contacts permission was not granted.".tr()),
+              backgroundColor: Colors.orangeAccent,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error saving to device contacts: $e"),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -320,38 +400,94 @@ class _ReviewContactScreenState extends State<ReviewContactScreen> {
                     _buildSectionHeader("Notes & Tags".tr()),
                     SizedBox(height: 8),
                     _buildTextField("Reminder Notes", _notesController, LucideIcons.fileText, fieldKey: 'notes', maxLines: 3),
-                    SizedBox(height: 40),
+                    
+                    SizedBox(height: 16),
+                    _buildSectionHeader("Save Options".tr()),
+                    SizedBox(height: 8),
+                    GlassContainer(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(LucideIcons.contact, color: Colors.white70, size: 20),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Also Save to Phone Contacts".tr(),
+                                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  "Sync to Android or iOS address book".tr(),
+                                  style: TextStyle(color: Colors.white54, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _saveToPhoneAlso,
+                            onChanged: (val) => setState(() => _saveToPhoneAlso = val),
+                            activeThumbColor: EventzoneTheme.primaryAction,
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 32),
                   ],
                 ),
               ),
             ),
 
             Container(
-              padding: EdgeInsets.all(24),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
               decoration: BoxDecoration(
                 color: Color(0xFF090C16),
                 border: Border(top: BorderSide(color: Colors.white10)),
               ),
               child: SafeArea(
                 top: false,
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _isSaving ? null : _saveContact,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: EventzoneTheme.primaryAction,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      elevation: 4,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        onPressed: _isSaving ? null : _saveContact,
+                        icon: _isSaving
+                            ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : Icon(_saveToPhoneAlso ? LucideIcons.cloudLightning : LucideIcons.cloud, size: 18),
+                        label: Text(
+                          _saveToPhoneAlso ? "Save to App & Phone".tr() : "Save to Eventzone App".tr(),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: EventzoneTheme.primaryAction,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 4,
+                        ),
+                      ),
                     ),
-                    child: _isSaving
-                        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text(
-                            "Save Contact".tr(),
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                  ),
+                    SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: OutlinedButton.icon(
+                        onPressed: _isSaving ? null : _saveToDeviceOnly,
+                        icon: Icon(LucideIcons.contact, size: 16, color: Colors.white70),
+                        label: Text(
+                          "Save to Phone Contacts Only".tr(),
+                          style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.white24),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
