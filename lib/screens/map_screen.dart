@@ -536,6 +536,16 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
       child: GlassContainer(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         borderRadius: 20,
+        backgroundColor: const Color(0xFF161C2C),
+        borderColor: Colors.white.withValues(alpha: 0.16),
+        borderWidth: 1.2,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: List.generate(floors.length, (idx) {
@@ -572,83 +582,240 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
       mainAxisSize: MainAxisSize.min,
       children: [
         GlassContainer(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           borderRadius: 20,
+          backgroundColor: const Color(0xFF161C2C),
+          borderColor: Colors.white.withValues(alpha: 0.16),
+          borderWidth: 1.2,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.45),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
           child: Row(
             children: [
-              const Icon(LucideIcons.search, color: Colors.white54, size: 16),
-              const SizedBox(width: 8),
+              const Icon(LucideIcons.search, color: EventzoneTheme.primaryAction, size: 18),
+              const SizedBox(width: 10),
               Expanded(
                 child: TextField(
                   controller: _searchController,
                   autofocus: true,
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  cursorColor: EventzoneTheme.primaryAction,
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
                   onChanged: (val) => setState(() => _searchQuery = val),
                   decoration: InputDecoration(
                     hintText: "Search booth # or company...".tr(),
-                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 13),
                     border: InputBorder.none,
                     isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 6),
                   ),
                 ),
               ),
               if (_searchQuery.isNotEmpty)
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () {
                     _searchController.clear();
                     setState(() => _searchQuery = "");
                   },
-                  child: const Icon(LucideIcons.xCircle, color: Colors.white38, size: 16),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(LucideIcons.x, color: Colors.white70, size: 13),
+                  ),
                 ),
             ],
           ),
         ),
 
         // Quick results preview dropdown
-        if (_searchQuery.isNotEmpty && filteredElements.isNotEmpty)
+        if (_searchQuery.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.only(top: 8),
             child: GlassContainer(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              borderRadius: 16,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 180),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  padding: EdgeInsets.zero,
-                  itemCount: math.min(filteredElements.length, 5),
-                  separatorBuilder: (_, __) => const Divider(color: Colors.white10, height: 1),
-                  itemBuilder: (context, idx) {
-                    final el = filteredElements[idx];
-                    final ex = _findExhibitorForElement(el, exhibitors);
-                    return ListTile(
-                      dense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                      title: Text(
-                        "Booth #${el.label}".tr(),
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      subtitle: ex != null
-                          ? Text(
-                              ex.name,
-                              style: const TextStyle(color: Colors.white70, fontSize: 11),
-                            )
-                          : Text(
-                              el.statusDisplay,
-                              style: TextStyle(color: el.statusStrokeColor, fontSize: 11, fontWeight: FontWeight.w600),
-                            ),
-                      trailing: const Icon(LucideIcons.chevronRight, color: Colors.white38, size: 14),
-                      onTap: () {
-                        setState(() {
-                          _selectedElement = el;
-                          _isSearchOpen = false;
-                        });
-                        _zoomToElement(el, viewportSize);
-                      },
-                    );
-                  },
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              borderRadius: 18,
+              backgroundColor: const Color(0xFF161C2C),
+              borderColor: Colors.white.withValues(alpha: 0.16),
+              borderWidth: 1.2,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  blurRadius: 22,
+                  offset: const Offset(0, 8),
                 ),
-              ),
+              ],
+              child: filteredElements.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.searchX, color: Colors.white.withValues(alpha: 0.4), size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            "No matching booths or companies".tr(),
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 260),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
+                        itemCount: math.min(filteredElements.length, 6),
+                        separatorBuilder: (_, index) => Divider(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          height: 1,
+                        ),
+                        itemBuilder: (context, idx) {
+                          final el = filteredElements[idx];
+                          final ex = _findExhibitorForElement(el, exhibitors);
+                          return Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () {
+                                setState(() {
+                                  _selectedElement = el;
+                                  _isSearchOpen = false;
+                                });
+                                _zoomToElement(el, viewportSize);
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                child: Row(
+                                  children: [
+                                    // Leading Logo or Status Icon
+                                    if (ex != null && ex.logo != null && ex.logo!.isNotEmpty)
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          ex.logo!,
+                                          width: 38,
+                                          height: 38,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => _buildFallbackLogo(ex.name, size: 38),
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(
+                                          color: el.statusStrokeColor.withValues(alpha: 0.16),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: el.statusStrokeColor.withValues(alpha: 0.4),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            el.isBooth ? LucideIcons.store : LucideIcons.layoutGrid,
+                                            color: el.statusStrokeColor,
+                                            size: 18,
+                                          ),
+                                        ),
+                                      ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: el.statusStrokeColor.withValues(alpha: 0.22),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color: el.statusStrokeColor.withValues(alpha: 0.5),
+                                                    width: 0.8,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  el.isBooth ? "Booth #${el.label}".tr() : el.label,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                decoration: BoxDecoration(
+                                                  color: el.statusStrokeColor.withValues(alpha: 0.12),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  el.statusDisplay,
+                                                  style: TextStyle(
+                                                    color: el.statusStrokeColor,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            ex != null
+                                                ? ex.name
+                                                : (el.surfaceArea != null
+                                                    ? "${el.surfaceArea} m²"
+                                                    : (el.isAvailable ? "Space Available".tr() : "${el.statusDisplay} Space".tr())),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (ex?.industry != null && ex!.industry!.isNotEmpty) ...[
+                                            const SizedBox(height: 1),
+                                            Text(
+                                              ex.industry!,
+                                              style: const TextStyle(
+                                                color: Color(0xFF94A3B8),
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Icon(LucideIcons.chevronRight, color: Colors.white38, size: 16),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
             ),
           ),
       ],
@@ -1009,6 +1176,17 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
     return GlassContainer(
       padding: const EdgeInsets.all(16),
       borderRadius: 22,
+      backgroundColor: const Color(0xFF161C2C),
+      borderColor: Colors.white.withValues(alpha: 0.16),
+      borderWidth: 1.2,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.45),
+          blurRadius: 24,
+          spreadRadius: 2,
+          offset: const Offset(0, 8),
+        ),
+      ],
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1021,9 +1199,12 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: element.statusStrokeColor.withOpacity(0.2),
+                      color: element.statusStrokeColor.withValues(alpha: 0.22),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: element.statusStrokeColor.withOpacity(0.6)),
+                      border: Border.all(
+                        color: element.statusStrokeColor.withValues(alpha: 0.7),
+                        width: 1.2,
+                      ),
                     ),
                     child: Text(
                       element.isBooth ? "Booth #${element.label}".tr() : element.label,
@@ -1038,9 +1219,12 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: element.statusStrokeColor.withOpacity(0.15),
+                      color: element.statusStrokeColor.withValues(alpha: 0.16),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: element.statusStrokeColor.withOpacity(0.4)),
+                      border: Border.all(
+                        color: element.statusStrokeColor.withValues(alpha: 0.5),
+                        width: 1.0,
+                      ),
                     ),
                     child: Text(
                       element.statusDisplay,
@@ -1056,9 +1240,9 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
               GestureDetector(
                 onTap: () => setState(() => _selectedElement = null),
                 child: Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(LucideIcons.x, color: Colors.white70, size: 14),
@@ -1075,8 +1259,8 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
                     borderRadius: BorderRadius.circular(10),
                     child: Image.network(
                       exhibitor.logo!,
-                      width: 44,
-                      height: 44,
+                      width: 46,
+                      height: 46,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => _buildFallbackLogo(exhibitor.name),
                     ),
@@ -1094,7 +1278,7 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
                         exhibitor.name,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 15,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                         maxLines: 1,
@@ -1104,7 +1288,11 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
                         const SizedBox(height: 2),
                         Text(
                           exhibitor.industry!,
-                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                          style: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1118,7 +1306,11 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
               const SizedBox(height: 8),
               Text(
                 exhibitor.description!,
-                style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.4),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 11,
+                  height: 1.4,
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -1126,8 +1318,17 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
           ] else ...[
             Row(
               children: [
-                const Icon(LucideIcons.layoutGrid, color: Colors.white60, size: 20),
-                const SizedBox(width: 10),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: element.statusStrokeColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: element.statusStrokeColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Icon(LucideIcons.layoutGrid, color: element.statusStrokeColor, size: 20),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1136,11 +1337,12 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
                         element.isAvailable ? "Space Available".tr() : "${element.statusDisplay} Space".tr(),
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         element.surfaceArea != null
                             ? "${element.surfaceArea} m² (${element.width.toInt()} × ${element.height.toInt()} px)"
                             : "${(element.width / 20 * element.height / 20).toStringAsFixed(1)} m² (${element.width.toInt()} × ${element.height.toInt()} px)",
-                        style: const TextStyle(color: Colors.white60, fontSize: 11),
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
                       ),
                     ],
                   ),
@@ -1153,20 +1355,24 @@ class _MapScreenState extends ConsumerState<MapScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildFallbackLogo(String name) {
+  Widget _buildFallbackLogo(String name, {double size = 44}) {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'E';
     return Container(
-      width: 44,
-      height: 44,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
-        color: EventzoneTheme.primaryAction.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: EventzoneTheme.primaryAction.withOpacity(0.4)),
+        color: EventzoneTheme.primaryAction.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(size > 40 ? 10 : 8),
+        border: Border.all(color: EventzoneTheme.primaryAction.withValues(alpha: 0.4)),
       ),
       child: Center(
         child: Text(
           initial,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: size > 40 ? 18 : 14,
+          ),
         ),
       ),
     );

@@ -58,6 +58,7 @@ class _NetworkingScreenState extends ConsumerState<NetworkingScreen> {
           notes: profile['bio'] ?? '',
           tags: profile['interests'] != null ? List<String>.from(profile['interests']) : [],
           targetUserId: userId,
+          eventId: widget.eventId,
         ),
       ),
     ).then((_) {

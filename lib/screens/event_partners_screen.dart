@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -291,49 +292,28 @@ class _EventPartnersScreenState extends ConsumerState<EventPartnersScreen> {
           return matchesQuery && matchesTier;
         }).toList();
 
+        final Map<String, List<SponsorModel>> groupedSponsors = {};
+        for (final sp in filtered) {
+          final rawTier = sp.tier?.trim();
+          final tierKey = (rawTier != null && rawTier.isNotEmpty) ? rawTier : 'Sponsors'.tr();
+          groupedSponsors.putIfAbsent(tierKey, () => []).add(sp);
+        }
+
+        final sortedTiers = groupedSponsors.keys.toList()
+          ..sort((a, b) {
+            final rankA = _tierRank(a);
+            final rankB = _tierRank(b);
+            if (rankA != rankB) return rankA.compareTo(rankB);
+            return a.toLowerCase().compareTo(b.toLowerCase());
+          });
+
         return Column(
           children: [
-            // Tier chips (if multiple tiers exist)
+            // Tier filter chips (if multiple tiers exist)
             if (distinctTiers.length > 2)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                child: SizedBox(
-                  height: 36,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: distinctTiers.map((tier) {
-                      final isSelected = _selectedTier.toLowerCase() == tier.toLowerCase();
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          label: Text(tier.toUpperCase()),
-                          selected: isSelected,
-                          onSelected: (_) {
-                            setState(() {
-                              _selectedTier = tier;
-                            });
-                          },
-                          backgroundColor: Colors.white.withValues(alpha: 0.05),
-                          selectedColor: EventzoneTheme.primaryAction.withValues(alpha: 0.2),
-                          checkmarkColor: EventzoneTheme.primaryAction,
-                          side: BorderSide(
-                            color: isSelected
-                                ? EventzoneTheme.primaryAction
-                                : Colors.white.withValues(alpha: 0.1),
-                          ),
-                          labelStyle: TextStyle(
-                            color: isSelected ? EventzoneTheme.primaryAction : Colors.white70,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
+              _buildTierFilterChips(distinctTiers),
 
-            // Grid
+            // Tier-separated sponsors scroll view
             Expanded(
               child: filtered.isEmpty
                   ? _buildEmptyState(
@@ -341,20 +321,39 @@ class _EventPartnersScreenState extends ConsumerState<EventPartnersScreen> {
                       title: "No Matching Sponsors".tr(),
                       subtitle: "Try searching with a different keyword or tier.".tr(),
                     )
-                  : GridView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  : CustomScrollView(
                       physics: const BouncingScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 14,
-                        crossAxisSpacing: 14,
-                        childAspectRatio: 0.95,
-                      ),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, index) {
-                        final sponsor = filtered[index];
-                        return _buildSponsorCard(context, sponsor);
-                      },
+                      slivers: [
+                        for (final tier in sortedTiers) ...[
+                          SliverToBoxAdapter(
+                            child: _buildTierHeader(tier, groupedSponsors[tier]!.length),
+                          ),
+                          SliverPadding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                            sliver: SliverGrid(
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                mainAxisSpacing: 14,
+                                crossAxisSpacing: 14,
+                                childAspectRatio: 0.95,
+                              ),
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final sponsor = groupedSponsors[tier]![index];
+                                  return _buildSponsorCard(context, sponsor);
+                                },
+                                childCount: groupedSponsors[tier]!.length,
+                              ),
+                            ),
+                          ),
+                          const SliverToBoxAdapter(
+                            child: SizedBox(height: 12),
+                          ),
+                        ],
+                        const SliverToBoxAdapter(
+                          child: SizedBox(height: 24),
+                        ),
+                      ],
                     ),
             ),
           ],
@@ -363,9 +362,126 @@ class _EventPartnersScreenState extends ConsumerState<EventPartnersScreen> {
     );
   }
 
+  Widget _buildTierFilterChips(Set<String> distinctTiers) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: SizedBox(
+        height: 36,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: distinctTiers.map((tier) {
+            final isSelected = _selectedTier.toLowerCase() == tier.toLowerCase();
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                label: Text(tier.toUpperCase()),
+                selected: isSelected,
+                onSelected: (_) {
+                  setState(() {
+                    _selectedTier = tier;
+                  });
+                },
+                backgroundColor: Colors.white.withValues(alpha: 0.05),
+                selectedColor: EventzoneTheme.primaryAction.withValues(alpha: 0.2),
+                checkmarkColor: EventzoneTheme.primaryAction,
+                side: BorderSide(
+                  color: isSelected
+                      ? EventzoneTheme.primaryAction
+                      : Colors.white.withValues(alpha: 0.1),
+                ),
+                labelStyle: TextStyle(
+                  color: isSelected ? EventzoneTheme.primaryAction : Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTierHeader(String tier, int count) {
+    final tierColor = _getTierColor(tier);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Vertical accent bar
+          Container(
+            width: 3.5,
+            height: 16,
+            decoration: BoxDecoration(
+              color: tierColor,
+              borderRadius: BorderRadius.circular(2),
+              boxShadow: [
+                BoxShadow(
+                  color: tierColor.withValues(alpha: 0.5),
+                  blurRadius: 6,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+
+          // Tier Name
+          Text(
+            tier.toUpperCase(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.8,
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // Count pill
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: tierColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: tierColor.withValues(alpha: 0.3)),
+            ),
+            child: Text(
+              "$count",
+              style: TextStyle(
+                color: tierColor,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // Subtle horizontal separator line
+          Expanded(
+            child: Container(
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.15),
+                    Colors.white.withValues(alpha: 0.02),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSponsorCard(BuildContext context, SponsorModel sponsor) {
-    final hasTier = sponsor.tier != null && sponsor.tier!.trim().isNotEmpty;
-    final tierColor = _getTierColor(sponsor.tier);
+    final hasWebsite = sponsor.website != null && sponsor.website!.isNotEmpty;
 
     return GestureDetector(
       onTap: () => _showSponsorDetailsSheet(context, sponsor),
@@ -375,39 +491,16 @@ class _EventPartnersScreenState extends ConsumerState<EventPartnersScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Top: Tier Badge & External icon
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (hasTier)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                    decoration: BoxDecoration(
-                      color: tierColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: tierColor.withValues(alpha: 0.35)),
-                    ),
-                    child: Text(
-                      sponsor.tier!.toUpperCase(),
-                      style: TextStyle(
-                        color: tierColor,
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  )
-                else
-                  const SizedBox.shrink(),
-                if (sponsor.website != null && sponsor.website!.isNotEmpty)
-                  const Icon(LucideIcons.externalLink, color: Colors.white30, size: 14)
-                else
-                  const SizedBox(width: 14, height: 14),
-              ],
+            // Top: External icon (if website available), no tier chip
+            Align(
+              alignment: Alignment.topRight,
+              child: hasWebsite
+                  ? const Icon(LucideIcons.externalLink, color: Colors.white30, size: 14)
+                  : const SizedBox(height: 14),
             ),
 
             // Centered Logo
-            _buildPartnerLogo(sponsor.logo, sponsor.name, isSponsor: true, size: 52),
+            _buildPartnerLogo(sponsor.logo, sponsor.name, isSponsor: true, size: 56),
 
             // Bottom Name and Industry
             Column(
@@ -951,22 +1044,44 @@ class _EventPartnersScreenState extends ConsumerState<EventPartnersScreen> {
   Widget _buildPartnerLogo(String? logoUrl, String name, {required bool isSponsor, double size = 48}) {
     final validUrl = logoUrl != null &&
         logoUrl.trim().isNotEmpty &&
-        (logoUrl.startsWith('http://') || logoUrl.startsWith('https://'));
+        (logoUrl.startsWith('http://') || logoUrl.startsWith('https://') || logoUrl.startsWith('data:image'));
 
     if (validUrl) {
+      Widget imageWidget;
+      if (logoUrl.startsWith('data:image')) {
+        final base64String = logoUrl.split(',').last;
+        try {
+          imageWidget = Image.memory(
+            base64Decode(base64String),
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => _buildFallbackLogo(name, isSponsor: isSponsor, size: size),
+          );
+        } catch (_) {
+          imageWidget = _buildFallbackLogo(name, isSponsor: isSponsor, size: size);
+        }
+      } else {
+        imageWidget = Image.network(
+          logoUrl.trim(),
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildFallbackLogo(name, isSponsor: isSponsor, size: size),
+        );
+      }
+
       return Container(
         width: size,
         height: size,
-        padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
-        child: Image.network(
-          logoUrl.trim(),
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) => _buildFallbackLogo(name, isSponsor: isSponsor, size: size),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(11),
+          child: imageWidget,
         ),
       );
     }
@@ -997,9 +1112,24 @@ class _EventPartnersScreenState extends ConsumerState<EventPartnersScreen> {
     );
   }
 
+  int _tierRank(String tier) {
+    final lower = tier.toLowerCase();
+    if (lower.contains('headline') || lower.contains('title') || lower.contains('presenting')) return 0;
+    if (lower.contains('diamond')) return 1;
+    if (lower.contains('platinum')) return 2;
+    if (lower.contains('gold')) return 3;
+    if (lower.contains('silver')) return 4;
+    if (lower.contains('bronze')) return 5;
+    if (lower.contains('partner') || lower.contains('official')) return 6;
+    if (lower.contains('supporter') || lower.contains('supporting') || lower.contains('media') || lower.contains('community')) return 7;
+    return 8;
+  }
+
   Color _getTierColor(String? tier) {
     if (tier == null) return const Color(0xFF94A3B8);
     final lower = tier.toLowerCase();
+    if (lower.contains('headline') || lower.contains('title') || lower.contains('presenting')) return const Color(0xFFEC4899);
+    if (lower.contains('diamond')) return const Color(0xFF38BDF8);
     if (lower.contains('platinum')) return const Color(0xFFA855F7);
     if (lower.contains('gold')) return const Color(0xFFF59E0B);
     if (lower.contains('silver')) return const Color(0xFF94A3B8);

@@ -74,6 +74,8 @@ class _MyMeetingsScreenState extends ConsumerState<MyMeetingsScreen> with Single
   Future<void> _updateStatus(String meetingId, String status) async {
     final success = await _supabaseService.updateMeetingStatus(meetingId, status);
     if (success && mounted) {
+      ref.invalidate(meetingsProvider(_userId));
+      ref.invalidate(bookedSlotsProvider);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Meeting ${status == 'accepted' ? 'accepted' : status == 'declined' ? 'declined' : 'cancelled'} successfully!"),

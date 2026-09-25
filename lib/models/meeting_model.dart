@@ -1,5 +1,6 @@
 class MeetingModel {
   final String id;
+  final String? eventId;
   final String organizerId;
   final String attendeeId;
   final String title;
@@ -19,6 +20,7 @@ class MeetingModel {
 
   MeetingModel({
     required this.id,
+    this.eventId,
     required this.organizerId,
     required this.attendeeId,
     required this.title,
@@ -44,6 +46,7 @@ class MeetingModel {
 
     return MeetingModel(
       id: json['id'] as String,
+      eventId: json['event_id'] as String?,
       organizerId: json['organizer_id'] as String,
       attendeeId: json['attendee_id'] as String,
       title: json['title'] as String,
@@ -62,8 +65,7 @@ class MeetingModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final map = <String, dynamic>{
       'organizer_id': organizerId,
       'attendee_id': attendeeId,
       'title': title,
@@ -75,5 +77,12 @@ class MeetingModel {
       'status': status,
       'created_at': createdAt.toIso8601String(),
     };
+    if (id.isNotEmpty) {
+      map['id'] = id;
+    }
+    if (eventId != null && eventId!.isNotEmpty) {
+      map['event_id'] = eventId;
+    }
+    return map;
   }
 }

@@ -981,7 +981,6 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           itemBuilder: (context, index) {
             final sponsor = _sponsors[index];
             final hasWebsite = sponsor.website != null && sponsor.website!.isNotEmpty;
-            final hasTier = sponsor.tier != null && sponsor.tier!.isNotEmpty;
 
             return Container(
               decoration: BoxDecoration(
@@ -1000,35 +999,12 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Top Row: Tier badge & external link icon
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            if (hasTier)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
-                                ),
-                                child: Text(
-                                  sponsor.tier!.toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Color(0xFFF59E0B),
-                                    fontSize: 8.5,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              )
-                            else
-                              const SizedBox.shrink(),
-                            if (hasWebsite)
-                              const Icon(LucideIcons.externalLink, color: Colors.white38, size: 14)
-                            else
-                              const SizedBox(width: 14, height: 14),
-                          ],
+                        // Top Row: external link icon (if available)
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: hasWebsite
+                              ? const Icon(LucideIcons.externalLink, color: Colors.white38, size: 14)
+                              : const SizedBox(height: 14),
                         ),
                         // Centered Logo
                         _buildPartnerLogo(sponsor.logo, sponsor.name, isSponsor: true, size: 46),
@@ -1300,12 +1276,16 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         );
       }
 
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          width: size,
-          height: size,
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(11),
           child: imageWidget,
         ),
       );

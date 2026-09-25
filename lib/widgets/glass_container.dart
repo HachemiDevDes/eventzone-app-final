@@ -11,6 +11,9 @@ class GlassContainer extends StatelessWidget {
   final bool showBorder;
   final Color? borderColor;
   final double borderWidth;
+  final Color? backgroundColor;
+  final List<BoxShadow>? boxShadow;
+  final double blur;
 
   const GlassContainer({
     super.key,
@@ -22,40 +25,63 @@ class GlassContainer extends StatelessWidget {
     this.showBorder = true,
     this.borderColor,
     this.borderWidth = 1.0,
+    this.backgroundColor,
+    this.boxShadow,
+    this.blur = 12.0,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          width: width,
-          height: height,
-          padding: padding,
-          decoration: BoxDecoration(
-            color: EventzoneTheme.glassBackground,
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: showBorder
-                ? Border.all(
-                    color: borderColor ?? EventzoneTheme.glassBorder,
-                    width: borderWidth,
-                  )
-                : null,
-            // Subtle internal gradient for depth
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.05),
-                Colors.white.withOpacity(0.01),
-              ],
-            ),
-          ),
-          child: child,
-        ),
+    final effectiveColor = backgroundColor ?? EventzoneTheme.glassBackground;
+    final bool needsBlur = blur > 0 && (backgroundColor == null || effectiveColor.a < 1.0);
+
+    Widget inner = Container(
+      width: width,
+      height: height,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: effectiveColor,
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: showBorder
+            ? Border.all(
+                color: borderColor ?? EventzoneTheme.glassBorder,
+                width: borderWidth,
+              )
+            : null,
+        gradient: backgroundColor != null
+            ? null
+            : LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.05),
+                  Colors.white.withValues(alpha: 0.01),
+                ],
+              ),
       ),
+      child: child,
     );
+
+    Widget content = ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: needsBlur
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+              child: inner,
+            )
+          : inner,
+    );
+
+    if (boxShadow != null && boxShadow!.isNotEmpty) {
+      return Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(borderRadius),
+          boxShadow: boxShadow,
+        ),
+        child: content,
+      );
+    }
+
+    return content;
   }
 }

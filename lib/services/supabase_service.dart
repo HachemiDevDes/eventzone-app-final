@@ -1810,12 +1810,18 @@ class SupabaseService {
   }
 
   // 📅 Fetch all meetings with joined profiles for a user
-  Future<List<MeetingModel>> fetchMeetings(String userId) async {
+  Future<List<MeetingModel>> fetchMeetings(String userId, {String? eventId}) async {
     try {
-      final response = await _supabase
+      var query = _supabase
           .from('meetings')
           .select('*, organizer_profile:profiles!organizer_id(*), attendee_profile:profiles!attendee_id(*)')
-          .or('organizer_id.eq.$userId,attendee_id.eq.$userId')
+          .or('organizer_id.eq.$userId,attendee_id.eq.$userId');
+      
+      if (eventId != null && eventId.isNotEmpty) {
+        query = query.eq('event_id', eventId);
+      }
+      
+      final response = await query
           .order('date', ascending: true)
           .order('start_time', ascending: true);
       
@@ -1827,11 +1833,11 @@ class SupabaseService {
   }
 
   // 📅 Stream meetings with joined profiles in real-time
-  Stream<List<MeetingModel>> streamMeetings(String userId) {
+  Stream<List<MeetingModel>> streamMeetings(String userId, {String? eventId}) {
     final controller = StreamController<List<MeetingModel>>();
     
     // Initial fetch
-    fetchMeetings(userId).then((meetings) {
+    fetchMeetings(userId, eventId: eventId).then((meetings) {
       if (!controller.isClosed) {
         controller.add(meetings);
       }
@@ -1839,13 +1845,13 @@ class SupabaseService {
     
     // Subscribe to real-time changes on meetings table
     final channel = _supabase
-        .channel('public:meetings:$userId')
+        .channel('public:meetings:${userId}_${eventId ?? "all"}')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'meetings',
           callback: (payload) async {
-            final updatedMeetings = await fetchMeetings(userId);
+            final updatedMeetings = await fetchMeetings(userId, eventId: eventId);
             if (!controller.isClosed) {
               controller.add(updatedMeetings);
             }

@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import 'professional_profile_screen.dart';
+import '../widgets/meeting_scheduler_sheet.dart';
 import '../utils/avatar_helper.dart';
 import 'package:easy_localization/easy_localization.dart';
 
@@ -486,6 +487,29 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          IconButton(
+            tooltip: "Book Meeting".tr(),
+            icon: Icon(LucideIcons.calendarPlus, color: Colors.white, size: 20),
+            onPressed: () {
+              if (_recipientId == null) return;
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => FractionallySizedBox(
+                  heightFactor: 0.9,
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    child: MeetingSchedulerSheet(
+                      otherUserId: _recipientId!,
+                      otherName: widget.contactName,
+                      otherAvatarUrl: widget.avatarUrl,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
           Theme(
             data: Theme.of(context).copyWith(
               cardColor: Color(0xFF1F2937),

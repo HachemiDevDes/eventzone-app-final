@@ -13,12 +13,24 @@ class MeetingSchedulerSheet extends ConsumerStatefulWidget {
   final String otherUserId;
   final String otherName;
   final String otherAvatarUrl;
+  final String? eventId;
+  final String? eventTitle;
+  final String? startDate;
+  final String? endDate;
+  final String? scheduleTime;
+  final List<DateTime>? eventDays;
 
   const MeetingSchedulerSheet({
     super.key,
     required this.otherUserId,
     required this.otherName,
     required this.otherAvatarUrl,
+    this.eventId,
+    this.eventTitle,
+    this.startDate,
+    this.endDate,
+    this.scheduleTime,
+    this.eventDays,
   });
 
   @override
@@ -45,24 +57,146 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
   bool _isSubmitting = false;
   String? _conflictError;
 
+  final List<String> _locationPresets = [
+    "Networking Lounge",
+    "Exhibition Area",
+    "Main Conference Hall",
+    "Café / Breakout Area",
+    "Virtual / Online",
+  ];
+
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: "Meeting with ${widget.otherName}");
     
-    // Generate 14 days starting from today
-    final now = DateTime.now();
-    _dates = List.generate(14, (index) => now.add(Duration(days: index)));
+    _initDates();
+    _initTimeSlots();
+    _loadEventDetailsIfMissing();
+  }
+
+  void _initDates() {
+    if (widget.eventDays != null && widget.eventDays!.isNotEmpty) {
+      _dates = List.from(widget.eventDays!);
+    } else {
+      _dates = _parseDatesFromStrings(widget.startDate, widget.endDate);
+    }
+    if (_dates.isEmpty) {
+      final now = DateTime.now();
+      _dates = List.generate(7, (index) => now.add(Duration(days: index)));
+    }
     _selectedDate = _dates.first;
-    
-    // Generate 30-minute time slots from 08:00 to 20:00
-    for (int hour = 8; hour <= 20; hour++) {
+  }
+
+  List<DateTime> _parseDatesFromStrings(String? startStr, String? endStr) {
+    if (startStr == null || startStr.isEmpty) return [];
+    try {
+      DateTime? sDate;
+      DateTime? eDate;
+
+      // Try ISO format YYYY-MM-DD
+      try {
+        sDate = DateTime.parse(startStr.split('T')[0]);
+      } catch (_) {
+        // Try DateFormat for human readable formats
+        try {
+          sDate = DateFormat('MMM d, yyyy').parse(startStr);
+        } catch (_) {}
+      }
+
+      if (endStr != null && endStr.isNotEmpty) {
+        try {
+          eDate = DateTime.parse(endStr.split('T')[0]);
+        } catch (_) {
+          try {
+            eDate = DateFormat('MMM d, yyyy').parse(endStr);
+          } catch (_) {}
+        }
+      }
+
+      if (sDate != null) {
+        if (eDate != null && eDate.isAfter(sDate)) {
+          final daysCount = eDate.difference(sDate).inDays + 1;
+          final maxDays = daysCount > 14 ? 14 : daysCount;
+          return List.generate(maxDays, (i) => sDate!.add(Duration(days: i)));
+        } else {
+          return [sDate];
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  void _loadEventDetailsIfMissing() async {
+    if (widget.eventId == null || widget.eventId!.isEmpty) return;
+    if (_dates.length > 1 && widget.startDate != null) return;
+
+    try {
+      final sessions = await _supabaseService.fetchEventSessions(widget.eventId!);
+      if (sessions.isNotEmpty) {
+        final sessionDates = <DateTime>{};
+        for (var s in sessions) {
+          try {
+            final dateVal = s.date;
+            if (dateVal != null && dateVal.isNotEmpty) {
+              final parsed = DateTime.parse(dateVal.split('T')[0]);
+              sessionDates.add(DateTime(parsed.year, parsed.month, parsed.day));
+            }
+          } catch (_) {}
+        }
+
+        if (sessionDates.isNotEmpty && mounted) {
+          final sorted = sessionDates.toList()..sort();
+          setState(() {
+            _dates = sorted;
+            if (!_dates.any((d) => DateFormat('yyyy-MM-dd').format(d) == DateFormat('yyyy-MM-dd').format(_selectedDate))) {
+              _selectedDate = _dates.first;
+            }
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _initTimeSlots() {
+    int startHour = 9;
+    int endHour = 18;
+
+    if (widget.scheduleTime != null && widget.scheduleTime!.isNotEmpty) {
+      try {
+        final regex = RegExp(r'(\d{1,2}):(\d{2})\s*(AM|PM)?', caseSensitive: false);
+        final matches = regex.allMatches(widget.scheduleTime!).toList();
+        if (matches.isNotEmpty) {
+          final match1 = matches[0];
+          int h1 = int.parse(match1.group(1)!);
+          final p1 = match1.group(3)?.toUpperCase();
+          if (p1 == 'PM' && h1 < 12) h1 += 12;
+          if (p1 == 'AM' && h1 == 12) h1 = 0;
+          startHour = h1;
+
+          if (matches.length > 1) {
+            final match2 = matches[1];
+            int h2 = int.parse(match2.group(1)!);
+            final p2 = match2.group(3)?.toUpperCase();
+            if (p2 == 'PM' && h2 < 12) h2 += 12;
+            if (p2 == 'AM' && h2 == 12) h2 = 0;
+            endHour = h2;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (endHour <= startHour) endHour = startHour + 8;
+    if (endHour > 23) endHour = 23;
+    if (startHour < 0) startHour = 0;
+
+    _timeSlots.clear();
+    for (int hour = startHour; hour < endHour; hour++) {
       final hourStr = hour.toString().padLeft(2, '0');
       _timeSlots.add("$hourStr:00");
-      if (hour < 20) {
-        _timeSlots.add("$hourStr:30");
-      }
+      _timeSlots.add("$hourStr:30");
     }
+    _timeSlots.add("${endHour.toString().padLeft(2, '0')}:00");
   }
 
   @override
@@ -98,7 +232,6 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
       _conflictError = null;
     });
 
-
     final currentUserIdStr = Supabase.instance.client.auth.currentUser?.id;
     if (currentUserIdStr == null) {
       setState(() {
@@ -107,6 +240,17 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
       });
       return;
     }
+
+    // 0. Connection Prerequisite Check
+    final connectionStatus = await _supabaseService.fetchConnectionStatus(widget.otherUserId);
+    if (connectionStatus != 'accepted') {
+      setState(() {
+        _conflictError = "You must be connected with this attendee before scheduling a meeting.";
+        _isSubmitting = false;
+      });
+      return;
+    }
+
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
     final startTimeStr = _selectedStartTime!;
     final endTimeStr = _getEndTime(startTimeStr, _selectedDuration);
@@ -131,6 +275,7 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
     // 2. Insert Meeting
     final newMeeting = MeetingModel(
       id: "", // Gen random on Supabase
+      eventId: widget.eventId,
       organizerId: currentUserIdStr,
       attendeeId: widget.otherUserId,
       title: _titleController.text.trim().isEmpty 
@@ -149,8 +294,10 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
     
     if (success) {
       if (mounted) {
-        // Invalidate booked slots to refresh UI
+        // Invalidate booked slots and meetings to refresh UI
         ref.invalidate(bookedSlotsProvider);
+        ref.invalidate(meetingsProvider(currentUserIdStr));
+        ref.invalidate(meetingsProvider(widget.otherUserId));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Meeting request sent to ${widget.otherName}!"),
@@ -158,7 +305,7 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.pop(context);
+        Navigator.pop(context, true);
       }
     } else {
       setState(() {
@@ -499,6 +646,29 @@ class _MeetingSchedulerSheetState extends ConsumerState<MeetingSchedulerSheet> {
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
+              ),
+            ),
+            SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: BouncingScrollPhysics(),
+              child: Row(
+                children: _locationPresets.map((loc) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ActionChip(
+                      label: Text(loc, style: TextStyle(color: Colors.white70, fontSize: 11)),
+                      backgroundColor: Color(0xFF141927),
+                      side: BorderSide(color: Colors.white12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      onPressed: () {
+                        setState(() {
+                          _locationController.text = loc;
+                        });
+                      },
+                    ),
+                  );
+                }).toList(),
               ),
             ),
             SizedBox(height: 20),

@@ -6,6 +6,7 @@ import '../widgets/glass_container.dart';
 import '../services/supabase_service.dart';
 import 'professional_profile_screen.dart';
 import 'chat_detail_screen.dart';
+import '../widgets/meeting_scheduler_sheet.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 class EventConnectionsScreen extends ConsumerStatefulWidget {
@@ -56,6 +57,7 @@ class _EventConnectionsScreenState extends ConsumerState<EventConnectionsScreen>
           notes: profile['bio'] ?? '',
           tags: profile['interests'] != null ? List<String>.from(profile['interests']) : [],
           targetUserId: userId,
+          eventId: widget.eventId,
         ),
       ),
     ).then((_) {
@@ -174,6 +176,31 @@ class _EventConnectionsScreenState extends ConsumerState<EventConnectionsScreen>
                                             ),
                                           ],
                                         ),
+                                      ),
+                                      
+                                      // Book Meeting Action Button
+                                      IconButton(
+                                        tooltip: "Book Meeting".tr(),
+                                        icon: Icon(LucideIcons.calendarPlus, color: Colors.white70, size: 20),
+                                        onPressed: () {
+                                          showModalBottomSheet(
+                                            context: context,
+                                            isScrollControlled: true,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (context) => FractionallySizedBox(
+                                              heightFactor: 0.9,
+                                              child: ClipRRect(
+                                                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                                                child: MeetingSchedulerSheet(
+                                                  otherUserId: userId,
+                                                  otherName: name,
+                                                  otherAvatarUrl: profile['avatar_url'] ?? '',
+                                                  eventId: widget.eventId,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
                                       ),
                                       
                                       // Message Action Button
