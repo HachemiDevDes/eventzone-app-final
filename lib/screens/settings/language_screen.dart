@@ -59,23 +59,26 @@ class LanguageScreen extends ConsumerWidget {
                       final lang = languages[index];
                       final isSelected = currentLocale.languageCode == lang['code'];
                       
-                      return ListTile(
-                        onTap: () {
-                          context.setLocale(Locale(lang['code']!));
-                          ref.read(languageProvider.notifier).setLanguage(Locale(lang['code']!)); // Keep this for now if anything else depends on it
-                        },
-                        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                        title: Text(
-                          lang['native']!.tr(),
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          onTap: () {
+                            context.setLocale(Locale(lang['code']!));
+                            ref.read(languageProvider.notifier).setLanguage(Locale(lang['code']!)); // Keep this for now if anything else depends on it
+                          },
+                          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                          title: Text(
+                            lang['native']!.tr(),
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
+                          ),
+                          subtitle: Text(
+                            lang['name']!.tr(),
+                            style: TextStyle(color: Colors.white54, fontSize: 13),
+                          ),
+                          trailing: isSelected
+                              ? Icon(LucideIcons.check, color: EventzoneTheme.primaryAction)
+                              : null,
                         ),
-                        subtitle: Text(
-                          lang['name']!.tr(),
-                          style: TextStyle(color: Colors.white54, fontSize: 13),
-                        ),
-                        trailing: isSelected
-                            ? Icon(LucideIcons.check, color: EventzoneTheme.primaryAction)
-                            : null,
                       );
                     },
                   ),

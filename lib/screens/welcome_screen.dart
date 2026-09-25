@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -40,12 +41,21 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> with SingleTicker
     try {
       final supabase = ref.read(supabaseProvider);
       
-      // Native Google Sign-In flow
-      final googleSignIn = GoogleSignIn();
+      // Native in-app Google Sign-In flow (serverClientId requests the ID token for Supabase)
+      final googleSignIn = GoogleSignIn(
+        serverClientId: '776224860515-7km7k2q9oa0vrfmc7vtk66kbdl1sjmng.apps.googleusercontent.com',
+        scopes: const ['email', 'profile'],
+      );
+      
+      // Clear any cached credentials so account selection is clean and reliable
+      try {
+        await googleSignIn.signOut();
+      } catch (_) {}
+
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
         setState(() => _isLoading = false);
-        return; // User cancelled
+        return; // User dismissed account selection
       }
       
       final googleAuth = await googleUser.authentication;
@@ -53,7 +63,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> with SingleTicker
       final accessToken = googleAuth.accessToken;
       
       if (idToken == null) {
-        throw 'No ID Token found';
+        throw 'No Google ID Token returned by Google Play Services';
       }
       
       await supabase.auth.signInWithIdToken(
@@ -62,23 +72,18 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> with SingleTicker
         accessToken: accessToken,
       );
     } catch (e) {
-      debugPrint("Native Google Sign-In failed, falling back to OAuth: $e");
-      try {
-        await ref.read(supabaseProvider).auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: 'eventzone://login-callback',
-          authScreenLaunchMode: LaunchMode.externalApplication,
+      debugPrint("Native Google Sign-In error: $e");
+      if (mounted) {
+        final errorMessage = kDebugMode
+            ? "Google sign-in error: $e"
+            : "Google sign-in failed. Please try again.".tr();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
-      } catch (err) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Google sign-in failed. Please try again.".tr()),
-              backgroundColor: Colors.redAccent,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
       }
     } finally {
       if (mounted) {

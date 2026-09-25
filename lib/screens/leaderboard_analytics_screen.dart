@@ -82,8 +82,13 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
   Future<void> _fetchData() async {
     setState(() => _isLoading = true);
     try {
-      // Fetch Leaderboard via RPC
-      final leaderboardResponse = await _supabase.rpc('get_global_leaderboard');
+      // Fetch Leaderboard via RPC (preserved for future leaderboard feature)
+      try {
+        final leaderboardResponse = await _supabase.rpc('get_global_leaderboard');
+        _leaderboard = List<Map<String, dynamic>>.from(leaderboardResponse as List);
+      } catch (e) {
+        debugPrint('Leaderboard data fetch dormant: $e');
+      }
       
       // Fetch Personal Analytics
       final userId = _supabase.auth.currentUser?.id;
@@ -96,7 +101,6 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
       }
 
       setState(() {
-        _leaderboard = List<Map<String, dynamic>>.from(leaderboardResponse as List);
         _myConnections = List<Map<String, dynamic>>.from(connectionsResponse);
         _isLoading = false;
       });
@@ -114,21 +118,23 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
     return Scaffold(
       backgroundColor: EventzoneTheme.backgroundStart,
       appBar: AppBar(
-        toolbarHeight: 100,
+        toolbarHeight: 90,
         title: Padding(
-          padding: EdgeInsets.only(top: 16.0),
+          padding: EdgeInsets.only(top: 12.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text("Leaderboard".tr(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 32, color: Colors.white)),
+              Text("Analytics".tr(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 32, color: Colors.white)),
               SizedBox(height: 4),
-              Text("See how you rank among other professionals".tr(), style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.normal)),
+              Text("Track your networking performance and reach".tr(), style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.normal)),
             ],
           ),
         ),
         backgroundColor: EventzoneTheme.backgroundStart,
         elevation: 0,
+        // NOTE: TabBar hidden for now; preserved for future updates when Leaderboard is re-enabled.
+        /*
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(80),
           child: Padding(
@@ -177,21 +183,17 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
             ),
           ),
         ),
+        */
       ),
       body: _isLoading 
         ? Center(child: CircularProgressIndicator(color: EventzoneTheme.primaryAction))
-        : TabBarView(
-            controller: _tabController,
-            children: [
-              _buildLeaderboardTab(),
-              _buildAnalyticsTab(),
-            ],
-          ),
+        : _buildAnalyticsTab(),
     );
   }
 
-  // --- LEADERBOARD TAB ---
+  // --- LEADERBOARD TAB (Preserved for future update) ---
 
+  // ignore: unused_element
   Widget _buildLeaderboardTab() {
     if (_leaderboard.isEmpty) {
       return Center(child: Text('No leaderboard data available yet.'.tr()));
@@ -443,7 +445,6 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
   Widget _buildSummaryCards() {
     int total = _myConnections.length;
     int scanned = _myConnections.where((c) => c['source'] == 'scan').length;
-    int manual = total - scanned;
 
     return Row(
       children: [
@@ -1003,7 +1004,7 @@ class _LeaderboardAnalyticsScreenState extends State<LeaderboardAnalyticsScreen>
 
   Widget _buildGoalWidget() {
     // Check if any goals are set
-    bool hasAnyGoal = _networkingGoals.values.any((v) => v != null && v! > 0);
+    bool hasAnyGoal = _networkingGoals.values.any((v) => v != null && v > 0);
 
     return Container(
       padding: EdgeInsets.all(16),

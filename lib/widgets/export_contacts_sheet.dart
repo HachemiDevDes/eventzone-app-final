@@ -392,7 +392,6 @@ class _ExportContactsSheetState extends ConsumerState<ExportContactsSheet> {
                 name,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontFamily: 'SpaceGrotesk',
                   fontWeight: FontWeight.w600,
                   fontSize: 16,
                 ),
@@ -415,7 +414,6 @@ class _ExportContactsSheetState extends ConsumerState<ExportContactsSheet> {
                     style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 12,
-                      fontFamily: 'SpaceGrotesk',
                       fontWeight: FontWeight.w300,
                     ),
                   ),

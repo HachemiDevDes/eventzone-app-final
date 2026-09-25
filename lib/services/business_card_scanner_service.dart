@@ -103,14 +103,14 @@ class BusinessCardScannerService {
         return BusinessCardScannerResult.failure('Image file does not exist');
       }
 
-      // Optimize image for fast upload and token efficiency (<100KB)
+      // Optimize image for ultra-fast upload and OpenAI token efficiency (<60KB)
       Uint8List? compressedBytes;
       try {
         compressedBytes = await FlutterImageCompress.compressWithFile(
           imageFile.path,
-          minWidth: 1024,
-          minHeight: 1024,
-          quality: 80,
+          minWidth: 800,
+          minHeight: 800,
+          quality: 75,
           format: CompressFormat.jpeg,
         );
       } catch (e) {
@@ -158,7 +158,16 @@ class BusinessCardScannerService {
       );
     } catch (e) {
       debugPrint('BusinessCardScannerService error: $e');
-      return BusinessCardScannerResult.failure(e.toString());
+      String errorMsg = e.toString();
+      if (e is FunctionException) {
+        final details = e.details;
+        if (details is Map && details['error'] != null) {
+          errorMsg = details['error'].toString();
+        } else if (details != null) {
+          errorMsg = details.toString();
+        }
+      }
+      return BusinessCardScannerResult.failure(errorMsg);
     }
   }
 }

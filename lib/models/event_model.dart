@@ -11,6 +11,9 @@ class EventModel {
   final String endDate;
   bool isJoined;
   final bool isLive;
+  String registrationStatus; // 'none' | 'pending' | 'registered'
+
+  bool get isPendingApproval => registrationStatus == 'pending';
 
   EventModel({
     required this.id,
@@ -25,6 +28,7 @@ class EventModel {
     this.stats,
     this.isJoined = false,
     this.isLive = false,
+    this.registrationStatus = 'none',
   });
 }
 

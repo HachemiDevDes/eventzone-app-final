@@ -424,7 +424,7 @@ class _DesktopCrmScreenState extends State<DesktopCrmScreen> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            _buildStep('1', 'Open the EventZone CRM on your desktop browser'),
+                            _buildStep('1', 'Open the Eventzone CRM on your desktop browser'),
                             _buildStep('2', 'Click "Login with Code" on the login page'),
                             _buildStep('3', 'Enter your code above and you\'re in!'),
                             const SizedBox(height: 12),

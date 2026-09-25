@@ -13,6 +13,7 @@ class EventCard extends StatelessWidget {
   final String category;
   final String imageUrl;
   final bool isLive;
+  final String? registrationStatus;
   final VoidCallback? onViewDetails;
 
   const EventCard({
@@ -23,6 +24,7 @@ class EventCard extends StatelessWidget {
     required this.category,
     required this.imageUrl,
     this.isLive = false,
+    this.registrationStatus,
     this.onViewDetails,
   });
 
@@ -48,13 +50,32 @@ class EventCard extends StatelessWidget {
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                         child: _buildEventImage(imageUrl, 160),
                       ),
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        child: isLive 
-                            ? StatusPill(label: "LIVE NOW", isLive: true)
-                            : StatusPill(label: category),
-                      ),
+                      if (isLive)
+                        const Positioned(
+                          top: 12,
+                          left: 12,
+                          child: StatusPill(label: "LIVE NOW", isLive: true),
+                        ),
+                      if (registrationStatus == 'registered')
+                        const Positioned(
+                          top: 12,
+                          right: 12,
+                          child: StatusPill(
+                            label: "REGISTERED",
+                            customColor: Color(0xFF059669),
+                            customBorderColor: Color(0xFF6EE7B7),
+                          ),
+                        )
+                      else if (registrationStatus == 'pending')
+                        const Positioned(
+                          top: 12,
+                          right: 12,
+                          child: StatusPill(
+                            label: "PENDING",
+                            customColor: Color(0xFFD97706),
+                            customBorderColor: Color(0xFFFCD34D),
+                          ),
+                        ),
                     ],
                   ),
                   Padding(
@@ -73,11 +94,15 @@ class EventCard extends StatelessWidget {
                           children: [
                             const Icon(LucideIcons.calendar, color: Colors.white38, size: 14),
                             const SizedBox(width: 6),
-                            Text(
-                              _formatDate(date), 
-                              style: Theme.of(context).textTheme.bodyMedium,
+                            Flexible(
+                              child: Text(
+                                _formatDate(date), 
+                                style: Theme.of(context).textTheme.bodyMedium,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 12),
                             const Icon(LucideIcons.mapPin, color: EventzoneTheme.primaryAction, size: 14),
                             const SizedBox(width: 4),
                             Expanded(

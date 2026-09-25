@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
-import 'my_network_screen.dart';
 import 'add_contact_screen.dart';
 import '../widgets/subscription_expired_bottom_sheet.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,10 +16,8 @@ import 'package:google_mlkit_language_id/google_mlkit_language_id.dart';
 import 'package:image_picker/image_picker.dart';
 import 'review_contact_screen.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
-import 'package:camerawesome/pigeon.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:math' as math;
 import 'package:image/image.dart' as img;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -116,7 +114,6 @@ class ScanQRScreen extends StatefulWidget {
 
 class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderStateMixin {
   bool _isConnecting = false;
-  bool _isSwitchingCamera = false;
   late String _scanType; // "QR Code", "Business Card", "Event Badge"
   final BarcodeScanner _barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.qrCode]);
   bool _isProcessingBarcode = false;
@@ -129,7 +126,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
   Rect? _lastTargetRect;
 
   CameraState? _cameraAwesomeState;
-  bool _isCameraInitialized = true;
+  Timer? _aiStatusTimer;
 
   @override
   void initState() {
@@ -143,6 +140,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    _aiStatusTimer?.cancel();
     _barcodeScanner.close();
     _laserController.dispose();
 
@@ -586,7 +584,17 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
         onPhotoMode: (pm) async {
           final request = await pm.takePhoto();
           if (request.path != null) {
-             await _processImageFile(request.path!, isCameraCapture: true);
+            // Ensure the captured file is completely written to disk
+            final capturedFile = File(request.path!);
+            int retries = 0;
+            while (retries < 20) {
+              if (await capturedFile.exists() && await capturedFile.length() > 0) {
+                break;
+              }
+              await Future.delayed(const Duration(milliseconds: 50));
+              retries++;
+            }
+            await _processImageFile(request.path!, isCameraCapture: true);
           } else {
             setState(() => _isConnecting = false);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -616,16 +624,128 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
   }
 
   Future<void> _processImageFile(String path, {bool isCameraCapture = false}) async {
+    _laserController.repeat(reverse: true);
+
+    // ── Ultra-Fast AI Track for Business Cards & Badges ──
+    if (_scanType == "Business Card" || _scanType == "Event Badge") {
+      setState(() {
+        _isConnecting = true;
+        _ocrStatus = "scan_qr_ai_optimizing".tr();
+        _ocrProgress = 0.20;
+      });
+
+      int aiStep = 0;
+      _aiStatusTimer?.cancel();
+      _aiStatusTimer = Timer.periodic(const Duration(milliseconds: 650), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        aiStep++;
+        if (aiStep == 1) {
+          setState(() {
+            _ocrStatus = "scan_qr_ai_reading".tr();
+            _ocrProgress = 0.50;
+          });
+        } else if (aiStep == 2) {
+          setState(() {
+            _ocrStatus = "scan_qr_ai_extracting".tr();
+            _ocrProgress = 0.75;
+          });
+        } else if (aiStep >= 3) {
+          setState(() {
+            _ocrStatus = "scan_qr_ai_almost_done".tr();
+            _ocrProgress = 0.90;
+          });
+          timer.cancel();
+        }
+      });
+
+      try {
+        // Pass original full-color image directly without waiting for slow CPU isolate decoding
+        final aiResult = await BusinessCardScannerService().scanCardImage(File(path));
+        _aiStatusTimer?.cancel();
+
+        if (aiResult.isNotBusinessCard) {
+          _laserController.stop();
+          if (mounted) {
+            setState(() => _isConnecting = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(aiResult.errorMessage ?? "No business card detected."),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
+          if (isCameraCapture) {
+            try {
+              await File(path).delete();
+            } catch (_) {}
+          }
+          return;
+        }
+
+        if (aiResult.isSuccess && aiResult.card != null && !aiResult.card!.isEmpty) {
+          final card = aiResult.card!;
+          if (mounted) {
+            setState(() {
+              _ocrStatus = "scan_qr_ai_ready".tr();
+              _ocrProgress = 1.0;
+            });
+            await Future.delayed(const Duration(milliseconds: 250));
+          }
+
+          if (mounted) {
+            _laserController.stop();
+            setState(() => _isConnecting = false);
+
+            if (isCameraCapture) {
+              try {
+                File(path).deleteSync();
+              } catch (_) {}
+            }
+
+            if (!mounted) return;
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ReviewContactScreen(
+                  initialName: card.name,
+                  initialTitle: card.title,
+                  initialEmail: card.email,
+                  initialPhone: card.phone,
+                  initialWebsite: card.website,
+                  initialCompany: card.company,
+                  initialDepartment: card.department,
+                  initialAddress: card.address,
+                  initialNotes: card.notes.isNotEmpty ? card.notes : null,
+                  source: _scanType,
+                ),
+              ),
+            );
+            return;
+          }
+        } else {
+          debugPrint("AI card scan fallback (reason: ${aiResult.errorMessage})");
+        }
+      } catch (aiErr) {
+        _aiStatusTimer?.cancel();
+        debugPrint("AI scan error, falling back to local OCR: $aiErr");
+      }
+    }
+
+    // ── Offline / Fallback ML Kit OCR Engine ──
+    _aiStatusTimer?.cancel();
     setState(() {
       _isConnecting = true;
       _ocrStatus = isCameraCapture 
           ? "Image captured! You can move your phone.".tr() 
           : "Analyzing image...".tr();
-      _ocrProgress = 0.1;
+      _ocrProgress = 0.35;
     });
-    
-    _laserController.repeat(reverse: true);
-    
+
+    if (!mounted) return;
+
     try {
       // Setup args for the isolate to prevent UI freezing
       final double screenWidth = MediaQuery.of(context).size.width;
@@ -653,13 +773,10 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
       final isolateResult = await compute(_processImageInIsolate, isolateArgs);
       
       String ocrImagePath = isolateResult['ocrImagePath'];
-      int cropWidth = isolateResult['cropWidth'];
-      int cropHeight = isolateResult['cropHeight'];
-      int imageWidth = isolateResult['imageWidth'];
-      int imageHeight = isolateResult['imageHeight'];
+      int cropHeight = isolateResult['cropHeight'] ?? 1;
+      int imageHeight = isolateResult['imageHeight'] ?? 1;
 
       if (isCameraCapture && mounted) {
-        // Compress the cropped image on the main isolate using the plugin (since plugins often need main isolate)
         try {
           final resultBytes = await FlutterImageCompress.compressWithFile(
             ocrImagePath,
@@ -672,95 +789,8 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
 
         setState(() {
           _ocrStatus = "Processing text recognition...";
-          _ocrProgress = 0.4;
+          _ocrProgress = 0.50;
         });
-      }
-
-      // ── Step 1.5: High-Fidelity AI Business Card Scan with GPT-4o-mini ──
-      if (_scanType == "Business Card" || _scanType == "Event Badge") {
-        if (mounted) {
-          setState(() {
-            _ocrStatus = "Scanning with AI...".tr();
-            _ocrProgress = 0.45;
-          });
-        }
-
-        try {
-          final aiResult = await BusinessCardScannerService().scanCardImage(File(ocrImagePath));
-
-          if (aiResult.isNotBusinessCard) {
-            _laserController.stop();
-            if (mounted) {
-              setState(() => _isConnecting = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(aiResult.errorMessage ?? "No business card detected."),
-                  backgroundColor: Colors.redAccent,
-                ),
-              );
-            }
-            if (isCameraCapture) {
-              try {
-                await File(ocrImagePath).delete();
-              } catch (_) {}
-            }
-            return;
-          }
-
-          if (aiResult.isSuccess && aiResult.card != null && !aiResult.card!.isEmpty) {
-            final card = aiResult.card!;
-            if (mounted) {
-              setState(() {
-                _ocrStatus = "scan_qr_extracting_metadata".tr();
-                _ocrProgress = 0.85;
-              });
-              await Future.delayed(const Duration(milliseconds: 300));
-            }
-
-            if (mounted) {
-              setState(() {
-                _ocrStatus = "scan_qr_scan_successful".tr();
-                _ocrProgress = 1.0;
-              });
-              await Future.delayed(const Duration(milliseconds: 500));
-            }
-
-            if (mounted) {
-              _laserController.stop();
-              setState(() => _isConnecting = false);
-
-              if (isCameraCapture) {
-                try {
-                  File(ocrImagePath).deleteSync();
-                } catch (_) {}
-              }
-
-              if (!mounted) return;
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ReviewContactScreen(
-                    initialName: card.name,
-                    initialTitle: card.title,
-                    initialEmail: card.email,
-                    initialPhone: card.phone,
-                    initialWebsite: card.website,
-                    initialCompany: card.company,
-                    initialDepartment: card.department,
-                    initialAddress: card.address,
-                    initialNotes: card.notes.isNotEmpty ? card.notes : null,
-                    source: _scanType,
-                  ),
-                ),
-              );
-              return;
-            }
-          } else {
-            debugPrint("AI card scan non-critical fallback: ${aiResult.errorMessage}");
-          }
-        } catch (aiErr) {
-          debugPrint("AI scan error, falling back to local OCR: $aiErr");
-        }
       }
 
       // ── Step 2: Primary OCR pass on the cropped/focused image ──
@@ -1466,8 +1496,6 @@ class _ScanQRScreenState extends State<ScanQRScreen> with SingleTickerProviderSt
     return GestureDetector(
       onTap: () async {
         if (_scanType == type) return;
-        
-        final bool isOcrModeBefore = _scanType != "QR Code";
 
         // Turn off torch/flash when switching modes
         if (_cameraAwesomeState != null) {

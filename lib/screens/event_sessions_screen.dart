@@ -92,15 +92,27 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                       );
                     }
 
-                    // Extract unique day tags dynamically
-                    final days = sessions.map((s) => s.date ?? "Day 1").toSet().toList();
-                    days.sort((a, b) => a.compareTo(b));
+                    // Extract unique day keys dynamically
+                    final Map<String, String> dayKeyToTabLabel = {};
+                    final distinctKeys = <String>{};
+                    for (final s in sessions) {
+                      distinctKeys.add(s.dateKey);
+                    }
+                    final sortedKeys = distinctKeys.toList()..sort();
+                    for (int i = 0; i < sortedKeys.length; i++) {
+                      final key = sortedKeys[i];
+                      final sampleSession = sessions.firstWhere((s) => s.dateKey == key);
+                      final dayNum = "Day ${i + 1}";
+                      dayKeyToTabLabel[key] = "$dayNum • ${sampleSession.shortDate}";
+                    }
 
                     // Default selection
-                    _selectedDay ??= days.isNotEmpty ? days.first : 'Day 1';
+                    if (_selectedDay == null || !sortedKeys.contains(_selectedDay)) {
+                      _selectedDay = sortedKeys.isNotEmpty ? sortedKeys.first : '';
+                    }
 
                     // Filter sessions for selected day
-                    final filteredSessions = sessions.where((s) => (s.date ?? "Day 1") == _selectedDay).toList();
+                    final filteredSessions = sessions.where((s) => s.dateKey == _selectedDay).toList();
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,26 +120,27 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                         // Day Selector Tabs
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                           child: Row(
-                            children: days.map((day) {
-                              final isSelected = _selectedDay == day;
+                            children: sortedKeys.map((key) {
+                              final isSelected = _selectedDay == key;
+                              final tabLabel = dayKeyToTabLabel[key] ?? key;
                               return GestureDetector(
                                 onTap: () {
                                   setState(() {
-                                    _selectedDay = day;
+                                    _selectedDay = key;
                                   });
                                 },
                                 child: Container(
-                                  margin: EdgeInsets.only(right: 12),
-                                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                                  margin: const EdgeInsets.only(right: 12),
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                                   decoration: BoxDecoration(
                                     color: isSelected ? EventzoneTheme.primaryAction : Colors.white.withOpacity(0.05),
                                     borderRadius: BorderRadius.circular(30),
                                     border: Border.all(color: isSelected ? Colors.transparent : Colors.white10),
                                   ),
                                   child: Text(
-                                    day,
+                                    tabLabel,
                                     style: TextStyle(
                                       color: isSelected ? Colors.white : Colors.white60,
                                       fontWeight: FontWeight.bold,
@@ -156,10 +169,13 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                                     final isFav = favList.contains(session.id);
 
                                     final startTimeStr = _formatTime(session.startTime);
+                                    final endTimeStr = _formatTime(session.endTime);
                                     final isLive = _isSessionLive(session.startTime, session.endTime);
+                                    final dayLabel = session.resolveDayLabel(sessions);
+                                    final fullDayLabel = session.resolveFullDayLabel(sessions);
 
                                     return Padding(
-                                      padding: EdgeInsets.only(bottom: 16),
+                                      padding: const EdgeInsets.only(bottom: 16),
                                       child: GestureDetector(
                                         onTap: () {
                                           Navigator.push(
@@ -173,43 +189,120 @@ class _EventSessionsScreenState extends ConsumerState<EventSessionsScreen> {
                                           });
                                         },
                                         child: GlassContainer(
-                                          padding: EdgeInsets.all(20),
+                                          padding: const EdgeInsets.all(20),
                                           child: Row(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              // Time slot column
+                                              // Time slot column with Day badge
                                               SizedBox(
-                                                width: 80,
+                                                width: 88,
                                                 child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
                                                     Text(
                                                       startTimeStr,
                                                       style: TextStyle(
-                                                        color: isLive ? EventzoneTheme.primaryAction : Colors.white38,
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 12,
+                                                        color: isLive ? EventzoneTheme.primaryAction : Colors.white,
+                                                        fontWeight: FontWeight.w800,
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      endTimeStr,
+                                                      style: const TextStyle(
+                                                        color: Colors.white38,
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    // Prominent Day badge on session card
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                      decoration: BoxDecoration(
+                                                        color: EventzoneTheme.primaryAction.withOpacity(0.15),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                        border: Border.all(color: EventzoneTheme.primaryAction.withOpacity(0.35)),
+                                                      ),
+                                                      child: Text(
+                                                        dayLabel,
+                                                        style: const TextStyle(
+                                                          color: EventzoneTheme.primaryAction,
+                                                          fontSize: 10,
+                                                          fontWeight: FontWeight.w900,
+                                                          letterSpacing: 0.5,
+                                                        ),
                                                       ),
                                                     ),
                                                     if (isLive) ...[
-                                                      SizedBox(height: 8),
-                                                      StatusPill(label: "LIVE", isLive: true),
+                                                      const SizedBox(height: 8),
+                                                      const StatusPill(label: "LIVE", isLive: true),
                                                     ]
                                                   ],
                                                 ),
                                               ),
-                                              SizedBox(width: 12),
-                                              Container(width: 1, height: 64, color: Colors.white10),
-                                              SizedBox(width: 16),
+                                              const SizedBox(width: 12),
+                                              Container(width: 1, height: 72, color: Colors.white10),
+                                              const SizedBox(width: 16),
                                               
                                               // Content column
                                               Expanded(
                                                 child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
+                                                    // Day & Date Pill
+                                                    Row(
+                                                      children: [
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                                          decoration: BoxDecoration(
+                                                            color: Colors.white.withOpacity(0.06),
+                                                            borderRadius: BorderRadius.circular(6),
+                                                            border: Border.all(color: Colors.white10),
+                                                          ),
+                                                          child: Row(
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            children: [
+                                                              const Icon(LucideIcons.calendar, size: 10, color: Colors.white60),
+                                                              const SizedBox(width: 4),
+                                                              Text(
+                                                                fullDayLabel,
+                                                                style: const TextStyle(
+                                                                  color: Colors.white70,
+                                                                  fontSize: 10.5,
+                                                                  fontWeight: FontWeight.w700,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        if (session.track != null && session.track!.isNotEmpty) ...[
+                                                          const SizedBox(width: 6),
+                                                          Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                                            decoration: BoxDecoration(
+                                                              color: EventzoneTheme.primaryAction.withOpacity(0.12),
+                                                              borderRadius: BorderRadius.circular(6),
+                                                              border: Border.all(color: EventzoneTheme.primaryAction.withOpacity(0.25)),
+                                                            ),
+                                                            child: Text(
+                                                              session.track!.toUpperCase(),
+                                                              style: const TextStyle(
+                                                                color: EventzoneTheme.primaryAction,
+                                                                fontSize: 9.5,
+                                                                fontWeight: FontWeight.w800,
+                                                                letterSpacing: 0.5,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 8),
                                                     Text(
                                                       session.title,
-                                                      style: TextStyle(
+                                                      style: const TextStyle(
                                                         fontWeight: FontWeight.bold,
                                                         fontSize: 15,
                                                         color: Colors.white,

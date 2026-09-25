@@ -1,40 +1,49 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'dart:io';
 import '../theme/eventzone_theme.dart';
 import '../utils/avatar_helper.dart';
 import '../widgets/glass_container.dart';
 import 'direct_messages_screen.dart';
 import 'professional_profile_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:easy_localization/easy_localization.dart';
-import '../services/export_service.dart';
 import '../widgets/export_contacts_sheet.dart';
+import '../services/supabase_service.dart';
+import '../models/connection_request_model.dart';
+import '../providers/connection_providers.dart';
 
-class MyNetworkScreen extends StatefulWidget {
+enum NetworkTab { contacts, requests }
+enum RequestsSubTab { received, sent }
+
+class MyNetworkScreen extends ConsumerStatefulWidget {
   const MyNetworkScreen({super.key});
 
   @override
-  State<MyNetworkScreen> createState() => _MyNetworkScreenState();
+  ConsumerState<MyNetworkScreen> createState() => _MyNetworkScreenState();
 }
 
-class _MyNetworkScreenState extends State<MyNetworkScreen> {
+class _MyNetworkScreenState extends ConsumerState<MyNetworkScreen> {
+  final SupabaseService _supabaseService = SupabaseService();
   String _searchQuery = "";
   String? _selectedTag;
   List<Map<String, dynamic>> _supabaseConnections = [];
+  List<ConnectionRequestModel> _incomingRequests = [];
+  List<ConnectionRequestModel> _sentRequests = [];
   bool _isLoading = true;
+  bool _isLoadingRequests = false;
   RealtimeChannel? _connectionsChannel;
   int _unreadCount = 0;
   RealtimeChannel? _messagesChannel;
 
+  NetworkTab _currentTab = NetworkTab.contacts;
+  RequestsSubTab _requestsSubTab = RequestsSubTab.received;
+
   @override
   void initState() {
     super.initState();
-    _loadConnections();
+    _loadAllData();
     _subscribeToConnections();
     _subscribeToMessages();
   }
@@ -43,10 +52,8 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
     final currentUserId = Supabase.instance.client.auth.currentUser?.id;
     if (currentUserId == null) return;
 
-    // Initial fetch
     _fetchUnreadCount(currentUserId);
 
-    // Subscribe to new messages
     _messagesChannel = Supabase.instance.client
         .channel('public:messages:unread')
         .onPostgresChanges(
@@ -66,7 +73,7 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
           .from('messages')
           .select('id')
           .eq('recipient_id', currentUserId)
-          .eq('is_read', false);
+          .or('is_read.eq.false,is_read.is.null');
       if (mounted) {
         setState(() {
           _unreadCount = data.length;
@@ -86,25 +93,36 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
 
   void _subscribeToConnections() {
     _connectionsChannel = Supabase.instance.client
-        .channel('network_connections_updates')
+        .channel('network_connections_updates_${DateTime.now().millisecondsSinceEpoch}')
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'connections',
           callback: (_) {
-            if (mounted) _loadConnections();
+            if (mounted) {
+              _loadAllData();
+            }
           },
         )
         .subscribe();
   }
 
+  Future<void> _loadAllData() async {
+    await Future.wait([
+      _loadConnections(),
+      _loadRequests(),
+    ]);
+  }
+
   Future<void> _loadConnections() async {
     try {
       final currentUser = Supabase.instance.client.auth.currentUser;
-      final currentUserId =
-          currentUser?.id ?? "0d3e48f0-b7c5-47db-a5c4-f3a08fc3d040";
+      final currentUserId = currentUser?.id;
+      if (currentUserId == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
 
-      // Fetch from Supabase connections table
       final response = await Supabase.instance.client
           .from('connections')
           .select()
@@ -113,7 +131,7 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
 
       List<Map<String, dynamic>> loaded = List<Map<String, dynamic>>.from(
         response,
-      );
+      ).where((row) => row['status'] != 'pending').toList();
 
       if (mounted) {
         setState(() {
@@ -126,9 +144,26 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
         setState(() {
           _supabaseConnections = [];
           _isLoading = false;
-          _searchQuery = "ERROR: $e";
         });
       }
+    }
+  }
+
+  Future<void> _loadRequests() async {
+    try {
+      if (mounted) setState(() => _isLoadingRequests = true);
+      final incoming = await _supabaseService.fetchIncomingConnectionRequests();
+      final sent = await _supabaseService.fetchSentConnectionRequests();
+      if (mounted) {
+        setState(() {
+          _incomingRequests = incoming;
+          _sentRequests = sent;
+          _isLoadingRequests = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading connection requests: $e");
+      if (mounted) setState(() => _isLoadingRequests = false);
     }
   }
 
@@ -142,9 +177,9 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
             borderRadius: BorderRadius.circular(24),
             side: const BorderSide(color: Colors.white10),
           ),
-          title: const Text(
-            "Delete Contact",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          title: Text(
+            "Delete Contact".tr(),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           content: Text(
             "Are you sure you want to delete ${connection['name']} from your contacts?",
@@ -153,9 +188,9 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
-                "Cancel",
-                style: TextStyle(color: Colors.white38),
+              child: Text(
+                "Cancel".tr(),
+                style: const TextStyle(color: Colors.white38),
               ),
             ),
             ElevatedButton(
@@ -164,7 +199,6 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                 setState(() => _isLoading = true);
 
                 try {
-                  // Delete from Supabase
                   if (connection['id'] != null) {
                     await Supabase.instance.client
                         .from('connections')
@@ -172,14 +206,14 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                         .eq('id', connection['id']);
                   }
 
-                  // (Removed static customConnections)
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text("Deleted ${connection['name']}!"),
-                      backgroundColor: Colors.redAccent,
-                    ),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Deleted ${connection['name']}!"),
+                        backgroundColor: Colors.redAccent,
+                      ),
+                    );
+                  }
                 } catch (e) {
                   debugPrint("Error deleting connection: $e");
                 }
@@ -192,9 +226,9 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text(
-                "Delete",
-                style: TextStyle(color: Colors.white),
+              child: Text(
+                "Delete".tr(),
+                style: const TextStyle(color: Colors.white),
               ),
             ),
           ],
@@ -214,24 +248,99 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
     );
   }
 
+  Future<void> _acceptRequest(ConnectionRequestModel request) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final success = await _supabaseService.acceptConnectionRequest(
+      request.id,
+      request.senderId,
+    );
+
+    if (success) {
+      ref.invalidate(connectionStatusProvider(request.senderId));
+      ref.invalidate(incomingRequestsCountProvider);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text("Connected with ${request.senderName ?? 'user'}! Added to contacts."),
+          backgroundColor: EventzoneTheme.accentSuccess,
+        ),
+      );
+      _loadAllData();
+    } else {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text("Failed to accept request. Please try again."),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  Future<void> _declineRequest(ConnectionRequestModel request) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final success = await _supabaseService.declineConnectionRequest(request.id);
+
+    if (success) {
+      ref.invalidate(connectionStatusProvider(request.senderId));
+      ref.invalidate(incomingRequestsCountProvider);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text("Request declined"),
+          backgroundColor: Colors.white24,
+        ),
+      );
+      _loadRequests();
+    }
+  }
+
+  Future<void> _cancelSentRequest(ConnectionRequestModel request) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final success = await _supabaseService.cancelSentConnectionRequest(request.id);
+
+    if (success) {
+      ref.invalidate(connectionStatusProvider(request.receiverId));
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text("Request cancelled"),
+          backgroundColor: Colors.white24,
+        ),
+      );
+      _loadRequests();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: EventzoneTheme.buildPlayfulBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(context),
-                _buildSection(
-                  context,
-                  "Connected Professionals".tr(),
-                  _buildContactsGrid(),
-                ),
-                const SizedBox(height: 100),
-              ],
+          child: RefreshIndicator(
+            color: EventzoneTheme.primaryAction,
+            backgroundColor: const Color(0xFF0B0F19),
+            onRefresh: _loadAllData,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(context),
+                  _buildTabBar(),
+                  if (_currentTab == NetworkTab.contacts) ...[
+                    _buildPendingRequestsBanner(),
+                    _buildSearchBar(),
+                    _buildTagsList(),
+                    _buildSection(
+                      context,
+                      "Connected Professionals".tr(),
+                      _buildContactsGrid(),
+                    ),
+                  ] else ...[
+                    _buildRequestsView(),
+                  ],
+                  const SizedBox(height: 100),
+                ],
+              ),
             ),
           ),
         ),
@@ -250,7 +359,7 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                "Contacts".tr(),
+                "My Network".tr(),
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w900,
                   fontSize: 32,
@@ -263,7 +372,7 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                     child: const Icon(
                       LucideIcons.download,
                       color: Colors.white,
-                      size: 28,
+                      size: 26,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -274,7 +383,10 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                         MaterialPageRoute(
                           builder: (context) => const DirectMessagesScreen(),
                         ),
-                      );
+                      ).then((_) {
+                        final uid = Supabase.instance.client.auth.currentUser?.id;
+                        if (uid != null) _fetchUnreadCount(uid);
+                      });
                     },
                     child: Stack(
                       clipBehavior: Clip.none,
@@ -282,7 +394,7 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                         const Icon(
                           LucideIcons.messageCircle,
                           color: Colors.white,
-                          size: 28,
+                          size: 26,
                         ),
                         if (_unreadCount > 0)
                           Positioned(
@@ -293,10 +405,6 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
                               decoration: const BoxDecoration(
                                 color: Colors.redAccent,
                                 shape: BoxShape.circle,
-                              ),
-                              constraints: const BoxConstraints(
-                                minWidth: 16,
-                                minHeight: 16,
                               ),
                               child: Text(
                                 "$_unreadCount",
@@ -318,31 +426,243 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            "Manage your profile and connections".tr(),
+            "Manage your connections, leads and requests".tr(),
             style: Theme.of(context).textTheme.bodyMedium,
           ),
-          const SizedBox(height: 16),
-          GlassContainer(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            borderRadius: 30,
-            child: TextField(
-              style: const TextStyle(color: Colors.white),
-              onChanged: (val) {
-                setState(() {
-                  _searchQuery = val;
-                });
-              },
-              decoration: InputDecoration(
-                hintText: "Search connections...".tr(),
-                hintStyle: const TextStyle(color: Colors.white38),
-                border: InputBorder.none,
-                icon: const Icon(LucideIcons.search, color: Colors.white38, size: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    final incomingCount = _incomingRequests.length;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _currentTab = NetworkTab.contacts),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _currentTab == NetworkTab.contacts
+                        ? EventzoneTheme.primaryAction
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        LucideIcons.users,
+                        size: 16,
+                        color: _currentTab == NetworkTab.contacts
+                            ? Colors.white
+                            : Colors.white60,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Contacts".tr(),
+                        style: TextStyle(
+                          color: _currentTab == NetworkTab.contacts
+                              ? Colors.white
+                              : Colors.white60,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (_supabaseConnections.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _currentTab == NetworkTab.contacts
+                                ? Colors.white.withOpacity(0.2)
+                                : Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            "${_supabaseConnections.length}",
+                            style: TextStyle(
+                              color: _currentTab == NetworkTab.contacts
+                                  ? Colors.white
+                                  : Colors.white70,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _currentTab = NetworkTab.requests),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _currentTab == NetworkTab.requests
+                        ? EventzoneTheme.primaryAction
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        LucideIcons.userCheck,
+                        size: 16,
+                        color: _currentTab == NetworkTab.requests
+                            ? Colors.white
+                            : Colors.white60,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Requests".tr(),
+                        style: TextStyle(
+                          color: _currentTab == NetworkTab.requests
+                              ? Colors.white
+                              : Colors.white60,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (incomingCount > 0) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            "$incomingCount",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPendingRequestsBanner() {
+    if (_incomingRequests.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _currentTab = NetworkTab.requests;
+            _requestsSubTab = RequestsSubTab.received;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: EventzoneTheme.primaryAction.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: EventzoneTheme.primaryAction.withOpacity(0.5),
+              width: 1,
+            ),
           ),
-          const SizedBox(height: 16),
-          _buildTagsList(),
-        ],
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: EventzoneTheme.primaryAction.withOpacity(0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  LucideIcons.userPlus,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "${_incomingRequests.length} pending connection request${_incomingRequests.length > 1 ? 's' : ''}",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      "Tap to review and connect",
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                LucideIcons.chevronRight,
+                color: Colors.white,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: GlassContainer(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        borderRadius: 30,
+        child: TextField(
+          style: const TextStyle(color: Colors.white),
+          onChanged: (val) {
+            setState(() {
+              _searchQuery = val;
+            });
+          },
+          decoration: InputDecoration(
+            hintText: "Search connections...".tr(),
+            hintStyle: const TextStyle(color: Colors.white38),
+            border: InputBorder.none,
+            icon: const Icon(LucideIcons.search, color: Colors.white38, size: 20),
+          ),
+        ),
       ),
     );
   }
@@ -363,18 +683,22 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
     final tags = _allTags;
     if (tags.isEmpty) return const SizedBox.shrink();
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: [
-          _buildTagChip("All".tr(), _selectedTag == null, () {
-            setState(() => _selectedTag = null);
-          }),
-          ...tags.map((tag) => _buildTagChip(tag, _selectedTag == tag, () {
-            setState(() => _selectedTag = tag);
-          })).toList(),
-        ],
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Row(
+          children: [
+            _buildTagChip("All".tr(), _selectedTag == null, () {
+              setState(() => _selectedTag = null);
+            }),
+            ...tags.map((tag) => _buildTagChip(tag, _selectedTag == tag, () {
+              setState(() => _selectedTag = tag);
+            })),
+          ],
+        ),
       ),
     );
   }
@@ -386,7 +710,9 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
         margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? EventzoneTheme.primaryAction : Colors.white.withOpacity(0.05),
+          color: isSelected
+              ? EventzoneTheme.primaryAction
+              : Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? EventzoneTheme.primaryAction : Colors.white12,
@@ -443,19 +769,31 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
       final title = (c['title'] ?? '').toString().toLowerCase();
       final query = _searchQuery.toLowerCase();
       final matchesSearch = name.contains(query) || title.contains(query);
-      
-      final matchesTag = _selectedTag == null || 
-          (c['tags'] != null && (c['tags'] as List).map((e) => e.toString()).contains(_selectedTag));
+
+      final matchesTag = _selectedTag == null ||
+          (c['tags'] != null &&
+              (c['tags'] as List).map((e) => e.toString()).contains(_selectedTag));
 
       return matchesSearch && matchesTag;
     }).toList();
 
     if (filteredConnections.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 12),
-        child: Text(
-          "No connections found matching search.",
-          style: TextStyle(color: Colors.white24, fontSize: 13),
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(LucideIcons.users, size: 48, color: Colors.white.withOpacity(0.2)),
+              const SizedBox(height: 12),
+              Text(
+                _searchQuery.isNotEmpty
+                    ? "No connections found matching search."
+                    : "You haven't connected with anyone yet.\nExplore the attendee directory to connect!",
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white38, fontSize: 14),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -469,7 +807,7 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
         separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final connection = filteredConnections[index];
-          final String name = connection['name'] ?? '';
+          final String name = connection['name'] ?? 'Attendee';
           final String rawTitle = connection['title'] ?? '';
           final String title = rawTitle.replaceAll(' @', ' @');
           final String avatarUrl = connection['avatar_url'] ?? '';
@@ -477,111 +815,120 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
           final bool isNew = connection['is_new'] == true;
 
           return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ProfessionalProfileScreen(
-                        name: name,
-                        title: title,
-                        avatarUrl: avatarUrl,
-                        source: source,
-                        isNew: isNew ? 'true' : 'false',
-                        email: connection['email'],
-                        phone: connection['phone'],
-                        website: connection['website'],
-                        company: connection['company'],
-                        department: connection['department'],
-                        notes: connection['notes'],
-                        tags: connection['tags'] != null
-                            ? List<String>.from(connection['tags'])
-                            : null,
-                        address: connection['address'],
-                        connectionId: connection['id'],
-                        createdAt: connection['created_at'],
-                        targetUserId:
-                            connection['linked_profile_id'] ??
-                            connection['target_user_id'],
-                      ),
-                    ),
-                  ).then((_) => _loadConnections());
-                },
-                child: GlassContainer(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 26,
-                        backgroundColor: Colors.white10,
-                        backgroundImage: getAvatarProvider(avatarUrl),
-                        child: getAvatarProvider(avatarUrl) == null
-                            ? const Icon(
-                                LucideIcons.user,
-                                size: 20,
-                                color: Colors.white54,
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                if (isNew) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: EventzoneTheme.primaryAction
-                                          .withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(
-                                        color: EventzoneTheme.primaryAction
-                                            .withOpacity(0.4),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      "NEW",
-                                      style: TextStyle(
-                                        color: EventzoneTheme.primaryAction,
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              title,
-                              style: const TextStyle(
-                                color: Colors.white38,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+            onLongPress: () => _confirmDeleteConnection(connection),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfessionalProfileScreen(
+                    name: name,
+                    title: title,
+                    avatarUrl: avatarUrl,
+                    source: source,
+                    isNew: isNew ? 'true' : 'false',
+                    email: connection['email'],
+                    phone: connection['phone'],
+                    website: connection['website'],
+                    company: connection['company'],
+                    department: connection['department'],
+                    notes: connection['notes'],
+                    tags: connection['tags'] != null
+                        ? List<String>.from(connection['tags'])
+                        : null,
+                    address: connection['address'],
+                    connectionId: connection['id'],
+                    createdAt: connection['created_at'],
+                    targetUserId:
+                        connection['linked_profile_id'] ??
+                        connection['connected_user_id'] ??
+                        connection['target_user_id'],
                   ),
                 ),
-              )
+              ).then((_) => _loadAllData());
+            },
+            child: GlassContainer(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: Colors.white10,
+                    backgroundImage: getAvatarProvider(avatarUrl),
+                    child: getAvatarProvider(avatarUrl) == null
+                        ? const Icon(
+                            LucideIcons.user,
+                            size: 20,
+                            color: Colors.white54,
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (isNew) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: EventzoneTheme.primaryAction
+                                      .withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: EventzoneTheme.primaryAction
+                                        .withOpacity(0.4),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Text(
+                                  "NEW",
+                                  style: TextStyle(
+                                    color: EventzoneTheme.primaryAction,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (title.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white38,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    LucideIcons.chevronRight,
+                    color: Colors.white24,
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+          )
               .animate(delay: (index * 20).ms)
               .fade(duration: 150.ms)
               .slideY(
@@ -592,6 +939,364 @@ class _MyNetworkScreenState extends State<MyNetworkScreen> {
               );
         },
       ),
+    );
+  }
+
+  // 📬 Requests View (Received / Sent)
+  Widget _buildRequestsView() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _buildSubTabChip(
+                "Received".tr(),
+                _incomingRequests.length,
+                _requestsSubTab == RequestsSubTab.received,
+                () => setState(() => _requestsSubTab = RequestsSubTab.received),
+              ),
+              const SizedBox(width: 8),
+              _buildSubTabChip(
+                "Sent".tr(),
+                _sentRequests.length,
+                _requestsSubTab == RequestsSubTab.sent,
+                () => setState(() => _requestsSubTab = RequestsSubTab.sent),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_isLoadingRequests)
+            const Padding(
+              padding: EdgeInsets.all(40.0),
+              child: Center(
+                child: CircularProgressIndicator(color: EventzoneTheme.primaryAction),
+              ),
+            )
+          else if (_requestsSubTab == RequestsSubTab.received)
+            _buildReceivedRequestsList()
+          else
+            _buildSentRequestsList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubTabChip(
+    String label,
+    int count,
+    bool isSelected,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? EventzoneTheme.primaryAction
+              : Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? EventzoneTheme.primaryAction : Colors.white12,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white70,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 13,
+              ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Colors.white.withOpacity(0.25)
+                      : Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  "$count",
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReceivedRequestsList() {
+    if (_incomingRequests.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(LucideIcons.inbox, size: 48, color: Colors.white.withOpacity(0.2)),
+              const SizedBox(height: 12),
+              const Text(
+                "No pending connection requests received.",
+                style: TextStyle(color: Colors.white38, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _incomingRequests.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final request = _incomingRequests[index];
+        final name = request.senderName ?? 'Attendee';
+        final job = request.senderTitle ?? '';
+        final company = request.senderCompany ?? '';
+        final subtitle = company.isNotEmpty
+            ? (job.isNotEmpty ? "$job @$company" : company)
+            : job;
+
+        return GlassContainer(
+          padding: const EdgeInsets.all(16),
+          borderRadius: 20,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: Colors.white10,
+                    backgroundImage: getAvatarProvider(request.senderAvatarUrl ?? ''),
+                    child: getAvatarProvider(request.senderAvatarUrl ?? '') == null
+                        ? const Icon(LucideIcons.user, color: Colors.white54, size: 22)
+                        : null,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                        if (subtitle.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (request.message != null && request.message!.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(LucideIcons.quote, size: 14, color: Colors.white38),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          request.message!,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _acceptRequest(request),
+                      icon: const Icon(LucideIcons.check, size: 16),
+                      label: Text("Accept".tr()),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: EventzoneTheme.primaryAction,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _declineRequest(request),
+                      icon: const Icon(LucideIcons.x, size: 16),
+                      label: Text("Decline".tr()),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white70,
+                        side: const BorderSide(color: Colors.white24),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSentRequestsList() {
+    if (_sentRequests.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(LucideIcons.send, size: 48, color: Colors.white.withOpacity(0.2)),
+              const SizedBox(height: 12),
+              const Text(
+                "No pending requests sent.",
+                style: TextStyle(color: Colors.white38, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _sentRequests.length,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final request = _sentRequests[index];
+        final name = request.receiverName ?? 'Attendee';
+        final job = request.receiverTitle ?? '';
+        final company = request.receiverCompany ?? '';
+        final subtitle = company.isNotEmpty
+            ? (job.isNotEmpty ? "$job @$company" : company)
+            : job;
+
+        return GlassContainer(
+          padding: const EdgeInsets.all(16),
+          borderRadius: 20,
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: Colors.white10,
+                backgroundImage: getAvatarProvider(request.receiverAvatarUrl ?? ''),
+                child: getAvatarProvider(request.receiverAvatarUrl ?? '') == null
+                    ? const Icon(LucideIcons.user, color: Colors.white54, size: 20)
+                    : null,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Colors.white,
+                      ),
+                    ),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(LucideIcons.clock, size: 10, color: Colors.amber),
+                          SizedBox(width: 4),
+                          Text(
+                            "Pending response",
+                            style: TextStyle(
+                              color: Colors.amber,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () => _cancelSentRequest(request),
+                child: Text(
+                  "Cancel".tr(),
+                  style: const TextStyle(
+                    color: Colors.white38,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

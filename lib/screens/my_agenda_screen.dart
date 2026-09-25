@@ -144,10 +144,12 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
               itemBuilder: (context, index) {
                 final session = favoritedSessions[index];
                 final startTimeStr = _formatTime(session.startTime);
-                final dateStr = _formatDate(session.startTime);
+                final endTimeStr = _formatTime(session.endTime);
+                final dayLabel = session.resolveDayLabel(sessions);
+                final fullDayLabel = session.resolveFullDayLabel(sessions);
 
                 return Padding(
-                  padding: EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.only(bottom: 16),
                   child: GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -160,52 +162,115 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
                       });
                     },
                     child: GlassContainer(
-                      padding: EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(20),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Time & Day Tag
                           SizedBox(
-                            width: 80,
+                            width: 88,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   startTimeStr,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     color: EventzoneTheme.primaryAction,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
                                   ),
                                 ),
-                                SizedBox(height: 6),
+                                const SizedBox(height: 2),
+                                Text(
+                                  endTimeStr,
+                                  style: const TextStyle(
+                                    color: Colors.white38,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
                                 Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.05),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: Colors.white10),
+                                    color: EventzoneTheme.primaryAction.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: EventzoneTheme.primaryAction.withOpacity(0.35)),
                                   ),
                                   child: Text(
-                                    session.date ?? "Day 1",
-                                    style: TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold),
+                                    dayLabel,
+                                    style: const TextStyle(
+                                      color: EventzoneTheme.primaryAction,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          SizedBox(width: 12),
-                          Container(width: 1, height: 64, color: Colors.white10),
-                          SizedBox(width: 16),
+                          const SizedBox(width: 12),
+                          Container(width: 1, height: 72, color: Colors.white10),
+                          const SizedBox(width: 16),
 
                           // Content
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Day & Date Pill
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.06),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.white10),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(LucideIcons.calendar, size: 10, color: Colors.white60),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            fullDayLabel,
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (session.track != null && session.track!.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                        decoration: BoxDecoration(
+                                          color: EventzoneTheme.primaryAction.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: EventzoneTheme.primaryAction.withOpacity(0.25)),
+                                        ),
+                                        child: Text(
+                                          session.track!.toUpperCase(),
+                                          style: const TextStyle(
+                                            color: EventzoneTheme.primaryAction,
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
                                 Text(
                                   session.title,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 15,
                                     color: Colors.white,
@@ -214,12 +279,20 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                SizedBox(height: 6),
-                                Text(
-                                  "$dateStr • ${session.location ?? 'TBA'}",
-                                  style: TextStyle(fontSize: 12, color: Colors.white38),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Icon(LucideIcons.mapPin, size: 12, color: Colors.white38),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        session.location ?? 'TBA',
+                                        style: const TextStyle(fontSize: 12, color: Colors.white38),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 SizedBox(height: 12),
                                 Row(
@@ -334,11 +407,5 @@ class _MyAgendaScreenState extends ConsumerState<MyAgendaScreen> with SingleTick
     final period = hour >= 12 ? 'PM' : 'AM';
     final formattedHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
     return "$formattedHour:$min $period";
-  }
-
-  String _formatDate(DateTime dateTime) {
-    final local = dateTime.toLocal();
-    final months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return "${months[local.month - 1]} ${local.day}";
   }
 }

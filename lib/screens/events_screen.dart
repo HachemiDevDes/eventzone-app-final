@@ -12,6 +12,7 @@ class EventsScreen extends StatefulWidget {
   final bool isLoading;
   final Function(EventModel) onEventJoined;
   final Function(EventModel) onAccessEvent;
+  final Future<void> Function()? onRefresh;
 
   const EventsScreen({
     super.key,
@@ -19,6 +20,7 @@ class EventsScreen extends StatefulWidget {
     this.isLoading = false,
     required this.onEventJoined,
     required this.onAccessEvent,
+    this.onRefresh,
   });
 
   @override
@@ -97,47 +99,60 @@ class _EventsScreenState extends State<EventsScreen> {
               ),
               Expanded(
                 child: widget.isLoading
-                    ? Center(
+                    ? const Center(
                         child: CircularProgressIndicator(color: EventzoneTheme.primaryAction),
                       )
-                    : filteredEvents.isEmpty
-                        ? Center(
-                            child: Text(
-                              _searchQuery.isEmpty 
-                                ? "No events available right now.".tr()
-                                : "No events match your search.".tr(),
-                              style: TextStyle(color: Colors.white60, fontSize: 16),
-                            ),
-                          )
-                        : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                        itemCount: filteredEvents.length,
-                        itemBuilder: (context, index) {
-                          final event = filteredEvents[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
-                            child: EventCard(
-                              title: event.title,
-                              date: event.date,
-                              location: event.location,
-                              category: event.category,
-                              imageUrl: event.imageUrl,
-                              isLive: event.isLive,
-                              onViewDetails: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => EventDetailsScreen(
-                                      event: event,
-                                      onRegister: () => widget.onEventJoined(event),
-                                      onAccess: () => widget.onAccessEvent(event),
+                    : RefreshIndicator(
+                        onRefresh: widget.onRefresh ?? () async {},
+                        color: EventzoneTheme.primaryAction,
+                        backgroundColor: const Color(0xFF0F121E),
+                        child: filteredEvents.isEmpty
+                            ? ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: [
+                                  SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                                  Center(
+                                    child: Text(
+                                      _searchQuery.isEmpty 
+                                        ? "No events available right now.".tr()
+                                        : "No events match your search.".tr(),
+                                      style: const TextStyle(color: Colors.white60, fontSize: 16),
                                     ),
                                   ),
-                                );
-                              },
-                            ),
-                          );
-                        },
+                                ],
+                              )
+                            : ListView.builder(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                itemCount: filteredEvents.length,
+                                itemBuilder: (context, index) {
+                                  final event = filteredEvents[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 16.0),
+                                    child: EventCard(
+                                      title: event.title,
+                                      date: event.date,
+                                      location: event.location,
+                                      category: event.category,
+                                      imageUrl: event.imageUrl,
+                                      isLive: event.isLive,
+                                      registrationStatus: event.registrationStatus,
+                                      onViewDetails: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => EventDetailsScreen(
+                                              event: event,
+                                              onRegister: () => widget.onEventJoined(event),
+                                              onAccess: () => widget.onAccessEvent(event),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
                       ),
               ),
             ],

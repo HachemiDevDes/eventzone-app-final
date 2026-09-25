@@ -196,17 +196,98 @@ class _NetworkingScreenState extends ConsumerState<NetworkingScreen> {
         final status = statusAsync.value ?? 'none';
         
         if (status == 'accepted') {
-          return Icon(LucideIcons.checkCircle, color: EventzoneTheme.accentSuccess);
-
-        } else {
-          return TextButton(
-            onPressed: () => _navigateToProfile(userId, profile),
-            style: TextButton.styleFrom(
-              backgroundColor: EventzoneTheme.primaryAction.withOpacity(0.1),
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          return const Icon(
+            LucideIcons.checkCircle2,
+            color: EventzoneTheme.accentSuccess,
+            size: 22,
+          );
+        } else if (status == 'pending_sent') {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.amber.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.amber.withOpacity(0.4)),
             ),
-            child: Text("Connect".tr(), style: TextStyle(color: EventzoneTheme.primaryAction, fontWeight: FontWeight.bold)),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(LucideIcons.clock, size: 12, color: Colors.amber),
+                const SizedBox(width: 4),
+                Text(
+                  "Pending".tr(),
+                  style: const TextStyle(
+                    color: Colors.amber,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          );
+        } else if (status == 'pending_received') {
+          return ElevatedButton(
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final success = await _supabaseService.sendConnectionRequest(userId);
+              if (success) {
+                ref.invalidate(connectionStatusProvider(userId));
+                ref.invalidate(incomingRequestsCountProvider);
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text("Connected with $name! Added to contacts."),
+                    backgroundColor: EventzoneTheme.accentSuccess,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: EventzoneTheme.accentSuccess,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              minimumSize: Size.zero,
+            ),
+            child: Text(
+              "Accept".tr(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          );
+        } else {
+          return ElevatedButton(
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              final success = await _supabaseService.sendConnectionRequest(
+                userId,
+                eventId: widget.eventId,
+              );
+              if (success) {
+                ref.invalidate(connectionStatusProvider(userId));
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text("Connection request sent to $name!"),
+                    backgroundColor: EventzoneTheme.primaryAction,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: EventzoneTheme.primaryAction,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              minimumSize: Size.zero,
+            ),
+            child: Text(
+              "Connect".tr(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
           );
         }
       },

@@ -69,7 +69,7 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Magic sign-in link sent to your email!".tr()),
+            content: Text("Verification code sent to your email!".tr()),
             backgroundColor: EventzoneTheme.accentSuccess,
             behavior: SnackBarBehavior.floating,
           ),
@@ -89,7 +89,7 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Failed to send magic link. Please check your connection.".tr()),
+            content: Text("Failed to send verification code. Please check your connection.".tr()),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
           ),
@@ -104,10 +104,10 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
 
   Future<void> _verifyOtp() async {
     final code = _codeController.text.trim();
-    if (code.length != 6) {
+    if (code.length < 6 || code.length > 8) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Please enter a valid 6-digit verification code.".tr()),
+          content: Text("Please enter a valid verification code.".tr()),
           backgroundColor: Colors.amber,
           behavior: SnackBarBehavior.floating,
         ),
@@ -203,7 +203,7 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
               SizedBox(height: 8),
               Text(
                 _codeSent
-                    ? "Enter the 6-digit code sent to your email address.".tr()
+                    ? "Enter the verification code sent to your email address.".tr()
                     : "No password needed. We'll send you a secure OTP verification code.".tr(),
                 style: TextStyle(
                   color: Colors.white38,
@@ -260,11 +260,11 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
-                            return 'Email is required';
+                            return "Please enter your email address".tr();
                           }
-                          final emailRegExp = RegExp(r'^[^@]+@[^@]+\.[^@]+');
-                          if (!emailRegExp.hasMatch(value.trim())) {
-                            return 'Enter a valid email address';
+                          final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                          if (!emailRegex.hasMatch(value.trim())) {
+                            return "Please enter a valid email address".tr();
                           }
                           return null;
                         },
@@ -285,18 +285,18 @@ class _EmailSignInScreenState extends ConsumerState<EmailSignInScreen> {
                         TextFormField(
                           controller: _codeController,
                           keyboardType: TextInputType.number,
-                          maxLength: 6,
+                          maxLength: 8,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            letterSpacing: 8,
+                            letterSpacing: 6,
                           ),
                           decoration: InputDecoration(
                             counterText: "",
-                            hintText: "000000".tr(),
-                            hintStyle: TextStyle(color: Colors.white12, letterSpacing: 8),
+                            hintText: "••••••",
+                            hintStyle: TextStyle(color: Colors.white12, letterSpacing: 6),
                             fillColor: Color(0xFF1A1E2E),
                             filled: true,
                             contentPadding: EdgeInsets.symmetric(vertical: 16),

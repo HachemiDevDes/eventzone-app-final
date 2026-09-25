@@ -1,30 +1,38 @@
-import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 class StatusPill extends StatelessWidget {
   final String label;
   final bool isLive;
+  final Color? customColor;
+  final Color? customBorderColor;
 
   const StatusPill({
     super.key,
     required this.label,
     this.isLive = false,
+    this.customColor,
+    this.customBorderColor,
   });
 
   @override
   Widget build(BuildContext context) {
     Widget pill = Container(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isLive 
-            ? Color(0xFFE11D48) // Red color for live
-            : Color(0xFF1E293B), // Solid slate grey
+        color: customColor ??
+            (isLive 
+                ? const Color(0xFFE11D48) // Red color for live
+                : const Color(0xFF1E293B)), // Solid slate grey
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isLive ? Color(0xFFFDA4AF) : Colors.white54,
-          width: 1.5,
-        ),
+        border: customBorderColor != null
+            ? Border.all(color: customBorderColor!, width: 1.5)
+            : (isLive
+                ? null
+                : Border.all(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    width: 1.0,
+                  )),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

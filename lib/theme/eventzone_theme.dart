@@ -19,7 +19,7 @@ class EventzoneTheme {
     final baseTheme = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      fontFamily: isArabic ? GoogleFonts.changa().fontFamily : GoogleFonts.spaceGrotesk().fontFamily,
+      fontFamily: isArabic ? GoogleFonts.changa().fontFamily : GoogleFonts.plusJakartaSans().fontFamily,
     );
 
     TextTheme buildTextTheme(TextTheme base) {
@@ -60,35 +60,35 @@ class EventzoneTheme {
           ),
         );
       } else {
-        return GoogleFonts.spaceGroteskTextTheme(base).copyWith(
-          displayLarge: GoogleFonts.spaceGrotesk(
+        return GoogleFonts.plusJakartaSansTextTheme(base).copyWith(
+          displayLarge: GoogleFonts.plusJakartaSans(
             color: textPrimary,
             fontSize: 34,
             fontWeight: FontWeight.w900,
             letterSpacing: -1.0,
           ),
-          headlineMedium: GoogleFonts.spaceGrotesk(
+          headlineMedium: GoogleFonts.plusJakartaSans(
             color: textPrimary,
             fontSize: 22,
             fontWeight: FontWeight.bold,
             letterSpacing: -0.5,
           ),
-          titleLarge: GoogleFonts.spaceGrotesk(
+          titleLarge: GoogleFonts.plusJakartaSans(
             color: textPrimary,
             fontSize: 18,
             fontWeight: FontWeight.w700,
           ),
-          bodyLarge: GoogleFonts.spaceGrotesk(
+          bodyLarge: GoogleFonts.plusJakartaSans(
             color: textPrimary,
             fontSize: 16,
             height: 1.6,
           ),
-          bodyMedium: GoogleFonts.spaceGrotesk(
+          bodyMedium: GoogleFonts.plusJakartaSans(
             color: textSecondary,
             fontSize: 14,
             height: 1.5,
           ),
-          labelLarge: GoogleFonts.spaceGrotesk(
+          labelLarge: GoogleFonts.plusJakartaSans(
             color: textSecondary,
             fontSize: 12,
             fontWeight: FontWeight.w800,

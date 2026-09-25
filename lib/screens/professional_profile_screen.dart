@@ -14,6 +14,9 @@ import '../utils/avatar_helper.dart';
 import '../utils/social_link_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../models/event_model.dart';
+import '../services/supabase_service.dart';
+import 'event_details_screen.dart';
 
 class ProfessionalProfileScreen extends ConsumerStatefulWidget {
   final String name;
@@ -79,8 +82,7 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
   List<String> _lookingFor = [];
   List<String> _industries = [];
   List<String> _interests = [];
-  bool _isLoadingProfile = true;
-  ProfileMaterialFinish _finish = ProfileMaterialFinish.cyberViolet;
+  ProfileMaterialFinish _finish = ProfileMaterialFinish.titaniumCobalt;
 
   List<Map<String, dynamic>> _parseSocialLinks(dynamic raw) {
     if (raw == null) return [];
@@ -138,11 +140,32 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
     _fetchInitialProfile();
     _subscribeToProfileUpdates();
     _markAsNotNew();
+    _loadAttendingEvents();
+  }
+
+  List<EventModel> _attendingEvents = [];
+  bool _isLoadingEvents = false;
+
+  Future<void> _loadAttendingEvents() async {
+    if (widget.targetUserId == null) return;
+    setState(() => _isLoadingEvents = true);
+    try {
+      final service = SupabaseService();
+      final events = await service.fetchAttendingEventsForUser(widget.targetUserId!);
+      if (mounted) {
+        setState(() {
+          _attendingEvents = events;
+          _isLoadingEvents = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading attending events for user: $e");
+      if (mounted) setState(() => _isLoadingEvents = false);
+    }
   }
 
   void _fetchInitialProfile() async {
     if (widget.targetUserId == null) {
-      setState(() => _isLoadingProfile = false);
       return;
     }
     try {
@@ -187,12 +210,6 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
       }
     } catch (e) {
       debugPrint("Error fetching initial profile: $e");
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoadingProfile = false;
-        });
-      }
     }
   }
 
@@ -285,21 +302,21 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
       case 'email':
         return LucideIcons.mail;
       case 'linkedin':
-        return FontAwesomeIcons.linkedin;
+        return FontAwesomeIcons.linkedin.data;
       case 'instagram':
-        return FontAwesomeIcons.instagram;
+        return FontAwesomeIcons.instagram.data;
       case 'x':
       case 'twitter':
-        return FontAwesomeIcons.xTwitter;
+        return FontAwesomeIcons.xTwitter.data;
       case 'facebook':
-        return FontAwesomeIcons.facebook;
+        return FontAwesomeIcons.facebook.data;
       case 'website':
       case 'company_website':
         return LucideIcons.globe;
       case 'whatsapp':
-        return FontAwesomeIcons.whatsapp;
+        return FontAwesomeIcons.whatsapp.data;
       case 'github':
-        return FontAwesomeIcons.github;
+        return FontAwesomeIcons.github.data;
       default:
         return LucideIcons.link;
     }
@@ -921,11 +938,17 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
         break;
       case 'event badge':
         sourceIcon = LucideIcons.contact;
-        sourceColor = Colors.purpleAccent;
+        sourceColor = const Color(0xFF38BDF8);
         break;
       case 'qr code':
+      case 'qr':
         sourceIcon = LucideIcons.qrCode;
         sourceColor = _finish.primaryColor;
+        break;
+      case 'attendee_portal':
+      case 'attendee portal':
+        sourceIcon = LucideIcons.globe;
+        sourceColor = Colors.blueAccent;
         break;
       case 'manual entry':
       default:
@@ -991,26 +1014,163 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
           ),
         ),
       );
+    } else if (status == 'pending_sent') {
+      return Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.withOpacity(0.4)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(LucideIcons.clock, size: 16, color: Colors.amber),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Request Sent".tr(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          OutlinedButton(
+            onPressed: () async {
+              if (widget.targetUserId == null) return;
+              final messenger = ScaffoldMessenger.of(context);
+              final service = ref.read(supabaseServiceProvider);
+              final sentList = await service.fetchSentConnectionRequests();
+              final matching = sentList.where((r) => r.receiverId == widget.targetUserId).toList();
+              if (matching.isNotEmpty) {
+                await service.cancelSentConnectionRequest(matching.first.id);
+              }
+              ref.invalidate(connectionStatusProvider(widget.targetUserId!));
+              messenger.showSnackBar(
+                const SnackBar(
+                  content: Text("Request cancelled"),
+                  backgroundColor: Colors.white24,
+                ),
+              );
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white70,
+              side: const BorderSide(color: Colors.white24),
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text("Cancel".tr()),
+          ),
+        ],
+      );
+    } else if (status == 'pending_received') {
+      return Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                if (widget.targetUserId == null) return;
+                final messenger = ScaffoldMessenger.of(context);
+                final service = ref.read(supabaseServiceProvider);
+                final incomingList = await service.fetchIncomingConnectionRequests();
+                final matching = incomingList.where((r) => r.senderId == widget.targetUserId).toList();
+                bool success = false;
+                if (matching.isNotEmpty) {
+                  success = await service.acceptConnectionRequest(matching.first.id, widget.targetUserId!);
+                } else {
+                  success = await service.sendConnectionRequest(widget.targetUserId!);
+                }
+                if (success) {
+                  ref.invalidate(connectionStatusProvider(widget.targetUserId!));
+                  ref.invalidate(incomingRequestsCountProvider);
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text("Connected with $_name! Added to contacts."),
+                      backgroundColor: EventzoneTheme.accentSuccess,
+                    ),
+                  );
+                } else {
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text("Failed to accept request. Please try again."),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(LucideIcons.check, size: 16),
+              label: Text("Accept Request".tr(), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: EventzoneTheme.accentSuccess,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            flex: 2,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                if (widget.targetUserId == null) return;
+                final messenger = ScaffoldMessenger.of(context);
+                final service = ref.read(supabaseServiceProvider);
+                final incomingList = await service.fetchIncomingConnectionRequests();
+                final matching = incomingList.where((r) => r.senderId == widget.targetUserId).toList();
+                if (matching.isNotEmpty) {
+                  await service.declineConnectionRequest(matching.first.id);
+                }
+                ref.invalidate(connectionStatusProvider(widget.targetUserId!));
+                ref.invalidate(incomingRequestsCountProvider);
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text("Request declined"),
+                    backgroundColor: Colors.white24,
+                  ),
+                );
+              },
+              icon: const Icon(LucideIcons.x, size: 16),
+              label: Text("Decline".tr()),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white70,
+                side: const BorderSide(color: Colors.white24),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
+      );
     } else {
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: () async {
+            if (widget.targetUserId == null) return;
             final messenger = ScaffoldMessenger.of(context);
             final service = ref.read(supabaseServiceProvider);
-            final success = await service.connectDirectly(widget.targetUserId!);
+            final success = await service.sendConnectionRequest(widget.targetUserId!);
             if (success) {
               ref.invalidate(connectionStatusProvider(widget.targetUserId!));
               messenger.showSnackBar(
                 SnackBar(
-                  content: Text("Connected with $_name!"),
-                  backgroundColor: EventzoneTheme.accentSuccess,
+                  content: Text("Connection request sent to $_name!"),
+                  backgroundColor: EventzoneTheme.primaryAction,
                 ),
               );
             } else {
               messenger.showSnackBar(
                 SnackBar(
-                  content: Text("Failed to connect.".tr()),
+                  content: Text("Failed to send request.".tr()),
                   backgroundColor: Colors.redAccent,
                 ),
               );
@@ -1031,12 +1191,12 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
 
   @override
   Widget build(BuildContext context) {
-    String connectionStatus = 'accepted';
-    if (widget.connectionId != null) {
-      connectionStatus = 'accepted';
-    } else if (widget.targetUserId != null) {
+    String connectionStatus = 'none';
+    if (widget.targetUserId != null) {
       final statusAsync = ref.watch(connectionStatusProvider(widget.targetUserId!));
-      connectionStatus = statusAsync.value ?? 'none';
+      connectionStatus = statusAsync.value ?? (widget.connectionId != null ? 'accepted' : 'none');
+    } else if (widget.connectionId != null) {
+      connectionStatus = 'accepted';
     }
     final bool isConnected = connectionStatus == 'accepted';
 
@@ -1375,6 +1535,12 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
                             );
                           }),
                         ],
+                        if (widget.targetUserId != null) ...[
+                          const SizedBox(height: 12),
+                          const Divider(color: Colors.white10),
+                          const SizedBox(height: 16),
+                          _buildAttendingEventsSection(),
+                        ],
                         const SizedBox(height: 40),
                       ],
                     ),
@@ -1435,6 +1601,342 @@ class _ProfessionalProfileScreenState extends ConsumerState<ProfessionalProfileS
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAttendingEventsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  LucideIcons.calendarCheck2,
+                  size: 16,
+                  color: EventzoneTheme.primaryAction,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "Events Attending".tr(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
+            if (_attendingEvents.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: EventzoneTheme.primaryAction.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: EventzoneTheme.primaryAction.withOpacity(0.4),
+                  ),
+                ),
+                child: Text(
+                  "${_attendingEvents.length}",
+                  style: const TextStyle(
+                    color: EventzoneTheme.primaryAction,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_isLoadingEvents)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24.0),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: EventzoneTheme.primaryAction,
+                ),
+              ),
+            ),
+          )
+        else if (_attendingEvents.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.03),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    LucideIcons.calendarX,
+                    size: 20,
+                    color: Colors.white38,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "No upcoming events scheduled".tr(),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        "Events this attendee registers for will appear here.".tr(),
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _attendingEvents.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final event = _attendingEvents[index];
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EventDetailsScreen(
+                        event: event,
+                        onRegister: () {},
+                        onAccess: () {},
+                      ),
+                    ),
+                  );
+                },
+                child: GlassContainer(
+                  padding: const EdgeInsets.all(12),
+                  borderRadius: 16,
+                  child: Row(
+                    children: [
+                      // Event Image Thumbnail
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          width: 72,
+                          height: 72,
+                          color: Colors.white10,
+                          child: event.imageUrl.isNotEmpty
+                              ? Image.network(
+                                  event.imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    color: Colors.white10,
+                                    child: const Icon(
+                                      LucideIcons.calendar,
+                                      color: Colors.white38,
+                                      size: 28,
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  color: Colors.white10,
+                                  child: const Icon(
+                                    LucideIcons.calendar,
+                                    color: Colors.white38,
+                                    size: 28,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Event Details
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: EventzoneTheme.primaryAction.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    event.category.toUpperCase(),
+                                    style: const TextStyle(
+                                      color: EventzoneTheme.primaryAction,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                if (event.isLive) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.redAccent.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.circle, color: Colors.redAccent, size: 5),
+                                        SizedBox(width: 3),
+                                        Text(
+                                          "LIVE",
+                                          style: TextStyle(
+                                            color: Colors.redAccent,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                if (event.isJoined) ...[
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: EventzoneTheme.accentSuccess.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: EventzoneTheme.accentSuccess.withOpacity(0.4),
+                                      ),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          LucideIcons.check,
+                                          size: 10,
+                                          color: EventzoneTheme.accentSuccess,
+                                        ),
+                                        SizedBox(width: 3),
+                                        Text(
+                                          "You're attending",
+                                          style: TextStyle(
+                                            color: EventzoneTheme.accentSuccess,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              event.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(
+                                  LucideIcons.calendar,
+                                  size: 11,
+                                  color: Colors.white54,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    event.date,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (event.location.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    LucideIcons.mapPin,
+                                    size: 11,
+                                    color: Colors.white38,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      event.location,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white38,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(
+                        LucideIcons.chevronRight,
+                        color: Colors.white24,
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
     );
   }
 

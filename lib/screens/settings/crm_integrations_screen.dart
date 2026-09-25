@@ -90,7 +90,6 @@ class CrmIntegrationsScreen extends ConsumerWidget {
                     crm.name,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontFamily: 'SpaceGrotesk',
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
                     ),
@@ -112,7 +111,6 @@ class CrmIntegrationsScreen extends ConsumerWidget {
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 12,
-                          fontFamily: 'SpaceGrotesk',
                         ),
                       ),
                     ],

@@ -11,41 +11,7 @@ void main() {
     );
   }
 
-  // Define replacements
-  final replacements = {
-    '"Error: Not a valid Eventzone Profile QR code."': '"scan_qr_error_invalid_code".tr()',
-    '"Detecting contact alignment..."': '"scan_qr_detecting_alignment".tr()',
-    '"Fetching profile from database..."': '"scan_qr_fetching_profile".tr()',
-    '"You cannot connect with yourself!"': '"scan_qr_error_connect_self".tr()',
-    '"You are already connected with \$existingName!"': '"scan_qr_error_already_connected".tr(args: [existingName])',
-    '"Eventzone User"': '"scan_qr_eventzone_user".tr()',
-    '"\$job at \$comp"': '"scan_qr_job_at_comp".tr(args: [job, comp])',
-    '"Professional at \$comp"': '"scan_qr_professional_at_comp".tr(args: [comp])',
-    '"Attendee"': '"scan_qr_attendee".tr()',
-    '"Error: Eventzone Profile not found in database."': '"scan_qr_error_profile_not_found".tr()',
-    '"Error communicating with database."': '"scan_qr_error_db".tr()',
-    '"Extracting contact fields..."': '"scan_qr_extracting_fields".tr()',
-    '"Structuring connection info..."': '"scan_qr_structuring_info".tr()',
-    '"Verification successful!"': '"scan_qr_verification_success".tr()',
-    '"Added \$name (\$title) to contacts!"': '"scan_qr_added_contact".tr(args: [name, title])',
-    '"Initializing OCR Scanner..."': '"scan_qr_initializing_ocr".tr()',
-    '"Processing image..."': '"scan_qr_processing_image".tr()',
-    '"Finding text blocks..."': '"scan_qr_finding_text".tr()',
-    '"Identifying names & titles..."': '"scan_qr_identifying_names".tr()',
-    '"Parsing emails & numbers..."': '"scan_qr_parsing_emails".tr()',
-    '"Extracting contact metadata..."': '"scan_qr_extracting_metadata".tr()',
-    '"Scan successful!"': '"scan_qr_scan_successful".tr()',
-    '"Processing..."': '"scan_qr_processing".tr()',
-    '"Scan QR to Connect"': '"scan_qr_title".tr()',
-    '"Position QR code within the frame"': '"scan_qr_instruction".tr()',
-    '"Align business card within the frame"': '"scan_qr_align_card".tr()',
-    '"Hold steady..."': '"scan_qr_hold_steady".tr()',
-    '"Tap to capture"': '"scan_qr_tap_capture".tr()',
-    '"QR Code"': '"scan_qr_tab_qr".tr()',
-    '"Business Card"': '"scan_qr_tab_card".tr()',
-    '"Event Badge"': '"scan_qr_tab_badge".tr()'
-  };
-  
+
   // Note: For state variables initialized to strings, `.tr()` requires `BuildContext` 
   // if not using the static way, but `easy_localization`'s `.tr()` extension on `String` works fine without context.
   

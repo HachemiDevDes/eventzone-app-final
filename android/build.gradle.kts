@@ -24,6 +24,11 @@ subprojects {
         sourceCompatibility = "17"
         targetCompatibility = "17"
     }
+    plugins.withId("com.android.library") {
+        extensions.findByType(com.android.build.api.dsl.LibraryExtension::class.java)?.let {
+            it.compileSdk = 36
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

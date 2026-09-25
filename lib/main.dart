@@ -42,6 +42,7 @@ import 'screens/profile_deep_link_handler_screen.dart';
 import 'services/deep_link_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/settings_providers.dart';
+import 'providers/connection_providers.dart';
 import 'screens/settings/language_screen.dart';
 import 'screens/settings/subscription_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
@@ -247,7 +248,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => Scaffold(
           backgroundColor: const Color(0xFF0F121E),
           body: const Center(
-            child: CircularProgressIndicator(color: Color(0xFF7c3aed)),
+            child: CircularProgressIndicator(color: EventzoneTheme.primaryAction),
           ),
         ),
       ),
@@ -403,20 +404,57 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
   List<EventModel> _allEvents = [];
   bool _isLoading = true;
   final _supabaseService = SupabaseService();
+  RealtimeChannel? _eventsChannel;
 
   @override
   void initState() {
     super.initState();
     _loadInitialData();
+    _subscribeToEventsChanges();
+  }
+
+  @override
+  void dispose() {
+    _eventsChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribeToEventsChanges() {
+    _eventsChannel = Supabase.instance.client
+        .channel('public:events_realtime_status')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'events',
+          callback: (payload) {
+            debugPrint('[Events Realtime] Change detected on events table');
+            _loadInitialData();
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
     final events = await _supabaseService.fetchEvents();
+    if (!mounted) return;
     setState(() {
       _allEvents = events;
       _registeredEvents.clear();
       _registeredEvents.addAll(events.where((e) => e.isJoined));
+      
+      // If the currently active event was suspended in admin panel, kick back to global view
+      if (_activeEvent != null && !events.any((e) => e.id == _activeEvent!.id)) {
+        _activeEvent = null;
+        _currentMode = AppViewMode.global;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("This event is suspended and no longer accessible.".tr()),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
       _isLoading = false;
     });
   }
@@ -424,6 +462,36 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
   Future<void> _onRegisterEvent(EventModel event) async {
     if (event.isJoined) {
       _onAccessEvent(event);
+      return;
+    }
+
+    if (event.isPendingApproval) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF141927),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                const Icon(LucideIcons.clock, color: Color(0xFFF59E0B), size: 24),
+                const SizedBox(width: 10),
+                Text("Pending Approval ⏳".tr(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Text(
+              "Your registration application for ${event.title} is currently awaiting organizer approval.".tr(),
+              style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text("Got It".tr(), style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      }
       return;
     }
     
@@ -464,12 +532,27 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
     }
   }
 
-  void _onAccessEvent(EventModel event) {
+  void _onAccessEvent(EventModel event) async {
     setState(() {
       _activeEvent = event;
       _currentMode = AppViewMode.event;
       _eventIndex = 0;
     });
+
+    final isSuspended = await _supabaseService.isEventSuspended(event.id);
+    if (isSuspended) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("This event is suspended and no longer accessible.".tr()),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      _exitEvent();
+      _loadInitialData();
+    }
   }
 
   void _exitEvent() {
@@ -528,6 +611,12 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
         DiscoveryScreen(
           onEventJoined: _onRegisterEvent,
           onAccessEvent: _onAccessEvent,
+          onBrowseEvents: () {
+            setState(() {
+              _globalIndex = 1;
+            });
+          },
+          onRefresh: _loadInitialData,
           events: _allEvents,
         ),
         EventsScreen(
@@ -535,6 +624,7 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
           isLoading: _isLoading,
           onEventJoined: _onRegisterEvent,
           onAccessEvent: _onAccessEvent,
+          onRefresh: _loadInitialData,
         ),
         LeaderboardAnalyticsScreen(),
         MyNetworkScreen(),
@@ -572,6 +662,7 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
                 child: Row(
                   children: [
                     GestureDetector(
+                      behavior: HitTestBehavior.opaque,
                       onTap: isAtDashboard 
                           ? _exitEvent 
                           : () {
@@ -579,57 +670,23 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
                                 _eventIndex = 0;
                               });
                             },
-                      child: Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white10,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white10),
-                        ),
-                        child: Icon(LucideIcons.chevronLeft, color: Colors.white, size: 18),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        child: Icon(LucideIcons.chevronLeft, color: Colors.white, size: 22),
                       ),
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _activeEvent!.title.toUpperCase(),
-                            style: TextStyle(
-                              
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.3,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: Color(0xFF1A73E8), // Electric blue accent
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                isAtDashboard ? "Event Dashboard" : _getEventHubTabTitle(_eventIndex),
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                      child: Text(
+                        _activeEvent!.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -642,30 +699,15 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
     );
   }
 
-  String _getEventHubTabTitle(int index) {
-    switch (index) {
-      case 0: return "Dashboard".tr();
-      case 1: return "My Agenda".tr();
-      case 2: return "Attendee Networking".tr();
-      case 3: return "Event Map".tr();
-      case 4: return "Speakers".tr();
-      case 5: return "Exhibitors".tr();
-      case 6: return "Sponsors".tr();
-      case 7: return "Sessions".tr();
-      case 8: return "Connections".tr();
-      default: return "Event Hub".tr();
-    }
-  }
-
   Widget _buildEventScreen() {
     switch (_eventIndex) {
       case 0: return EventDashboard(event: _activeEvent!, onNavigate: _navigateToEventIndex);
       case 1: return MyAgendaScreen(eventId: _activeEvent!.id);
       case 2: return NetworkingScreen(eventId: _activeEvent!.id);
-      case 3: return MapScreen();
-      case 4: return EventSpeakersScreen();
-      case 5: return EventPartnersScreen(type: "Exhibitors");
-      case 6: return EventPartnersScreen(type: "Sponsors");
+      case 3: return MapScreen(eventId: _activeEvent!.id);
+      case 4: return EventSpeakersScreen(eventId: _activeEvent!.id);
+      case 5: return EventPartnersScreen(eventId: _activeEvent!.id, type: "Exhibitors");
+      case 6: return EventPartnersScreen(eventId: _activeEvent!.id, type: "Sponsors");
       case 7: return EventSessionsScreen(eventId: _activeEvent!.id);
       case 8: return EventConnectionsScreen(eventId: _activeEvent!.id);
       default: return EventDashboard(event: _activeEvent!, onNavigate: _navigateToEventIndex);
@@ -673,6 +715,8 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
   }
 
   Widget _buildBottomBar() {
+    final unreadMessages = ref.watch(unreadMessagesCountProvider).valueOrNull ?? 0;
+
     return Container(
       decoration: BoxDecoration(
         color: EventzoneTheme.backgroundEnd,
@@ -690,14 +734,26 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
             ? [
                 _buildNavItem(LucideIcons.home, "Home".tr(), 0, true),
                 _buildNavItem(LucideIcons.calendar, "Events".tr(), 1, true),
-                _buildNavItem(LucideIcons.trophy, "Leaderboard".tr(), 2, true),
-                _buildNavItem(LucideIcons.users, "Contacts".tr(), 3, true),
+                _buildNavItem(LucideIcons.barChart2, "Analytics".tr(), 2, true),
+                _buildNavItem(
+                  LucideIcons.users,
+                  "My Network".tr(),
+                  3,
+                  true,
+                  showBadge: unreadMessages > 0,
+                ),
                 _buildNavItem(LucideIcons.settings, "Settings".tr(), 4, true),
               ]
             : [
                 _buildNavItem(LucideIcons.layoutDashboard, "Hub".tr(), 0, false),
                 _buildNavItem(LucideIcons.calendarCheck, "My Agenda".tr(), 1, false),
-                _buildNavItem(LucideIcons.users, "Connections".tr(), 8, false),
+                _buildNavItem(
+                  LucideIcons.users,
+                  "Connections".tr(),
+                  8,
+                  false,
+                  showBadge: unreadMessages > 0,
+                ),
                 _buildNavItem(LucideIcons.map, "Map".tr(), 3, false),
               ],
         ),
@@ -707,6 +763,7 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
 
   Widget _buildBarScanButton() {
     return GestureDetector(
+      onLongPress: _showQRMenu,
       onTap: () {
         HapticFeedback.lightImpact();
         final subStatus = ref.read(subscriptionStatusProvider).valueOrNull;
@@ -737,7 +794,13 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index, bool isGlobal) {
+  Widget _buildNavItem(
+    IconData icon,
+    String label,
+    int index,
+    bool isGlobal, {
+    bool showBadge = false,
+  }) {
     final bool isSelected = (isGlobal ? _globalIndex : _eventIndex) == index;
     return InkWell(
       onTap: () {
@@ -755,14 +818,45 @@ class _MainNavigationHolderState extends ConsumerState<MainNavigationHolder> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              color: isSelected ? EventzoneTheme.primaryAction : Colors.white38,
-              size: 20,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  icon,
+                  color: isSelected ? EventzoneTheme.primaryAction : Colors.white38,
+                  size: 20,
+                ),
+                if (showBadge)
+                  Positioned(
+                    top: -1,
+                    right: -3,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: EventzoneTheme.backgroundEnd,
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFEF4444).withValues(alpha: 0.6),
+                            blurRadius: 4,
+                            spreadRadius: 0.5,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            SizedBox(height: 2),
+            const SizedBox(height: 2),
             Text(
               label,
+              maxLines: 1,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: isSelected ? EventzoneTheme.primaryAction : Colors.white38,
                 fontSize: 9,

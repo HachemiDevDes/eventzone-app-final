@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -6,8 +5,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/subscription_expired_bottom_sheet.dart';
-import '../widgets/glass_container.dart';
-import 'my_network_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 

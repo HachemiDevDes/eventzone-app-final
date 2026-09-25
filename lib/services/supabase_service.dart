@@ -1,9 +1,34 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/event_model.dart';
 import '../models/meeting_model.dart';
 import '../models/session_model.dart';
+import '../models/ticket_model.dart';
+import '../models/form_model.dart';
+import '../models/sponsor_model.dart';
+import '../models/exhibitor_model.dart';
+import '../models/floor_plan_model.dart';
+import '../models/connection_request_model.dart';
+
+enum RegistrationStatus { registered, pending, failed }
+
+class RegistrationResult {
+  final RegistrationStatus status;
+  final String? errorMessage;
+  final String? ticketName;
+
+  RegistrationResult({
+    required this.status,
+    this.errorMessage,
+    this.ticketName,
+  });
+
+  bool get isSuccess => status != RegistrationStatus.failed;
+  bool get isPending => status == RegistrationStatus.pending;
+  bool get isRegistered => status == RegistrationStatus.registered;
+}
 
 class SupabaseService {
   final _supabase = Supabase.instance.client;
@@ -13,39 +38,93 @@ class SupabaseService {
     try {
       final currentUserId = _supabase.auth.currentUser?.id;
       if (currentUserId == null) return [];
+      final currentUserEmail = _supabase.auth.currentUser?.email;
       
-      final registrationsResponse = await _supabase
-          .from('event_registrations')
-          .select('event_id')
-          .eq('profile_id', currentUserId);
-      
-      final registeredEventIds = (registrationsResponse as List)
-          .map((reg) => reg['event_id'] as String)
-          .toSet();
+      final Set<String> registeredEventIds = {};
+      final Set<String> pendingEventIds = {};
+
+      try {
+        final registrationsResponse = await _supabase
+            .from('event_registrations')
+            .select('event_id')
+            .eq('profile_id', currentUserId);
+        
+        for (final reg in (registrationsResponse as List)) {
+          if (reg['event_id'] != null) {
+            registeredEventIds.add(reg['event_id'].toString());
+          }
+        }
+      } catch (e) {
+        debugPrint('event_registrations query error: $e');
+      }
+
+      if (currentUserEmail != null && currentUserEmail.isNotEmpty) {
+        try {
+          final participantsRes = await _supabase
+              .from('participants')
+              .select('event_id, status_participation')
+              .ilike('email', currentUserEmail)
+              .neq('status_participation', 'archived');
+          for (final part in (participantsRes as List)) {
+            final eid = part['event_id']?.toString();
+            if (eid != null) {
+              registeredEventIds.add(eid);
+            }
+          }
+        } catch (_) {}
+
+        try {
+          final pendingRes = await _supabase
+              .from('pending_registrations')
+              .select('event_id')
+              .ilike('email', currentUserEmail);
+          for (final pend in (pendingRes as List)) {
+            final eid = pend['event_id']?.toString();
+            if (eid != null && !registeredEventIds.contains(eid)) {
+              pendingEventIds.add(eid);
+            }
+          }
+        } catch (_) {}
+      }
 
       final response = await _supabase
           .from('events')
           .select()
+          .neq('status', 'suspended')
+          .neq('status', 'archived')
           .order('created_at', ascending: false);
       
-      final events = (response as List).map((data) {
-        final id = data['id'] as String;
-        final isJoined = registeredEventIds.contains(id);
-        return EventModel(
-          id: id,
-          title: data['name'] ?? 'Untitled Event',
-          date: data['start_date'] ?? data['date'] ?? 'TBA',
-          location: data['location'] ?? 'Online',
-          category: data['type'] ?? 'EVENT',
-          imageUrl: data['banner'] ?? data['cover_url'] ?? 'https://images.unsplash.com/photo-1540575861501-7cf05a4b125a?w=800&q=80',
-          description: data['description'] ?? '',
-          stats: data['capacity'] != null ? '${data['capacity']} Capacity' : null,
-          startDate: data['start_date'] ?? 'TBA',
-          endDate: data['end_date'] ?? data['start_date'] ?? 'TBA',
-          isJoined: isJoined,
-          isLive: data['is_live'] == true || data['status'] == 'live' || _isEventLiveNow(data['start_date'] ?? data['date'], data['end_date']),
-        );
-      }).toList();
+      final events = (response as List)
+          .where((data) {
+            final status = (data['status'] ?? '').toString().toLowerCase().trim();
+            // Events that are suspended in admin panel or archived must NOT show in mobile app
+            if (status == 'suspended' || status == 'archived' || status == 'cancelled') {
+              return false;
+            }
+            return true;
+          })
+          .map((data) {
+            final id = data['id'] as String;
+            final isRegistered = registeredEventIds.contains(id);
+            final isPending = !isRegistered && pendingEventIds.contains(id);
+            final regStatus = isRegistered ? 'registered' : (isPending ? 'pending' : 'none');
+
+            return EventModel(
+              id: id,
+              title: data['name'] ?? 'Untitled Event',
+              date: data['start_date'] ?? data['date'] ?? 'TBA',
+              location: data['location'] ?? 'Online',
+              category: data['type'] ?? 'EVENT',
+              imageUrl: data['banner'] ?? data['cover_url'] ?? 'https://images.unsplash.com/photo-1540575861501-7cf05a4b125a?w=800&q=80',
+              description: data['description'] ?? '',
+              stats: data['capacity'] != null ? '${data['capacity']} Capacity' : null,
+              startDate: data['start_date'] ?? 'TBA',
+              endDate: data['end_date'] ?? data['start_date'] ?? 'TBA',
+              isJoined: isRegistered,
+              registrationStatus: regStatus,
+              isLive: data['is_live'] == true || data['status'] == 'live' || _isEventLiveNow(data['start_date'] ?? data['date'], data['end_date']),
+            );
+          }).toList();
 
       // Sort events: upcoming closest first, then past events, then TBA
       final now = DateTime.now();
@@ -122,9 +201,31 @@ class SupabaseService {
     return months[month - 1];
   }
 
-  // 📝 Register for an event
+  // 🔍 Check if an event is suspended or inactive
+  Future<bool> isEventSuspended(String eventId) async {
+    try {
+      final res = await _supabase
+          .from('events')
+          .select('status')
+          .eq('id', eventId)
+          .maybeSingle();
+      if (res == null) return false;
+      final status = (res['status'] ?? '').toString().toLowerCase().trim();
+      return status == 'suspended' || status == 'archived' || status == 'cancelled';
+    } catch (e) {
+      debugPrint('Error checking event suspended status: $e');
+      return false;
+    }
+  }
+
+  // 📝 Register for an event (legacy fallback)
   Future<bool> registerForEvent(String eventId, String profileId) async {
     try {
+      if (await isEventSuspended(eventId)) {
+        debugPrint('Cannot register: event is suspended or inactive');
+        return false;
+      }
+
       await _supabase.from('event_registrations').insert({
         'event_id': eventId,
         'profile_id': profileId,
@@ -133,6 +234,596 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Error registering: $e');
       return false;
+    }
+  }
+
+  // 🎟️ Fetch available tickets for an event
+  Future<List<TicketModel>> fetchTickets(String eventId) async {
+    try {
+      final response = await _supabase
+          .from('tickets')
+          .select()
+          .eq('event_id', eventId)
+          .neq('status', 'archived')
+          .order('price', ascending: true);
+      
+      final list = (response as List)
+          .map((data) => TicketModel.fromJson(Map<String, dynamic>.from(data)))
+          .where((t) => t.isActive && t.status != 'archived')
+          .toList();
+      return list;
+    } catch (e) {
+      debugPrint('Error fetching tickets: $e');
+      return [];
+    }
+  }
+
+  // 📋 Fetch registration form for an event or ticket
+  Future<FormModel?> fetchEventForm(String eventId, {String? formId, String? ticketId}) async {
+    try {
+      if (formId != null && formId.isNotEmpty) {
+        final res = await _supabase
+            .from('forms')
+            .select()
+            .eq('id', formId)
+            .maybeSingle();
+        if (res != null) {
+          return FormModel.fromJson(Map<String, dynamic>.from(res));
+        }
+      }
+
+      final response = await _supabase
+          .from('forms')
+          .select()
+          .eq('event_id', eventId)
+          .neq('status', 'archived');
+      
+      final forms = (response as List)
+          .map((data) => FormModel.fromJson(Map<String, dynamic>.from(data)))
+          .toList();
+
+      if (forms.isEmpty) return null;
+
+      if (ticketId != null) {
+        final matching = forms.firstWhere(
+          (f) => f.ticketId == ticketId,
+          orElse: () => forms.firstWhere(
+            (f) => f.ticketId == 'all' || f.ticketId == null,
+            orElse: () => forms.first,
+          ),
+        );
+        return matching;
+      }
+
+      return forms.first;
+    } catch (e) {
+      debugPrint('Error fetching event form: $e');
+      return null;
+    }
+  }
+
+  // Helper: Extract company name from form submissions answers or custom fields
+  String _extractCompanyFromMap(Map<dynamic, dynamic>? answers) {
+    if (answers == null || answers.isEmpty) return '';
+    final direct = answers['company'] ??
+        answers['f_company'] ??
+        answers['organization'] ??
+        answers['f_organization'] ??
+        answers['preset_company'] ??
+        answers['org'] ??
+        answers['org_name'] ??
+        answers['company_name'] ??
+        answers['companyName'];
+    if (direct != null && direct.toString().trim().isNotEmpty) {
+      return direct.toString().trim();
+    }
+    for (final entry in answers.entries) {
+      final k = entry.key.toString().toLowerCase();
+      final v = entry.value;
+      if (v is String && v.trim().isNotEmpty) {
+        if (k.contains('company') || k.contains('societe') || k.contains('entreprise') || k.contains('org')) {
+          return v.trim();
+        }
+      }
+    }
+    return '';
+  }
+
+  // Helper: Extract job title from form submissions answers or custom fields
+  String _extractJobTitleFromMap(Map<dynamic, dynamic>? answers) {
+    if (answers == null || answers.isEmpty) return '';
+    final direct = answers['jobTitle'] ??
+        answers['job_title'] ??
+        answers['f_job_title'] ??
+        answers['headline'] ??
+        answers['function'] ??
+        answers['profession'] ??
+        answers['title'] ??
+        answers['poste'] ??
+        answers['role'];
+    if (direct != null && direct.toString().trim().isNotEmpty) {
+      return direct.toString().trim();
+    }
+    for (final entry in answers.entries) {
+      final k = entry.key.toString().toLowerCase();
+      final v = entry.value;
+      if (v is String && v.trim().isNotEmpty) {
+        if (k.contains('job') ||
+            k.contains('title') ||
+            k.contains('function') ||
+            k.contains('profession') ||
+            k.contains('poste') ||
+            k.contains('role') ||
+            k.contains('fonction')) {
+          return v.trim();
+        }
+      }
+    }
+    return '';
+  }
+
+  // Helper: Build a comprehensive lookup table of participants and their form submission answers
+  Future<Map<String, Map<String, dynamic>>> _fetchParticipantLookup(String eventId) async {
+    final Map<String, Map<String, dynamic>> participantLookup = {};
+    try {
+      final participantsFuture = _supabase
+          .from('participants')
+          .select('id, first_name, last_name, email, phone, ticket_type, is_speaker, image, custom_fields, status_participation')
+          .eq('event_id', eventId);
+
+      final formSubmissionsFuture = _supabase
+          .from('form_submissions')
+          .select('id, respondent_email, answers')
+          .eq('event_id', eventId);
+
+      final results = await Future.wait([
+        participantsFuture.catchError((_) => []),
+        formSubmissionsFuture.catchError((_) => []),
+      ]);
+
+      final participantsList = results[0] as List? ?? [];
+      final formSubsList = results[1] as List? ?? [];
+
+      for (final p in participantsList) {
+        if (p is! Map) continue;
+        final pMap = Map<String, dynamic>.from(p);
+        if (pMap['status_participation']?.toString().toLowerCase() == 'archived') continue;
+        final pId = pMap['id']?.toString() ?? '';
+        final firstName = pMap['first_name']?.toString() ?? '';
+        final lastName = pMap['last_name']?.toString() ?? '';
+        final fullName = "$firstName $lastName".trim();
+        final email = (pMap['email']?.toString() ?? '').toLowerCase().trim();
+
+        // Match form submission for this participant by ID or respondent_email
+        Map<dynamic, dynamic>? subAnswers;
+        for (final sub in formSubsList) {
+          if (sub is! Map) continue;
+          final sId = sub['id']?.toString();
+          final sEmail = (sub['respondent_email']?.toString() ?? '').toLowerCase().trim();
+          if ((pId.isNotEmpty && sId == pId) || (email.isNotEmpty && sEmail == email)) {
+            if (sub['answers'] is Map) {
+              subAnswers = sub['answers'] as Map;
+              break;
+            }
+          }
+        }
+
+        final customFields = pMap['custom_fields'] is Map ? pMap['custom_fields'] as Map : null;
+
+        var comp = _extractCompanyFromMap(subAnswers);
+        if (comp.isEmpty) comp = _extractCompanyFromMap(customFields);
+
+        var job = _extractJobTitleFromMap(subAnswers);
+        if (job.isEmpty) job = _extractJobTitleFromMap(customFields);
+        if (job.isEmpty && pMap['ticket_type'] != null) {
+          job = pMap['ticket_type'].toString().trim();
+        }
+
+        final avatar = pMap['image']?.toString() ?? '';
+
+        final enriched = {
+          'id': pId,
+          'name': fullName,
+          'email': email,
+          'company': comp,
+          'title': job,
+          'avatar': avatar,
+          'is_speaker': pMap['is_speaker'] == true ||
+              (pMap['ticket_type']?.toString().toLowerCase().contains('speaker') ?? false),
+        };
+
+        if (fullName.isNotEmpty) {
+          participantLookup['name:${fullName.toLowerCase()}'] = enriched;
+        }
+        if (email.isNotEmpty) {
+          participantLookup['email:$email'] = enriched;
+        }
+        if (pId.isNotEmpty) {
+          participantLookup['id:$pId'] = enriched;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error building participant lookup: $e');
+    }
+    return participantLookup;
+  }
+
+  Map<String, dynamic>? _matchSpeaker(SessionSpeaker spk, Map<String, Map<String, dynamic>> participantLookup) {
+    if (spk.id != null && participantLookup.containsKey('id:${spk.id}')) {
+      return participantLookup['id:${spk.id}'];
+    }
+    if (spk.email != null && spk.email!.trim().isNotEmpty && participantLookup.containsKey('email:${spk.email!.trim().toLowerCase()}')) {
+      return participantLookup['email:${spk.email!.trim().toLowerCase()}'];
+    }
+    final nameKey = 'name:${spk.name.trim().toLowerCase()}';
+    if (participantLookup.containsKey(nameKey)) {
+      return participantLookup[nameKey];
+    }
+    return null;
+  }
+
+  // ⏱️ Fetch conference agenda / sessions
+  Future<List<SessionModel>> fetchEventSessions(String eventId) async {
+    try {
+      final response = await _supabase
+          .from('sessions')
+          .select()
+          .eq('event_id', eventId)
+          .order('start_time', ascending: true);
+      
+      final sessions = (response as List)
+          .map((data) => SessionModel.fromJson(Map<String, dynamic>.from(data)))
+          .toList();
+
+      // If any session speaker is missing company or title, attempt enrichment
+      final hasIncompleteSpeakers = sessions.any((s) => s.speakers.any((spk) => spk.company.isEmpty || spk.title.isEmpty));
+      if (hasIncompleteSpeakers) {
+        try {
+          final pLookup = await _fetchParticipantLookup(eventId);
+          if (pLookup.isNotEmpty) {
+            return sessions.map((sess) {
+              final enrichedSpeakers = sess.speakers.map((spk) {
+                if (spk.company.isNotEmpty && spk.title.isNotEmpty) return spk;
+                final match = _matchSpeaker(spk, pLookup);
+                if (match != null) {
+                  return spk.copyWith(
+                    company: spk.company.isNotEmpty ? spk.company : (match['company']?.toString() ?? ''),
+                    title: spk.title.isNotEmpty ? spk.title : (match['title']?.toString() ?? ''),
+                    avatarUrl: spk.avatarUrl.isNotEmpty ? spk.avatarUrl : (match['avatar']?.toString() ?? ''),
+                  );
+                }
+                return spk;
+              }).toList();
+              return SessionModel(
+                id: sess.id,
+                eventId: sess.eventId,
+                title: sess.title,
+                description: sess.description,
+                speakerId: sess.speakerId,
+                startTime: sess.startTime,
+                endTime: sess.endTime,
+                location: sess.location,
+                track: sess.track,
+                date: sess.date,
+                speakers: enrichedSpeakers,
+                logos: sess.logos,
+              );
+            }).toList();
+          }
+        } catch (_) {}
+      }
+
+      return sessions;
+    } catch (e) {
+      debugPrint('Error fetching event sessions: $e');
+      return [];
+    }
+  }
+
+  // 🎙️ Fetch unified event speakers (merging sessions, participants, form submissions, and moderators)
+  Future<List<SessionSpeaker>> fetchEventSpeakers(String eventId) async {
+    try {
+      final futures = await Future.wait([
+        fetchEventSessions(eventId),
+        _fetchParticipantLookup(eventId),
+      ]);
+
+      final sessions = futures[0] as List<SessionModel>;
+      final participantLookup = futures[1] as Map<String, Map<String, dynamic>>;
+
+      final Map<String, SessionSpeaker> speakersMap = {};
+
+      // 1. Process speakers from sessions
+      for (final sess in sessions) {
+        for (final spk in sess.speakers) {
+          if (spk.name.trim().isEmpty) continue;
+
+          final nameKey = 'name:${spk.name.trim().toLowerCase()}';
+          final emailKey = spk.email != null && spk.email!.trim().isNotEmpty
+              ? 'email:${spk.email!.trim().toLowerCase()}'
+              : '';
+
+          final uniqueKey = emailKey.isNotEmpty ? emailKey : nameKey;
+          if (!speakersMap.containsKey(uniqueKey)) {
+            speakersMap[uniqueKey] = spk;
+          } else {
+            final existing = speakersMap[uniqueKey]!;
+            speakersMap[uniqueKey] = existing.copyWith(
+              company: existing.company.isNotEmpty ? existing.company : spk.company,
+              title: existing.title.isNotEmpty ? existing.title : spk.title,
+              avatarUrl: existing.avatarUrl.isNotEmpty ? existing.avatarUrl : spk.avatarUrl,
+            );
+          }
+        }
+      }
+
+      // 2. Add marked speakers from participants (even if not yet in a session)
+      for (final p in participantLookup.values) {
+        if (p['is_speaker'] == true) {
+          final pName = p['name']?.toString() ?? '';
+          final pEmail = p['email']?.toString() ?? '';
+          if (pName.trim().isEmpty) continue;
+
+          final nameKey = 'name:${pName.trim().toLowerCase()}';
+          final emailKey = pEmail.isNotEmpty ? 'email:${pEmail.toLowerCase()}' : '';
+          final uniqueKey = emailKey.isNotEmpty ? emailKey : nameKey;
+
+          if (!speakersMap.containsKey(uniqueKey)) {
+            speakersMap[uniqueKey] = SessionSpeaker(
+              id: p['id']?.toString(),
+              name: pName,
+              title: p['title']?.toString() ?? '',
+              company: p['company']?.toString() ?? '',
+              avatarUrl: p['avatar']?.toString() ?? '',
+              email: pEmail.isNotEmpty ? pEmail : null,
+              role: 'Speaker',
+            );
+          } else {
+            final existing = speakersMap[uniqueKey]!;
+            speakersMap[uniqueKey] = existing.copyWith(
+              company: existing.company.isNotEmpty ? existing.company : (p['company']?.toString() ?? ''),
+              title: existing.title.isNotEmpty ? existing.title : (p['title']?.toString() ?? ''),
+              avatarUrl: existing.avatarUrl.isNotEmpty ? existing.avatarUrl : (p['avatar']?.toString() ?? ''),
+            );
+          }
+        }
+      }
+
+      return speakersMap.values.toList();
+    } catch (e) {
+      debugPrint('Error fetching event speakers: $e');
+      return [];
+    }
+  }
+
+  // 🤝 Fetch event sponsors
+  Future<List<SponsorModel>> fetchEventSponsors(String eventId) async {
+    try {
+      final response = await _supabase
+          .from('sponsors')
+          .select()
+          .eq('event_id', eventId)
+          .order('created_at', ascending: true);
+      
+      final list = (response as List);
+      return list
+          .where((data) => (data['status']?.toString().toLowerCase() != 'archived'))
+          .map((data) => SponsorModel.fromJson(Map<String, dynamic>.from(data)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching event sponsors: $e');
+      return [];
+    }
+  }
+
+  // 🏢 Fetch event exhibitors
+  Future<List<ExhibitorModel>> fetchEventExhibitors(String eventId) async {
+    try {
+      final response = await _supabase
+          .from('exhibitors')
+          .select()
+          .eq('event_id', eventId)
+          .order('created_at', ascending: true);
+      
+      final list = (response as List);
+      return list
+          .where((data) => (data['status']?.toString().toLowerCase() != 'archived'))
+          .map((data) => ExhibitorModel.fromJson(Map<String, dynamic>.from(data)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching event exhibitors: $e');
+      return [];
+    }
+  }
+
+  // 🗺️ Fetch floor plans for an event
+  Future<List<FloorPlanModel>> fetchEventFloorPlans(String eventId) async {
+    try {
+      final response = await _supabase
+          .from('floor_plans')
+          .select()
+          .eq('event_id', eventId)
+          .neq('status', 'archived')
+          .order('created_at', ascending: true);
+
+      return (response as List)
+          .map((data) => FloorPlanModel.fromJson(Map<String, dynamic>.from(data)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching event floor plans: $e');
+      return [];
+    }
+  }
+
+  // 🔍 Check event registration status for current user ('registered', 'pending', 'none')
+  Future<String> checkEventRegistrationStatus(String eventId, String profileId, String? email) async {
+    try {
+      // 1. Direct registration table check
+      final regRes = await _supabase
+          .from('event_registrations')
+          .select('id')
+          .eq('event_id', eventId)
+          .eq('profile_id', profileId)
+          .maybeSingle();
+      if (regRes != null) return 'registered';
+
+      if (email != null && email.isNotEmpty) {
+        final cleanEmail = email.trim().toLowerCase();
+
+        // 2. Participants check
+        final partRes = await _supabase
+            .from('participants')
+            .select('id, status_participation')
+            .eq('event_id', eventId)
+            .ilike('email', cleanEmail)
+            .neq('status_participation', 'archived')
+            .maybeSingle();
+        if (partRes != null) return 'registered';
+
+        // 3. Pending registrations check
+        final pendRes = await _supabase
+            .from('pending_registrations')
+            .select('id')
+            .eq('event_id', eventId)
+            .ilike('email', cleanEmail)
+            .maybeSingle();
+        if (pendRes != null) return 'pending';
+      }
+
+      return 'none';
+    } catch (e) {
+      debugPrint('Error checking registration status: $e');
+      return 'none';
+    }
+  }
+
+  // 🎟️ Register with ticket tier (Instant or Approval mode)
+  Future<RegistrationResult> registerWithTicket({
+    required String eventId,
+    required TicketModel ticket,
+    required String profileId,
+    required String fullName,
+    required String email,
+    String? phone,
+    String? company,
+    String? jobTitle,
+    Map<String, dynamic>? customAnswers,
+  }) async {
+    try {
+      if (await isEventSuspended(eventId)) {
+        return RegistrationResult(
+          status: RegistrationStatus.failed,
+          errorMessage: 'Cannot register: Event is inactive or suspended.',
+        );
+      }
+
+      final cleanEmail = email.trim().toLowerCase();
+      final cleanPhone = phone?.trim() ?? '';
+      final cleanName = fullName.trim();
+      final nameParts = cleanName.split(' ');
+      final firstName = nameParts.first;
+      final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : 'Attendee';
+
+      final existingStatus = await checkEventRegistrationStatus(eventId, profileId, cleanEmail);
+      if (existingStatus == 'registered') {
+        return RegistrationResult(
+          status: RegistrationStatus.registered,
+          errorMessage: 'You are already registered for this event.',
+          ticketName: ticket.name,
+        );
+      } else if (existingStatus == 'pending') {
+        return RegistrationResult(
+          status: RegistrationStatus.pending,
+          errorMessage: 'Your registration application is already pending organizer review.',
+          ticketName: ticket.name,
+        );
+      }
+
+      final dateStr = DateTime.now().toIso8601String().split('T').first;
+
+      // ── IF APPROVAL REQUIRED ──
+      if (ticket.requiresApproval) {
+        final notePayload = jsonEncode({
+          'ticketType': ticket.name,
+          'note': 'Applied for ${ticket.name} (Pending Approval)',
+          'company': company ?? '',
+          'jobTitle': jobTitle ?? '',
+          'phone': cleanPhone,
+          'answers': customAnswers ?? {},
+        });
+
+        await _supabase.from('pending_registrations').insert({
+          'event_id': eventId,
+          'name': cleanName,
+          'email': cleanEmail,
+          'note': notePayload,
+          'date': dateStr,
+        });
+
+        if (customAnswers != null && customAnswers.isNotEmpty) {
+          try {
+            await _supabase.from('form_submissions').insert({
+              'event_id': eventId,
+              'respondent_name': cleanName,
+              'respondent_email': cleanEmail,
+              'ticket_tier': ticket.name,
+              'answers': customAnswers,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          } catch (_) {}
+        }
+
+        return RegistrationResult(
+          status: RegistrationStatus.pending,
+          ticketName: ticket.name,
+        );
+      }
+
+      // ── IF DIRECT ACCEPTANCE ──
+      try {
+        await _supabase.from('participants').insert({
+          'event_id': eventId,
+          'first_name': firstName,
+          'last_name': lastName,
+          'email': cleanEmail,
+          'phone': cleanPhone,
+          'ticket_type': ticket.name,
+          'status_participation': 'registered',
+          'registered_at': DateTime.now().toIso8601String(),
+          'custom_fields': customAnswers ?? {},
+        });
+      } catch (e) {
+        debugPrint('Participant insert note: $e');
+      }
+
+      await _supabase.from('event_registrations').insert({
+        'event_id': eventId,
+        'profile_id': profileId,
+      });
+
+      if (customAnswers != null && customAnswers.isNotEmpty) {
+        try {
+          await _supabase.from('form_submissions').insert({
+            'event_id': eventId,
+            'respondent_name': cleanName,
+            'respondent_email': cleanEmail,
+            'ticket_tier': ticket.name,
+            'answers': customAnswers,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        } catch (_) {}
+      }
+
+      return RegistrationResult(
+        status: RegistrationStatus.registered,
+        ticketName: ticket.name,
+      );
+    } catch (e) {
+      debugPrint('Error registering with ticket: $e');
+      return RegistrationResult(
+        status: RegistrationStatus.failed,
+        errorMessage: e.toString(),
+      );
     }
   }
 
@@ -228,7 +919,7 @@ class SupabaseService {
     }
   }
 
-  // 🤝 Fetch connections/leads
+  // 🤝 Fetch connections/leads (active contacts only)
   Future<List<Map<String, dynamic>>> fetchConnections(String userId) async {
     try {
       final response = await _supabase
@@ -236,7 +927,8 @@ class SupabaseService {
           .select()
           .eq('user_id', userId)
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response);
+      final list = List<Map<String, dynamic>>.from(response);
+      return list.where((item) => item['status'] != 'pending').toList();
     } catch (e) {
       debugPrint('Error fetching connections: $e');
       return [];
@@ -248,11 +940,12 @@ class SupabaseService {
     try {
       final response = await _supabase
           .from('connections')
-          .select('created_at')
+          .select('created_at, status')
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
-      final List data = response as List;
+      final List rawData = response as List;
+      final data = rawData.where((item) => item['status'] != 'pending').toList();
       if (data.isEmpty) return 0;
 
       // Extract unique dates (ignoring time)
@@ -355,27 +1048,17 @@ class SupabaseService {
     }
   }
 
-  // 🤝 Connect directly (bypasses requests)
+  // 🤝 Connect directly (bypasses requests / accepts mutual connection)
   Future<bool> connectDirectly(String targetUserId) async {
     try {
       final currentUserId = _supabase.auth.currentUser?.id;
-      if (currentUserId == null) return false;
+      if (currentUserId == null || currentUserId == targetUserId) return false;
 
       // Check active subscription first!
       final hasSub = await hasActiveSubscription(currentUserId);
       if (!hasSub) {
         return false;
       }
-
-      // Check if already connected
-      final existingConn = await _supabase
-          .from('connections')
-          .select('id')
-          .eq('user_id', currentUserId)
-          .eq('linked_profile_id', targetUserId)
-          .maybeSingle();
-
-      if (existingConn != null) return true;
 
       // 1. Fetch sender profile
       final senderProfile = await _supabase
@@ -395,10 +1078,16 @@ class SupabaseService {
         final senderMeta = senderProfile['metadata'] as Map<String, dynamic>? ?? {};
         final receiverMeta = receiverProfile['metadata'] as Map<String, dynamic>? ?? {};
 
-        // Insert receiver into sender's connections
-        try {
-          await _supabase.from('connections').insert({
-            'user_id': currentUserId,
+        // Upsert/Insert receiver into sender's connections
+        final existingSenderConn = await _supabase
+            .from('connections')
+            .select('id')
+            .eq('user_id', currentUserId)
+            .or('connected_user_id.eq.$targetUserId,linked_profile_id.eq.$targetUserId')
+            .maybeSingle();
+
+        if (existingSenderConn != null) {
+          await _supabase.from('connections').update({
             'name': receiverProfile['full_name'] ?? 'Attendee',
             'title': receiverProfile['job_title'] ?? '',
             'avatar_url': receiverProfile['avatar_url'] ?? '',
@@ -409,15 +1098,41 @@ class SupabaseService {
             'address': receiverProfile['address'] ?? receiverMeta['address'] ?? '',
             'tags': receiverProfile['interests'] ?? [],
             'source': 'B2B Connection',
+            'status': 'connected',
+            'pipeline_stage': 'lead',
             'is_new': true,
-            'linked_profile_id': targetUserId,
-          });
-        } catch (_) {}
-
-        // Insert sender into receiver's connections
-        try {
+          }).eq('id', existingSenderConn['id']);
+        } else {
           await _supabase.from('connections').insert({
-            'user_id': targetUserId,
+            'user_id': currentUserId,
+            'connected_user_id': targetUserId,
+            'linked_profile_id': targetUserId,
+            'name': receiverProfile['full_name'] ?? 'Attendee',
+            'title': receiverProfile['job_title'] ?? '',
+            'avatar_url': receiverProfile['avatar_url'] ?? '',
+            'company': receiverProfile['company_name'] ?? '',
+            'email': receiverProfile['email'] ?? receiverMeta['email'] ?? '',
+            'phone': receiverProfile['phone'] ?? receiverMeta['phone'] ?? '',
+            'website': receiverProfile['website'] ?? receiverMeta['website'] ?? '',
+            'address': receiverProfile['address'] ?? receiverMeta['address'] ?? '',
+            'tags': receiverProfile['interests'] ?? [],
+            'source': 'B2B Connection',
+            'status': 'connected',
+            'pipeline_stage': 'lead',
+            'is_new': true,
+          });
+        }
+
+        // Upsert/Insert sender into receiver's connections
+        final existingReceiverConn = await _supabase
+            .from('connections')
+            .select('id')
+            .eq('user_id', targetUserId)
+            .or('connected_user_id.eq.$currentUserId,linked_profile_id.eq.$currentUserId')
+            .maybeSingle();
+
+        if (existingReceiverConn != null) {
+          await _supabase.from('connections').update({
             'name': senderProfile['full_name'] ?? 'Attendee',
             'title': senderProfile['job_title'] ?? '',
             'avatar_url': senderProfile['avatar_url'] ?? '',
@@ -428,14 +1143,383 @@ class SupabaseService {
             'address': senderProfile['address'] ?? senderMeta['address'] ?? '',
             'tags': senderProfile['interests'] ?? [],
             'source': 'B2B Connection',
+            'status': 'connected',
+            'pipeline_stage': 'lead',
             'is_new': true,
+          }).eq('id', existingReceiverConn['id']);
+        } else {
+          await _supabase.from('connections').insert({
+            'user_id': targetUserId,
+            'connected_user_id': currentUserId,
             'linked_profile_id': currentUserId,
+            'name': senderProfile['full_name'] ?? 'Attendee',
+            'title': senderProfile['job_title'] ?? '',
+            'avatar_url': senderProfile['avatar_url'] ?? '',
+            'company': senderProfile['company_name'] ?? '',
+            'email': senderProfile['email'] ?? senderMeta['email'] ?? '',
+            'phone': senderProfile['phone'] ?? senderMeta['phone'] ?? '',
+            'website': senderProfile['website'] ?? senderMeta['website'] ?? '',
+            'address': senderProfile['address'] ?? senderMeta['address'] ?? '',
+            'tags': senderProfile['interests'] ?? [],
+            'source': 'B2B Connection',
+            'status': 'connected',
+            'pipeline_stage': 'lead',
+            'is_new': true,
           });
-        } catch (_) {}
+        }
       }
       return true;
     } catch (e) {
       debugPrint('Error connecting directly: $e');
+      return false;
+    }
+  }
+
+  // 🤝 Send connection request
+  Future<bool> sendConnectionRequest(
+    String targetUserId, {
+    String? message,
+    String? eventId,
+  }) async {
+    try {
+      final currentUserId = _supabase.auth.currentUser?.id;
+      if (currentUserId == null || currentUserId == targetUserId) return false;
+
+      // Check current connection status
+      final currentStatus = await fetchConnectionStatus(targetUserId);
+      if (currentStatus == 'accepted') {
+        return true; // Already connected
+      }
+
+      // If target user already sent a pending request to us, auto-accept it!
+      if (currentStatus == 'pending_received') {
+        final incoming = await _supabase
+            .from('connections')
+            .select('id')
+            .eq('user_id', targetUserId)
+            .or('connected_user_id.eq.$currentUserId,linked_profile_id.eq.$currentUserId')
+            .eq('status', 'pending')
+            .maybeSingle();
+
+        if (incoming != null) {
+          return await acceptConnectionRequest(incoming['id'] as String, targetUserId);
+        }
+      }
+
+      // If already sent pending request, return true
+      if (currentStatus == 'pending_sent') {
+        return true;
+      }
+
+      // Fetch sender and receiver profiles
+      final senderProfile = await _supabase
+          .from('profiles')
+          .select()
+          .eq('id', currentUserId)
+          .maybeSingle();
+
+      final receiverProfile = await _supabase
+          .from('profiles')
+          .select()
+          .eq('id', targetUserId)
+          .maybeSingle();
+
+      final senderMeta = senderProfile != null ? (senderProfile['metadata'] as Map<String, dynamic>? ?? {}) : {};
+      final receiverMeta = receiverProfile != null ? (receiverProfile['metadata'] as Map<String, dynamic>? ?? {}) : {};
+
+      final now = DateTime.now().toUtc().toIso8601String();
+      final notesMap = {
+        'event_id': eventId,
+        'sender_id': currentUserId,
+        'sender_email': senderProfile?['email'] ?? senderMeta['email'] ?? '',
+        'sender_name': senderProfile?['full_name'] ?? 'Attendee',
+        'sender_avatar': senderProfile?['avatar_url'] ?? '',
+        'sender_company': senderProfile?['company_name'] ?? '',
+        'sender_title': senderProfile?['job_title'] ?? '',
+        'recipient_id': targetUserId,
+        'recipient_email': receiverProfile?['email'] ?? receiverMeta['email'] ?? '',
+        'recipient_name': receiverProfile?['full_name'] ?? 'Attendee',
+        'recipient_avatar': receiverProfile?['avatar_url'] ?? '',
+        'recipient_company': receiverProfile?['company_name'] ?? '',
+        'recipient_title': receiverProfile?['job_title'] ?? '',
+        'status': 'pending',
+        'message': message ?? '',
+        'created_at': now,
+        'updated_at': now,
+      };
+
+      // Check if an existing row already exists from current user
+      final existingSent = await _supabase
+          .from('connections')
+          .select('id')
+          .eq('user_id', currentUserId)
+          .or('connected_user_id.eq.$targetUserId,linked_profile_id.eq.$targetUserId')
+          .maybeSingle();
+
+      if (existingSent != null) {
+        await _supabase.from('connections').update({
+          'connected_user_id': targetUserId,
+          'linked_profile_id': targetUserId,
+          'event_id': eventId,
+          'name': receiverProfile?['full_name'] ?? 'Attendee',
+          'title': receiverProfile?['job_title'] ?? '',
+          'avatar_url': receiverProfile?['avatar_url'] ?? '',
+          'company': receiverProfile?['company_name'] ?? '',
+          'email': receiverProfile?['email'] ?? receiverMeta['email'] ?? '',
+          'phone': receiverProfile?['phone'] ?? receiverMeta['phone'] ?? '',
+          'website': receiverProfile?['website'] ?? receiverMeta['website'] ?? '',
+          'address': receiverProfile?['address'] ?? receiverMeta['address'] ?? '',
+          'tags': receiverProfile?['interests'] ?? [],
+          'source': 'In-App Request',
+          'is_new': true,
+          'status': 'pending',
+          'notes': jsonEncode(notesMap),
+        }).eq('id', existingSent['id']);
+      } else {
+        await _supabase.from('connections').insert({
+          'user_id': currentUserId,
+          'connected_user_id': targetUserId,
+          'linked_profile_id': targetUserId,
+          'event_id': eventId,
+          'name': receiverProfile?['full_name'] ?? 'Attendee',
+          'title': receiverProfile?['job_title'] ?? '',
+          'avatar_url': receiverProfile?['avatar_url'] ?? '',
+          'company': receiverProfile?['company_name'] ?? '',
+          'email': receiverProfile?['email'] ?? receiverMeta['email'] ?? '',
+          'phone': receiverProfile?['phone'] ?? receiverMeta['phone'] ?? '',
+          'website': receiverProfile?['website'] ?? receiverMeta['website'] ?? '',
+          'address': receiverProfile?['address'] ?? receiverMeta['address'] ?? '',
+          'tags': receiverProfile?['interests'] ?? [],
+          'source': 'In-App Request',
+          'is_new': true,
+          'status': 'pending',
+          'notes': jsonEncode(notesMap),
+        });
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error sending connection request: $e');
+      return false;
+    }
+  }
+
+  // 📥 Fetch incoming connection requests for current user
+  Future<List<ConnectionRequestModel>> fetchIncomingConnectionRequests() async {
+    try {
+      final currentUserId = _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return [];
+
+      final response = await _supabase
+          .from('connections')
+          .select()
+          .or('connected_user_id.eq.$currentUserId,linked_profile_id.eq.$currentUserId')
+          .neq('user_id', currentUserId)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+
+      final rawList = List<Map<String, dynamic>>.from(response);
+      if (rawList.isEmpty) return [];
+
+      // Fetch latest profile details for senders
+      final senderIds = rawList
+          .map((r) => r['user_id']?.toString())
+          .whereType<String>()
+          .toSet()
+          .toList();
+
+      Map<String, Map<String, dynamic>> profilesMap = {};
+      if (senderIds.isNotEmpty) {
+        try {
+          final profilesRes = await _supabase
+              .from('profiles')
+              .select()
+              .inFilter('id', senderIds);
+          for (var p in profilesRes) {
+            profilesMap[p['id'].toString()] = Map<String, dynamic>.from(p);
+          }
+        } catch (e) {
+          debugPrint('Error fetching sender profiles: $e');
+        }
+      }
+
+      return rawList.map((item) {
+        final senderId = item['user_id']?.toString();
+        final map = Map<String, dynamic>.from(item);
+        if (senderId != null && profilesMap.containsKey(senderId)) {
+          map['sender_profile'] = profilesMap[senderId];
+        }
+        return ConnectionRequestModel.fromJson(map);
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching incoming connection requests: $e');
+      return [];
+    }
+  }
+
+  // 📤 Fetch outgoing / sent connection requests from current user
+  Future<List<ConnectionRequestModel>> fetchSentConnectionRequests() async {
+    try {
+      final currentUserId = _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return [];
+
+      final response = await _supabase
+          .from('connections')
+          .select()
+          .eq('user_id', currentUserId)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+
+      final rawList = List<Map<String, dynamic>>.from(response);
+      if (rawList.isEmpty) return [];
+
+      // Fetch recipient profiles
+      final recipientIds = rawList
+          .map((r) => (r['connected_user_id'] ?? r['linked_profile_id'])?.toString())
+          .whereType<String>()
+          .toSet()
+          .toList();
+
+      Map<String, Map<String, dynamic>> profilesMap = {};
+      if (recipientIds.isNotEmpty) {
+        try {
+          final profilesRes = await _supabase
+              .from('profiles')
+              .select()
+              .inFilter('id', recipientIds);
+          for (var p in profilesRes) {
+            profilesMap[p['id'].toString()] = Map<String, dynamic>.from(p);
+          }
+        } catch (e) {
+          debugPrint('Error fetching recipient profiles: $e');
+        }
+      }
+
+      return rawList.map((item) {
+        final recipientId = (item['connected_user_id'] ?? item['linked_profile_id'])?.toString();
+        final map = Map<String, dynamic>.from(item);
+        if (recipientId != null && profilesMap.containsKey(recipientId)) {
+          map['receiver_profile'] = profilesMap[recipientId];
+        }
+        return ConnectionRequestModel.fromJson(map);
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching sent connection requests: $e');
+      return [];
+    }
+  }
+
+  // ✅ Accept connection request and mutually add to both users' contacts lists
+  Future<bool> acceptConnectionRequest(String requestId, String senderId) async {
+    try {
+      final currentUserId = _supabase.auth.currentUser?.id;
+      if (currentUserId == null) return false;
+
+      // 1. Fetch both profiles to populate all fields accurately
+      final senderProfile = await _supabase
+          .from('profiles')
+          .select()
+          .eq('id', senderId)
+          .maybeSingle();
+
+      final currentProfile = await _supabase
+          .from('profiles')
+          .select()
+          .eq('id', currentUserId)
+          .maybeSingle();
+
+      final senderMeta = senderProfile != null ? (senderProfile['metadata'] as Map<String, dynamic>? ?? {}) : {};
+      final currentMeta = currentProfile != null ? (currentProfile['metadata'] as Map<String, dynamic>? ?? {}) : {};
+
+      // 2. Update the original request row to 'connected' with fresh receiver details
+      await _supabase.from('connections').update({
+        'status': 'connected',
+        'pipeline_stage': 'lead',
+        'is_new': true,
+        'name': currentProfile?['full_name'] ?? 'Attendee',
+        'title': currentProfile?['job_title'] ?? '',
+        'avatar_url': currentProfile?['avatar_url'] ?? '',
+        'company': currentProfile?['company_name'] ?? '',
+        'email': currentProfile?['email'] ?? currentMeta['email'] ?? '',
+        'phone': currentProfile?['phone'] ?? currentMeta['phone'] ?? '',
+        'website': currentProfile?['website'] ?? currentMeta['website'] ?? '',
+        'address': currentProfile?['address'] ?? currentMeta['address'] ?? '',
+        'tags': currentProfile?['interests'] ?? [],
+        'source': 'B2B Connection',
+      }).eq('id', requestId);
+
+      // 3. Ensure reciprocal row exists for current user (currentUserId -> senderId)
+      final existingReciprocal = await _supabase
+          .from('connections')
+          .select('id')
+          .eq('user_id', currentUserId)
+          .or('connected_user_id.eq.$senderId,linked_profile_id.eq.$senderId')
+          .maybeSingle();
+
+      if (existingReciprocal != null) {
+        await _supabase.from('connections').update({
+          'status': 'connected',
+          'pipeline_stage': 'lead',
+          'connected_user_id': senderId,
+          'linked_profile_id': senderId,
+          'name': senderProfile?['full_name'] ?? 'Attendee',
+          'title': senderProfile?['job_title'] ?? '',
+          'avatar_url': senderProfile?['avatar_url'] ?? '',
+          'company': senderProfile?['company_name'] ?? '',
+          'email': senderProfile?['email'] ?? senderMeta['email'] ?? '',
+          'phone': senderProfile?['phone'] ?? senderMeta['phone'] ?? '',
+          'website': senderProfile?['website'] ?? senderMeta['website'] ?? '',
+          'address': senderProfile?['address'] ?? senderMeta['address'] ?? '',
+          'tags': senderProfile?['interests'] ?? [],
+          'source': 'B2B Connection',
+          'is_new': true,
+        }).eq('id', existingReciprocal['id']);
+      } else {
+        await _supabase.from('connections').insert({
+          'user_id': currentUserId,
+          'connected_user_id': senderId,
+          'linked_profile_id': senderId,
+          'name': senderProfile?['full_name'] ?? 'Attendee',
+          'title': senderProfile?['job_title'] ?? '',
+          'avatar_url': senderProfile?['avatar_url'] ?? '',
+          'company': senderProfile?['company_name'] ?? '',
+          'email': senderProfile?['email'] ?? senderMeta['email'] ?? '',
+          'phone': senderProfile?['phone'] ?? senderMeta['phone'] ?? '',
+          'website': senderProfile?['website'] ?? senderMeta['website'] ?? '',
+          'address': senderProfile?['address'] ?? senderMeta['address'] ?? '',
+          'tags': senderProfile?['interests'] ?? [],
+          'source': 'B2B Connection',
+          'status': 'connected',
+          'pipeline_stage': 'lead',
+          'is_new': true,
+        });
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error accepting connection request: $e');
+      return false;
+    }
+  }
+
+  // ❌ Decline connection request
+  Future<bool> declineConnectionRequest(String requestId) async {
+    try {
+      await _supabase.from('connections').delete().eq('id', requestId);
+      return true;
+    } catch (e) {
+      debugPrint('Error declining connection request: $e');
+      return false;
+    }
+  }
+
+  // 🚫 Cancel sent connection request
+  Future<bool> cancelSentConnectionRequest(String requestId) async {
+    try {
+      await _supabase.from('connections').delete().eq('id', requestId);
+      return true;
+    } catch (e) {
+      debugPrint('Error cancelling sent connection request: $e');
       return false;
     }
   }
@@ -446,15 +1530,19 @@ class SupabaseService {
       final currentUserId = _supabase.auth.currentUser?.id;
       if (currentUserId == null) return [];
       
-      // 1. Fetch all connections for current user
+      // 1. Fetch all active connections for current user
       final connections = await _supabase
           .from('connections')
-          .select('linked_profile_id')
-          .eq('user_id', currentUserId)
-          .not('linked_profile_id', 'is', null);
+          .select('linked_profile_id, connected_user_id, status')
+          .eq('user_id', currentUserId);
           
-      final connectionIds = (connections as List)
-          .map((c) => c['linked_profile_id'] as String)
+      final activeConnections = (connections as List)
+          .where((c) => c['status'] != 'pending')
+          .toList();
+
+      final connectionIds = activeConnections
+          .map((c) => (c['linked_profile_id'] ?? c['connected_user_id']) as String?)
+          .whereType<String>()
           .toSet()
           .toList();
 
@@ -484,28 +1572,197 @@ class SupabaseService {
   }
 
   // 🤝 Fetch connection status between current user and target user
+  // Returns: 'accepted' | 'pending_sent' | 'pending_received' | 'none'
   Future<String> fetchConnectionStatus(String targetUserId) async {
     try {
       final currentUserId = _supabase.auth.currentUser?.id;
       if (currentUserId == null) return 'none';
       if (currentUserId == targetUserId) return 'accepted'; // Self is always accepted/fully visible
 
-      // 1. Check if an active connection already exists in the connections table
-      final existingConn = await _supabase
+      // 1. Check current user's connection row with target user
+      final myConn = await _supabase
           .from('connections')
-          .select('id')
+          .select('id, status')
           .eq('user_id', currentUserId)
-          .eq('linked_profile_id', targetUserId)
+          .or('connected_user_id.eq.$targetUserId,linked_profile_id.eq.$targetUserId')
           .maybeSingle();
 
-      if (existingConn != null) {
-        return 'accepted';
+      if (myConn != null) {
+        final status = myConn['status'] as String?;
+        if (status == 'connected' || status == 'accepted' || status == null) {
+          return 'accepted';
+        } else if (status == 'pending') {
+          return 'pending_sent';
+        }
+      }
+
+      // 2. Check reciprocal connection row (from target user to current user)
+      final targetConn = await _supabase
+          .from('connections')
+          .select('id, status')
+          .eq('user_id', targetUserId)
+          .or('connected_user_id.eq.$currentUserId,linked_profile_id.eq.$currentUserId')
+          .maybeSingle();
+
+      if (targetConn != null) {
+        final status = targetConn['status'] as String?;
+        if (status == 'connected' || status == 'accepted' || status == null) {
+          return 'accepted';
+        } else if (status == 'pending') {
+          return 'pending_received';
+        }
       }
 
       return 'none';
     } catch (e) {
       debugPrint('Error fetching connection status: $e');
       return 'none';
+    }
+  }
+
+  // 🎟️ Fetch upcoming and live events that a specific user is registered in and attending
+  Future<List<EventModel>> fetchAttendingEventsForUser(String userId) async {
+    try {
+      final Set<String> registeredEventIds = {};
+
+      // 1. Check event_registrations by profile_id
+      try {
+        final regRes = await _supabase
+            .from('event_registrations')
+            .select('event_id')
+            .eq('profile_id', userId);
+        for (final row in (regRes as List)) {
+          if (row['event_id'] != null) {
+            registeredEventIds.add(row['event_id'].toString());
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching event_registrations for user: $e');
+      }
+
+      // 2. Also check participants by user email from profile
+      try {
+        final profileRes = await _supabase
+            .from('profiles')
+            .select('email, metadata')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (profileRes != null) {
+          final meta = profileRes['metadata'] as Map<String, dynamic>? ?? {};
+          final email = (profileRes['email'] ?? meta['email'])?.toString().trim();
+          if (email != null && email.isNotEmpty) {
+            final partRes = await _supabase
+                .from('participants')
+                .select('event_id, status_participation')
+                .ilike('email', email)
+                .neq('status_participation', 'archived');
+            for (final row in (partRes as List)) {
+              if (row['event_id'] != null) {
+                registeredEventIds.add(row['event_id'].toString());
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching participants for user: $e');
+      }
+
+      if (registeredEventIds.isEmpty) return [];
+
+      // 3. Fetch the event records
+      final eventsRes = await _supabase
+          .from('events')
+          .select()
+          .inFilter('id', registeredEventIds.toList())
+          .neq('status', 'suspended')
+          .neq('status', 'archived')
+          .neq('status', 'cancelled');
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      // Check current user's registrations to know if current user is also attending
+      final currentUserId = _supabase.auth.currentUser?.id;
+      final currentUserEmail = _supabase.auth.currentUser?.email;
+      final Set<String> myEventIds = {};
+      if (currentUserId != null) {
+        try {
+          final myRegs = await _supabase
+              .from('event_registrations')
+              .select('event_id')
+              .eq('profile_id', currentUserId);
+          for (var r in (myRegs as List)) {
+            if (r['event_id'] != null) myEventIds.add(r['event_id'].toString());
+          }
+          if (currentUserEmail != null && currentUserEmail.isNotEmpty) {
+            final myParts = await _supabase
+                .from('participants')
+                .select('event_id')
+                .ilike('email', currentUserEmail)
+                .neq('status_participation', 'archived');
+            for (var r in (myParts as List)) {
+              if (r['event_id'] != null) myEventIds.add(r['event_id'].toString());
+            }
+          }
+        } catch (_) {}
+      }
+
+      final events = (eventsRes as List)
+          .where((data) {
+            final status = (data['status'] ?? '').toString().toLowerCase().trim();
+            if (status == 'suspended' || status == 'archived' || status == 'cancelled') {
+              return false;
+            }
+            return true;
+          })
+          .map((data) {
+            final id = data['id'] as String;
+            final isLive = data['is_live'] == true ||
+                data['status'] == 'live' ||
+                _isEventLiveNow(data['start_date'] ?? data['date'], data['end_date']);
+
+            final isViewerAlsoAttending = myEventIds.contains(id);
+
+            return EventModel(
+              id: id,
+              title: data['name'] ?? 'Untitled Event',
+              date: data['start_date'] ?? data['date'] ?? 'TBA',
+              location: data['location'] ?? 'Online',
+              category: data['type'] ?? 'EVENT',
+              imageUrl: data['banner'] ?? data['cover_url'] ?? 'https://images.unsplash.com/photo-1540575861501-7cf05a4b125a?w=800&q=80',
+              description: data['description'] ?? '',
+              stats: data['capacity'] != null ? '${data['capacity']} Capacity' : null,
+              startDate: data['start_date'] ?? 'TBA',
+              endDate: data['end_date'] ?? data['start_date'] ?? 'TBA',
+              isJoined: isViewerAlsoAttending,
+              registrationStatus: isViewerAlsoAttending ? 'registered' : 'none',
+              isLive: isLive,
+            );
+          })
+          .where((event) {
+            if (event.isLive) return true;
+            final endDate = DateTime.tryParse(event.endDate) ?? DateTime.tryParse(event.startDate);
+            if (endDate == null) return true;
+            final endDay = DateTime(endDate.year, endDate.month, endDate.day);
+            return !endDay.isBefore(today);
+          })
+          .toList();
+
+      // Sort: closest upcoming first
+      events.sort((a, b) {
+        final aDate = DateTime.tryParse(a.startDate);
+        final bDate = DateTime.tryParse(b.startDate);
+        if (aDate == null && bDate == null) return 0;
+        if (aDate == null) return 1;
+        if (bDate == null) return -1;
+        return aDate.compareTo(bDate);
+      });
+
+      return events;
+    } catch (e) {
+      debugPrint('Error fetching attending events for user: $e');
+      return [];
     }
   }
 
@@ -778,10 +2035,11 @@ class SupabaseService {
       if (currentUserId == null) return 0;
       final response = await _supabase
           .from('connections')
-          .select('id')
+          .select('id, status')
           .eq('user_id', currentUserId);
       
-      return (response as List).length;
+      final list = (response as List).where((item) => item['status'] != 'pending').toList();
+      return list.length;
     } catch (e) {
       debugPrint('Error fetching connections count: $e');
       return 0;

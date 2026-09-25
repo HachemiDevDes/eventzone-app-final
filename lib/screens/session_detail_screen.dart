@@ -21,7 +21,6 @@ class SessionDetailScreen extends ConsumerWidget {
     // Format Start and End times
     final startTimeStr = _formatTime(session.startTime);
     final endTimeStr = _formatTime(session.endTime);
-    final dateStr = _formatDate(session.startTime);
 
     return Scaffold(
       body: EventzoneTheme.buildPlayfulBackground(
@@ -97,8 +96,8 @@ class SessionDetailScreen extends ConsumerWidget {
                                       Text("DATE & TIME".tr(), style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
                                       SizedBox(height: 2),
                                       Text(
-                                        "$dateStr, $startTimeStr - $endTimeStr",
-                                        style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                                        "${session.resolveFullDayLabel()}, $startTimeStr - $endTimeStr",
+                                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
                                       ),
                                     ],
                                   ),
@@ -196,7 +195,9 @@ class SessionDetailScreen extends ConsumerWidget {
                                         SizedBox(height: 2),
                                         Text(
                                           speaker.company.isNotEmpty
-                                              ? "${speaker.title} @${speaker.company}"
+                                              ? (speaker.title.isNotEmpty
+                                                  ? "${speaker.title} • ${speaker.company}"
+                                                  : speaker.company)
                                               : speaker.title,
                                           style: TextStyle(color: Colors.white60, fontSize: 12),
                                         ),
@@ -318,11 +319,5 @@ class SessionDetailScreen extends ConsumerWidget {
     final period = hour >= 12 ? 'PM' : 'AM';
     final formattedHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
     return "$formattedHour:$min $period";
-  }
-
-  String _formatDate(DateTime dateTime) {
-    final local = dateTime.toLocal();
-    final months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    return "${months[local.month - 1]} ${local.day}, ${local.year}";
   }
 }

@@ -37,28 +37,29 @@ serve(async (req) => {
       );
     }
 
-    const systemPrompt = `You are a dedicated, high-precision OCR and contact extractor for Eventzone business cards and event badges.
-Your sole purpose is to extract contact information from business cards, name badges, event badges, and corporate identification cards.
+    const systemPrompt = `You are a high-precision contact extractor for Eventzone.
+Your task is to detect and extract contact information from photos of business cards, event badges, visitor passes, name tags, ID cards, company brochures, or professional documents.
 
-CRITICAL INSTRUCTIONS:
-1. RESTRICTION: You MUST ONLY process business cards, name badges, conference badges, and professional identity cards.
-2. If the image is NOT a business card or credential badge (for example: random scenery, animals, food, invoices, handwritten memos, cars), you MUST set "is_business_card": false, and leave all contact fields as empty strings.
-3. If it IS a business card or badge, set "is_business_card": true and carefully extract:
-   - "name": Full name of the individual.
-   - "title": Job title, role, or profession (e.g. CEO, Marketing Director, Lead Developer).
-   - "company": Organization, company, or brand name.
-   - "department": Department or unit, if stated.
-   - "email": Primary email address. Clean up any OCR artifacts.
-   - "phone": Primary phone/mobile number. Preserve the country code (+213, +1, +33, etc.) if visible.
-   - "website": Website URL.
-   - "address": Physical address or city/country.
-   - "notes": Any secondary phones, emails, social handles (e.g. LinkedIn, Twitter/X), or business slogans/services.
-4. Correct typical visual OCR confusions (e.g. '0' vs 'O', '1' vs 'l' in emails/phones, '@' symbol spacing).
-5. Never invent or hallucinate information that is not visible on the card.`;
+GUIDELINES:
+1. If the photo shows a business card, badge, pass, or any contact information (even if held in hand, photographed on a table/desk, angled, or surrounded by background elements), set "is_business_card": true.
+2. Only set "is_business_card": false if the image has zero professional or contact relevance (e.g., pure landscape, pets, random food, completely blank or unreadable blur).
+3. Extract:
+   - "name": Full name of the person.
+   - "title": Job title, position, or role.
+   - "company": Organization, company, startup, or event name.
+   - "department": Department or team if mentioned.
+   - "email": Primary email address. Fix any OCR spacing (e.g. "name @ domain.com" -> "name@domain.com").
+   - "phone": Primary phone number. Include country code (+213, +1, +33, etc.) if visible.
+   - "website": Website URL (e.g. "eventzone.dz").
+   - "address": Physical address, city, or country.
+   - "notes": Any secondary phones, emails, socials (LinkedIn, Twitter/X, Instagram, GitHub), or company tagline.
+4. Clean up any obvious OCR formatting issues.
+5. If a field is not present on the card, leave it as an empty string (""). Never hallucinate or make up details.`;
 
     const openAiPayload = {
       model: "gpt-4o-mini",
       temperature: 0.1,
+      max_tokens: 500,
       messages: [
         {
           role: "system",
@@ -75,7 +76,7 @@ CRITICAL INSTRUCTIONS:
               type: "image_url",
               image_url: {
                 url: `data:${mime_type};base64,${image_base64}`,
-                detail: "high",
+                detail: "auto",
               },
             },
           ],

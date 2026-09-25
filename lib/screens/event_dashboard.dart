@@ -1,11 +1,7 @@
-import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:sensors_plus/sensors_plus.dart';
 import '../theme/eventzone_theme.dart';
 import '../widgets/glass_container.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -13,9 +9,6 @@ import '../widgets/status_pill.dart';
 import '../models/event_model.dart';
 import '../providers/session_providers.dart';
 import 'schedule_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../providers/shake_providers.dart';
-import '../widgets/shake_search_overlay.dart';
 
 class EventDashboard extends ConsumerStatefulWidget {
   final EventModel event;
@@ -27,128 +20,7 @@ class EventDashboard extends ConsumerStatefulWidget {
   ConsumerState<EventDashboard> createState() => _EventDashboardState();
 }
 
-class _EventDashboardState extends ConsumerState<EventDashboard> with WidgetsBindingObserver {
-
-  // Direct accelerometer subscription
-  StreamSubscription<AccelerometerEvent>? _accelSub;
-  final List<DateTime> _shakeTimestamps = [];
-  bool _isDebouncing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _checkTooltip();
-    _startShakeListener();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      final sessionState = ref.read(shakeSessionProvider).value;
-      if (sessionState != null && sessionState.status == ShakeStatus.searching) {
-        ref.read(shakeSessionProvider.notifier).forceReset();
-      }
-    }
-  }
-
-  void _startShakeListener() {
-    debugPrint('[ShakeToConnect] Starting accelerometer listener...');
-    _accelSub = accelerometerEventStream(
-      samplingPeriod: const Duration(milliseconds: 50),
-    ).listen(
-      (AccelerometerEvent event) {
-        if (_isDebouncing) return;
-
-        // accelerometerEventStream includes gravity (~9.8 m/s²).
-        // Compute total magnitude and subtract gravity to get shake force.
-        final double magnitude =
-            sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
-        final double shakeMagnitude = (magnitude - 9.8).abs();
-
-        // Threshold lowered to 5.5 for Samsung OneUI compatibility
-        if (shakeMagnitude > 5.5) {
-          final now = DateTime.now();
-          _shakeTimestamps.add(now);
-          _shakeTimestamps.removeWhere(
-              (t) => now.difference(t).inMilliseconds > 1000);
-
-          debugPrint(
-              '[ShakeToConnect] Shake hit! magnitude=$shakeMagnitude, '
-              'count=${_shakeTimestamps.length}/2');
-
-          if (_shakeTimestamps.length >= 2) {
-            _shakeTimestamps.clear();
-            _isDebouncing = true;
-            debugPrint('[ShakeToConnect] ✅ SHAKE DETECTED — triggering session');
-            HapticFeedback.heavyImpact();
-            _triggerShakeSession();
-            Future.delayed(const Duration(seconds: 5), () {
-              if (mounted) _isDebouncing = false;
-            });
-          }
-        }
-      },
-      onError: (error) {
-        debugPrint('[ShakeToConnect] ❌ Accelerometer error: $error');
-      },
-    );
-    debugPrint('[ShakeToConnect] Accelerometer listener started.');
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _accelSub?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _checkTooltip() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('shake_tooltip_shown') != true) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text("💡 Shake your phone to connect with someone nearby"),
-            duration: const Duration(seconds: 10),
-            behavior: SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: 'Dismiss',
-              onPressed: () {},
-            ),
-          ),
-        );
-        await prefs.setBool('shake_tooltip_shown', true);
-      }
-    }
-  }
-
-  void _triggerShakeSession() {
-    if (!mounted) return;
-    
-    final state = ref.read(shakeSessionProvider).value;
-    
-    if (state != null && (state.status == ShakeStatus.searching || state.status == ShakeStatus.matched)) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Searching for connection...".tr()),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black87,
-      builder: (_) => const ShakeSearchOverlay(),
-    );
-    
-    ref.read(shakeSessionProvider.notifier).startSession(context);
-  }
-
+class _EventDashboardState extends ConsumerState<EventDashboard> {
   @override
   Widget build(BuildContext context) {
 
@@ -167,8 +39,10 @@ class _EventDashboardState extends ConsumerState<EventDashboard> with WidgetsBin
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(height: 64),
-                _buildEventStatusPill(widget.event.startDate, widget.event.endDate),
-                SizedBox(height: 20),
+                if (_isEventLiveNow(widget.event.startDate, widget.event.endDate)) ...[
+                  _buildEventStatusPill(widget.event.startDate, widget.event.endDate),
+                  const SizedBox(height: 20),
+                ],
                 Text(
                   widget.event.title,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -179,22 +53,26 @@ class _EventDashboardState extends ConsumerState<EventDashboard> with WidgetsBin
                 SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(LucideIcons.calendar, color: Colors.white54, size: 14),
-                    SizedBox(width: 8),
-                    Text(
-                      widget.event.date,
-                      style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                    const Icon(LucideIcons.calendar, color: Colors.white54, size: 14),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.event.date,
+                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
                     ),
                   ],
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Row(
                   children: [
-                    Icon(LucideIcons.mapPin, color: Colors.white54, size: 14),
-                    SizedBox(width: 8),
-                    Text(
-                      widget.event.location,
-                      style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                    const Icon(LucideIcons.mapPin, color: Colors.white54, size: 14),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.event.location,
+                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
                     ),
                   ],
                 ),
@@ -245,22 +123,7 @@ class _EventDashboardState extends ConsumerState<EventDashboard> with WidgetsBin
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                
-                // Shake to Connect Secondary Button
-                Center(
-                  child: OutlinedButton.icon(
-                    onPressed: _triggerShakeSession,
-                    icon: const Icon(LucideIcons.vibrate, size: 16, color: EventzoneTheme.primaryAction),
-                    label: Text("Shake to Connect".tr(), style: const TextStyle(color: EventzoneTheme.primaryAction)),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: EventzoneTheme.primaryAction),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 32),
+                const SizedBox(height: 32),
                 
                 // Personalized Networking Stats Section
                 _buildSectionHeader(context, "My Event Stats".tr()),
@@ -294,7 +157,7 @@ class _EventDashboardState extends ConsumerState<EventDashboard> with WidgetsBin
                 Text(
                   "NEXT PLANNED MEETING".tr(),
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: EventzoneTheme.primaryAction,
+                        color: Colors.white,
                         fontSize: 12,
                         letterSpacing: 1.5,
                       ),
@@ -485,9 +348,38 @@ class _EventDashboardState extends ConsumerState<EventDashboard> with WidgetsBin
     ).animate().fade(duration: 150.ms).slideY(begin: 0.1, end: 0, duration: 150.ms, curve: Curves.easeOutQuad);
   }
 
+  bool _isEventLiveNow(String? startDateStr, String? endDateStr) {
+    if (widget.event.isLive) return true;
+    if (startDateStr == null || startDateStr == 'TBA' || startDateStr.isEmpty) return false;
+    try {
+      final now = DateTime.now();
+      final start = DateTime.tryParse(startDateStr);
+      if (start != null) {
+        final today = DateTime(now.year, now.month, now.day);
+        final startDate = DateTime(start.year, start.month, start.day);
+        
+        DateTime endDate = startDate;
+        if (endDateStr != null && endDateStr.isNotEmpty && endDateStr != 'TBA') {
+          final end = DateTime.tryParse(endDateStr);
+          if (end != null) {
+            endDate = DateTime(end.year, end.month, end.day);
+          }
+        }
+        
+        if (today.isAfter(startDate.subtract(const Duration(days: 1))) && 
+            today.isBefore(endDate.add(const Duration(days: 1)))) {
+          return true;
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
   Widget _buildEventStatusPill(String start, String end) {
-    // Simple helper to check if event is live
-    return const StatusPill(label: "LIVE NOW", isLive: true);
+    if (_isEventLiveNow(start, end)) {
+      return const StatusPill(label: "LIVE NOW", isLive: true);
+    }
+    return const SizedBox.shrink();
   }
 
   String _format12HourTime(String rawTime) {

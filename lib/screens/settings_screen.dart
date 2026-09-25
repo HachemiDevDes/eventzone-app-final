@@ -248,9 +248,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildNavigationTile(IconData icon, String title, {String? trailingText, Color? textColor, Color? iconColor, VoidCallback? onTap}) {
-    return ListTile(
-      onTap: onTap ?? () {},
-      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        onTap: onTap ?? () {},
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         padding: EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -286,7 +288,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Icon(LucideIcons.chevronRight, color: Colors.white24, size: 18),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Future<void> _showSignOutDialog() async {

@@ -24,7 +24,7 @@ class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
   String _companyName = "";
   String _avatarUrl = "";
   int _dailyStreak = 0;
-  ProfileMaterialFinish _finish = ProfileMaterialFinish.cyberViolet;
+  ProfileMaterialFinish _finish = ProfileMaterialFinish.titaniumCobalt;
 
   String _userId = "";
 
@@ -146,6 +146,28 @@ class _MyQRCodeScreenState extends State<MyQRCodeScreen> {
                                   subtitle,
                                   style: const TextStyle(fontSize: 14, color: Colors.white38),
                                 ),
+                              if (_dailyStreak > 0) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(LucideIcons.flame, color: Colors.amber, size: 14),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        "$_dailyStreak Day Streak",
+                                        style: const TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             const SizedBox(height: 32),
                             Container(
                               padding: const EdgeInsets.all(16),

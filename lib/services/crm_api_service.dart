@@ -201,32 +201,7 @@ class CrmApiService {
         final email = c['email'];
         final name = c['full_name'] ?? 'Unknown';
         
-        // 1. Check if exists
-        final searchBody = {
-          "jsonrpc": "2.0",
-          "method": "call",
-          "params": {
-            "service": "object",
-            "method": "execute_kw",
-            "args": [
-              db,
-              2, // uid 2 is usually admin, but with API key in newer Odoo we might just use uid=2 or we need to authenticate first.
-              // Wait, the prompt says "Auth: API key passed in JSON-RPC params".
-              // For Odoo 14+, you can pass the API key instead of the password.
-              apiKey,
-              "res.partner",
-              "search",
-              [[["email", "=", email]]]
-            ]
-          }
-        };
-
-        // This is a simplified Odoo XML-RPC over JSON call structure.
-        // Actually, the prompt specified:
-        // Endpoint: POST {url}/web/dataset/call_kw
-        // This endpoint requires a session id in cookies usually, but we'll implement a generic approach.
-        
-        // As a simplified fallback for the sake of the prompt's instructions:
+        // Create contact in Odoo
         final createBody = {
           "jsonrpc": "2.0",
           "method": "call",

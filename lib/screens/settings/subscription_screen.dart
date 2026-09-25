@@ -957,6 +957,15 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen>
                         ],
                       ),
                     ),
+                    if (amount != null)
+                      Text(
+                        "${isPurchase ? '+' : ''}$amount DZD",
+                        style: TextStyle(
+                          color: isPurchase ? EventzoneTheme.accentSuccess : Colors.white70,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
                   ],
                 ),
               );

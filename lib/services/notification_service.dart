@@ -179,11 +179,14 @@ class NotificationService {
       if (user == null) return;
       
       // Upsert the token to the user_fcm_tokens table
-      await Supabase.instance.client.from('user_fcm_tokens').upsert({
-        'user_id': user.id,
-        'token': token,
-        'updated_at': DateTime.now().toIso8601String(),
-      });
+      await Supabase.instance.client.from('user_fcm_tokens').upsert(
+        {
+          'user_id': user.id,
+          'token': token,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        onConflict: 'user_id,token',
+      );
       debugPrint("FCM token saved to Supabase.");
     } catch (e) {
       debugPrint("Error saving FCM token to Supabase: $e");

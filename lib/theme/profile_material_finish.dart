@@ -36,23 +36,23 @@ class ProfileMaterialFinish {
     this.buttonTextColor = Colors.white,
   });
 
-  // 1. Titanium Cobalt
+  // 1. Titanium Cobalt (Default / Brand)
   static const ProfileMaterialFinish titaniumCobalt = ProfileMaterialFinish(
     id: 'titanium_cobalt',
     name: 'Titanium Cobalt',
     type: ProfileMaterialFinishType.titaniumCobalt,
-    dotColor: Color(0xFF2563EB), // Vibrant Cobalt Blue
-    primaryColor: Color(0xFF3B82F6),
+    dotColor: Color(0xFF1A73E8), // Eventzone Blue
+    primaryColor: Color(0xFF1A73E8),
     accentColor: Color(0xFF60A5FA),
-    glowColor: Color(0x662563EB),
-    cardBorderColor: Color(0x403B82F6),
+    glowColor: Color(0x661A73E8),
+    cardBorderColor: Color(0x401A73E8),
     cardSurfaceColor: Color(0xFF0F1E38),
     gradientColors: [
-      Color(0xFF1D4ED8),
+      Color(0xFF1A73E8),
       Color(0xFF1E3A8A),
       Color(0xFF0B1120),
     ],
-    buttonColor: Color(0xFF2563EB),
+    buttonColor: Color(0xFF1A73E8),
   );
 
   // 2. Obsidian Matte
@@ -120,17 +120,17 @@ class ProfileMaterialFinish {
   ];
 
   static ProfileMaterialFinish fromId(String? id) {
-    if (id == null || id.isEmpty) return cyberViolet;
+    if (id == null || id.isEmpty) return titaniumCobalt;
     for (final finish in all) {
       if (finish.id == id || finish.name.toLowerCase() == id.toLowerCase()) {
         return finish;
       }
     }
-    return cyberViolet;
+    return titaniumCobalt;
   }
 
   static ProfileMaterialFinish fromProfile(Map<String, dynamic>? profileData) {
-    if (profileData == null) return cyberViolet;
+    if (profileData == null) return titaniumCobalt;
     final metadata = profileData['metadata'];
     if (metadata is Map<String, dynamic> || metadata is Map) {
       final finishId = metadata['material_finish'] ?? metadata['profile_finish'] ?? metadata['ui_color'];
@@ -138,6 +138,6 @@ class ProfileMaterialFinish {
     }
     final directFinish = profileData['material_finish'] ?? profileData['profile_theme'];
     if (directFinish != null) return fromId(directFinish.toString());
-    return cyberViolet;
+    return titaniumCobalt;
   }
 }

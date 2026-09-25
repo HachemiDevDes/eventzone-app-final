@@ -13,13 +13,38 @@ let firebaseApp: any = null;
 
 function getFirebaseApp() {
   if (!firebaseApp) {
-    const serviceAccount = {
-      projectId: Deno.env.get('FIREBASE_PROJECT_ID'),
-      clientEmail: Deno.env.get('FIREBASE_CLIENT_EMAIL'),
-      privateKey: Deno.env.get('FIREBASE_PRIVATE_KEY')?.replace(/\\n/g, '\n'),
-    };
+    // Option 1: Full JSON string in FIREBASE_SERVICE_ACCOUNT or FIREBASE_SERVICE_ACCOUNT_KEY
+    const rawJson = Deno.env.get('FIREBASE_SERVICE_ACCOUNT') || Deno.env.get('FIREBASE_SERVICE_ACCOUNT_KEY');
+    if (rawJson && rawJson.trim()) {
+      try {
+        const parsed = typeof rawJson === 'string' ? JSON.parse(rawJson.trim()) : rawJson;
+        firebaseApp = initializeApp({
+          credential: cert(parsed),
+        });
+        return firebaseApp;
+      } catch (err: any) {
+        console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:", err);
+      }
+    }
+
+    // Option 2: Individual environment variables
+    const projectId = Deno.env.get('FIREBASE_PROJECT_ID') || 'eventzone-app-f4984';
+    const clientEmail = Deno.env.get('FIREBASE_CLIENT_EMAIL');
+    const rawPrivateKey = Deno.env.get('FIREBASE_PRIVATE_KEY');
+
+    if (!clientEmail || !rawPrivateKey) {
+      throw new Error(
+        "Firebase Admin credentials are missing. Please add FIREBASE_SERVICE_ACCOUNT (full service account JSON from Firebase Console) in Supabase Dashboard -> Project Settings -> Edge Functions -> Secrets."
+      );
+    }
+
+    const privateKey = rawPrivateKey.replace(/\\n/g, '\n');
     firebaseApp = initializeApp({
-      credential: cert(serviceAccount),
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
     });
   }
   return firebaseApp;

@@ -10,11 +10,8 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/eventzone_theme.dart';
-import '../theme/profile_material_finish.dart';
 import '../widgets/glass_container.dart';
-import '../widgets/material_finish_selector.dart';
 import '../services/supabase_service.dart';
-import 'schedule_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_providers.dart';
 
@@ -57,7 +54,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   final _supabaseService = SupabaseService();
   String _avatarUrl = "";
-  ProfileMaterialFinish _selectedFinish = ProfileMaterialFinish.cyberViolet;
 
   List<Map<String, dynamic>> _socialLinks = [];
 
@@ -131,7 +127,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       interests: _selectedInterests,
       metadata: {
         "socials": _socialLinks,
-        "material_finish": _selectedFinish.id,
       },
     );
     
@@ -147,10 +142,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         'what_im_looking_for': _selectedLookingFor.join(', '),
         'industries': _selectedIndustries,
         'interests': _selectedInterests,
-        'material_finish': _selectedFinish.id,
         'metadata': {
           "socials": _socialLinks,
-          "material_finish": _selectedFinish.id,
         },
       });
     }
@@ -220,7 +213,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       } else {
         _socialLinks = [];
       }
-      _selectedFinish = ProfileMaterialFinish.fromProfile(data);
       _isLoaded = true;
     });
   }
@@ -262,7 +254,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     return NetworkImage(url);
   }
 
-  IconData _getPlatformIcon(String platform) {
+  FaIconData _getPlatformIcon(String platform) {
     switch (platform.toLowerCase()) {
       case 'phone':
       case 'phone number':
@@ -577,12 +569,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: _selectedFinish.primaryColor.withOpacity(0.6),
+                            color: EventzoneTheme.primaryAction.withOpacity(0.6),
                             width: 2.5,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: _selectedFinish.glowColor,
+                              color: Colors.black.withOpacity(0.3),
                               blurRadius: 16,
                               offset: const Offset(0, 4),
                             ),
@@ -605,7 +597,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: _selectedFinish.primaryColor,
+                          color: EventzoneTheme.primaryAction,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(LucideIcons.pencil, size: 16, color: Colors.white),
@@ -615,17 +607,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-
-              // 🎨 MATERIAL FINISH CUSTOMIZATION
-              MaterialFinishSelector(
-                selectedFinish: _selectedFinish,
-                onFinishChanged: (finish) {
-                  setState(() {
-                    _selectedFinish = finish;
-                  });
-                  _autoSaveProfile();
-                },
-              ),
 
               const SizedBox(height: 32),
               _buildSectionTitle("Personal Details".tr()),
@@ -890,7 +871,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             style: const TextStyle(color: Colors.white, fontSize: 16),
             decoration: InputDecoration(
               enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
-              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: _selectedFinish.primaryColor)),
+              focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: EventzoneTheme.primaryAction)),
               contentPadding: const EdgeInsets.symmetric(vertical: 8),
             ),
           ),
@@ -899,7 +880,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
-  Widget _buildSocialAddButton(IconData icon, String platform) {
+  Widget _buildSocialAddButton(FaIconData icon, String platform) {
     return GestureDetector(
       onTap: () => _showAddEditSocialDialog(platformName: platform),
       child: Column(
@@ -907,11 +888,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _selectedFinish.primaryColor,
+              color: EventzoneTheme.primaryAction,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: _selectedFinish.glowColor,
+                  color: EventzoneTheme.primaryAction.withOpacity(0.3),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -949,10 +930,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: _selectedFinish.primaryColor.withOpacity(0.12),
+                  color: EventzoneTheme.primaryAction.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: FaIcon(icon, color: _selectedFinish.primaryColor, size: 18),
+                child: FaIcon(icon, color: EventzoneTheme.primaryAction, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1025,7 +1006,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: _selectedFinish.primaryColor, width: 2),
+                  borderSide: const BorderSide(color: EventzoneTheme.primaryAction, width: 2),
                 ),
               ),
             ),
@@ -1046,11 +1027,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ),
                   );
                 },
-                icon: Icon(LucideIcons.checkCircle2, color: _selectedFinish.primaryColor, size: 16),
-                label: Text("Save Bio", style: TextStyle(color: _selectedFinish.primaryColor, fontWeight: FontWeight.bold)),
+                icon: const Icon(LucideIcons.checkCircle2, color: EventzoneTheme.primaryAction, size: 16),
+                label: const Text("Save Bio", style: TextStyle(color: EventzoneTheme.primaryAction, fontWeight: FontWeight.bold)),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  backgroundColor: _selectedFinish.primaryColor.withOpacity(0.12),
+                  backgroundColor: EventzoneTheme.primaryAction.withOpacity(0.12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 ),
               ),
@@ -1099,7 +1080,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       _onFieldChanged();
                     },
                     backgroundColor: const Color(0xFF1A1E2E),
-                    selectedColor: _selectedFinish.primaryColor,
+                    selectedColor: EventzoneTheme.primaryAction,
                     checkmarkColor: Colors.white,
                     labelStyle: TextStyle(
                       color: isSelected ? Colors.white : Colors.white70,
@@ -1191,11 +1172,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
                         color: isSelected 
-                            ? _selectedFinish.primaryColor.withOpacity(0.2) 
+                            ? EventzoneTheme.primaryAction.withOpacity(0.2) 
                             : const Color(0xFF1A1E2E),
                         border: Border.all(
                           color: isSelected 
-                              ? _selectedFinish.primaryColor 
+                              ? EventzoneTheme.primaryAction 
                               : Colors.white10,
                           width: 1.5,
                         ),

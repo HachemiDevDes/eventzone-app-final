@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/session_model.dart';
 import '../models/meeting_model.dart';
+import '../models/floor_plan_model.dart';
+import '../models/exhibitor_model.dart';
+import '../models/sponsor_model.dart';
 import '../services/supabase_service.dart';
 import 'connection_providers.dart';
 
@@ -62,4 +65,28 @@ final connectionsCountProvider = FutureProvider<int>((ref) async {
 final nextMeetingProvider = FutureProvider<MeetingModel?>((ref) async {
   final service = ref.watch(supabaseServiceProvider);
   return await service.fetchNextMeeting();
+});
+
+// FutureProvider for fetching floor plans for an event
+final eventFloorPlansProvider = FutureProvider.family<List<FloorPlanModel>, String>((ref, eventId) async {
+  final service = ref.watch(supabaseServiceProvider);
+  return await service.fetchEventFloorPlans(eventId);
+});
+
+// FutureProvider for fetching exhibitors for an event
+final eventExhibitorsProvider = FutureProvider.family<List<ExhibitorModel>, String>((ref, eventId) async {
+  final service = ref.watch(supabaseServiceProvider);
+  return await service.fetchEventExhibitors(eventId);
+});
+
+// FutureProvider for fetching speakers for an event
+final eventSpeakersProvider = FutureProvider.family<List<SessionSpeaker>, String>((ref, eventId) async {
+  final service = ref.watch(supabaseServiceProvider);
+  return await service.fetchEventSpeakers(eventId);
+});
+
+// FutureProvider for fetching sponsors for an event
+final eventSponsorsProvider = FutureProvider.family<List<SponsorModel>, String>((ref, eventId) async {
+  final service = ref.watch(supabaseServiceProvider);
+  return await service.fetchEventSponsors(eventId);
 });
