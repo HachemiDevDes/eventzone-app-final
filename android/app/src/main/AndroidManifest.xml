@@ -51,6 +51,11 @@
                 <data android:scheme="https" android:host="profile.eventzone.pro" />
             </intent-filter>
         </activity>
+        <!-- Set high importance notification channel for FCM notifications in background -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="high_importance_channel" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

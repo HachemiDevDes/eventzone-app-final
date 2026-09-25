@@ -33,6 +33,33 @@ class RegistrationResult {
 class SupabaseService {
   final _supabase = Supabase.instance.client;
 
+  // 🔔 Send push notification via Supabase Edge Function 'send-notification'
+  Future<void> sendPushNotification({
+    required String targetUserId,
+    required String title,
+    required String message,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      if (targetUserId.trim().isEmpty) return;
+      final body = <String, dynamic>{
+        'target': targetUserId.trim(),
+        'title': title.trim(),
+        'message': message.trim(),
+      };
+      if (data != null && data.isNotEmpty) {
+        body['data'] = data;
+      }
+      final res = await _supabase.functions.invoke(
+        'send-notification',
+        body: body,
+      );
+      debugPrint('Push notification dispatched to $targetUserId: ${res.data}');
+    } catch (e) {
+      debugPrint('Failed to send push notification to $targetUserId: $e');
+    }
+  }
+
   // 📅 Fetch all events from the 'events' table
   Future<List<EventModel>> fetchEvents() async {
     try {
@@ -1297,6 +1324,20 @@ class SupabaseService {
         });
       }
 
+      // Send push notification to target user
+      final senderName = senderProfile?['full_name'] ?? 'Someone';
+      await sendPushNotification(
+        targetUserId: targetUserId,
+        title: 'New Connection Request',
+        message: '$senderName sent you a connection request.',
+        data: {
+          'type': 'connection_request',
+          'sender_id': currentUserId,
+          'target_id': targetUserId,
+          'event_id': eventId ?? '',
+        },
+      );
+
       return true;
     } catch (e) {
       debugPrint('Error sending connection request: $e');
@@ -1494,6 +1535,18 @@ class SupabaseService {
           'is_new': true,
         });
       }
+
+      // Send push notification to the sender that request was accepted
+      final acceptorName = currentProfile?['full_name'] ?? 'Attendee';
+      await sendPushNotification(
+        targetUserId: senderId,
+        title: 'Connection Request Accepted',
+        message: '$acceptorName accepted your connection request.',
+        data: {
+          'type': 'connection_accepted',
+          'user_id': currentUserId,
+        },
+      );
 
       return true;
     } catch (e) {
@@ -1871,6 +1924,44 @@ class SupabaseService {
   Future<bool> createMeeting(MeetingModel meeting) async {
     try {
       await _supabase.from('meetings').insert(meeting.toJson());
+
+      // Fetch organizer name to notify attendee
+      final currentUserId = _supabase.auth.currentUser?.id;
+      final organizerId = meeting.organizerId.isNotEmpty ? meeting.organizerId : (currentUserId ?? '');
+
+      String organizerName = 'Someone';
+      if (organizerId.isNotEmpty) {
+        try {
+          final profile = await _supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', organizerId)
+              .maybeSingle();
+          if (profile != null && profile['full_name'] != null && profile['full_name'].toString().trim().isNotEmpty) {
+            organizerName = profile['full_name'].toString().trim();
+          }
+        } catch (e) {
+          debugPrint('Error fetching organizer profile for push: $e');
+        }
+      }
+
+      final dateStr = meeting.date.isNotEmpty ? ' on ${meeting.date}' : '';
+      final timeStr = meeting.startTime.isNotEmpty ? ' at ${meeting.startTime}' : '';
+      final titleStr = meeting.title.isNotEmpty ? ': "${meeting.title}"' : '';
+
+      await sendPushNotification(
+        targetUserId: meeting.attendeeId,
+        title: 'New Meeting Request',
+        message: '$organizerName requested a meeting$titleStr$dateStr$timeStr.',
+        data: {
+          'type': 'meeting_request',
+          'meeting_id': meeting.id,
+          'organizer_id': meeting.organizerId,
+          'date': meeting.date,
+          'time': meeting.startTime,
+        },
+      );
+
       return true;
     } catch (e) {
       debugPrint('Error creating meeting: $e');
@@ -1881,10 +1972,65 @@ class SupabaseService {
   // 📅 Update meeting status (accepted, declined, cancelled)
   Future<bool> updateMeetingStatus(String meetingId, String status) async {
     try {
+      final meetingData = await _supabase
+          .from('meetings')
+          .select('organizer_id, attendee_id, title')
+          .eq('id', meetingId)
+          .maybeSingle();
+
       await _supabase
           .from('meetings')
           .update({'status': status})
           .eq('id', meetingId);
+
+      if (meetingData != null) {
+        final currentUserId = _supabase.auth.currentUser?.id;
+        final organizerId = meetingData['organizer_id']?.toString();
+        final attendeeId = meetingData['attendee_id']?.toString();
+        final title = meetingData['title']?.toString() ?? 'Meeting';
+
+        String actorName = 'Someone';
+        if (currentUserId != null) {
+          try {
+            final profile = await _supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', currentUserId)
+                .maybeSingle();
+            if (profile != null && profile['full_name'] != null && profile['full_name'].toString().trim().isNotEmpty) {
+              actorName = profile['full_name'].toString().trim();
+            }
+          } catch (_) {}
+        }
+
+        if (currentUserId == attendeeId && organizerId != null) {
+          if (status == 'accepted') {
+            await sendPushNotification(
+              targetUserId: organizerId,
+              title: 'Meeting Accepted',
+              message: '$actorName accepted your meeting request: "$title".',
+              data: {'type': 'meeting_status', 'meeting_id': meetingId, 'status': 'accepted'},
+            );
+          } else if (status == 'declined') {
+            await sendPushNotification(
+              targetUserId: organizerId,
+              title: 'Meeting Declined',
+              message: '$actorName declined your meeting request: "$title".',
+              data: {'type': 'meeting_status', 'meeting_id': meetingId, 'status': 'declined'},
+            );
+          }
+        } else if (currentUserId == organizerId && attendeeId != null) {
+          if (status == 'cancelled') {
+            await sendPushNotification(
+              targetUserId: attendeeId,
+              title: 'Meeting Cancelled',
+              message: '$actorName cancelled the meeting: "$title".',
+              data: {'type': 'meeting_status', 'meeting_id': meetingId, 'status': 'cancelled'},
+            );
+          }
+        }
+      }
+
       return true;
     } catch (e) {
       debugPrint('Error updating meeting status: $e');

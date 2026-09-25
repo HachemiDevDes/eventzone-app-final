@@ -56,7 +56,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { target, title, message } = await req.json()
+    const { target, title, message, data } = await req.json()
 
     // 1. Validate inputs
     if (!title || !message || !target) {
@@ -136,13 +136,33 @@ serve(async (req: Request) => {
 
     for (let i = 0; i < tokensToSend.length; i += BATCH_SIZE) {
       const batchTokens = tokensToSend.slice(i, i + BATCH_SIZE);
-      const payload = {
+      const payload: any = {
         notification: {
           title: title,
           body: message,
         },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'high_importance_channel',
+            sound: 'default',
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'default',
+            },
+          },
+        },
         tokens: batchTokens,
       };
+
+      if (data && typeof data === 'object') {
+        payload.data = Object.fromEntries(
+          Object.entries(data).map(([k, v]) => [k, String(v)])
+        );
+      }
 
       const response = await messaging.sendEachForMulticast(payload);
       successCount += response.successCount;

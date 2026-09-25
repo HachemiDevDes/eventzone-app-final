@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -101,12 +102,15 @@ class NotificationService {
 
   RealtimeChannel? _messagesChannel;
   RealtimeChannel? _connectionsChannel;
+  RealtimeChannel? _meetingsChannel;
 
   void _teardownRealtimeListeners() {
     _messagesChannel?.unsubscribe();
     _connectionsChannel?.unsubscribe();
+    _meetingsChannel?.unsubscribe();
     _messagesChannel = null;
     _connectionsChannel = null;
+    _meetingsChannel = null;
   }
 
   void _setupSupabaseRealtimeListeners() {
@@ -116,7 +120,7 @@ class NotificationService {
     // Prevent duplicate subscriptions
     _teardownRealtimeListeners();
 
-    // Listen for new messages
+    // 1. Listen for new messages
     _messagesChannel = Supabase.instance.client
         .channel('public:messages:recipient_id=eq.${user.id}')
         .onPostgresChanges(
@@ -149,7 +153,7 @@ class NotificationService {
         )
         .subscribe();
         
-    // Listen for new connections (QR Code scans)
+    // 2. Listen for connection requests & connections
     _connectionsChannel = Supabase.instance.client
         .channel('public:connections:linked_profile_id=eq.${user.id}')
         .onPostgresChanges(
@@ -161,13 +165,165 @@ class NotificationService {
             column: 'linked_profile_id',
             value: user.id,
           ),
-          callback: (payload) {
+          callback: (payload) async {
             final newConn = payload.newRecord;
-            final name = newConn['name'] ?? 'Someone';
-            showLocalNotification(
-              title: 'New Connection!',
-              body: '$name connected with you via QR code.',
-            );
+            final status = newConn['status']?.toString();
+            final source = newConn['source']?.toString();
+            final senderId = newConn['user_id']?.toString();
+
+            // Ignore if self-created
+            if (senderId == user.id) return;
+
+            // Extract sender name from notes or database
+            String partnerName = 'Someone';
+            if (newConn['notes'] != null && newConn['notes'].toString().isNotEmpty) {
+              try {
+                final notes = jsonDecode(newConn['notes'].toString());
+                if (notes is Map && notes['sender_name'] != null && notes['sender_name'].toString().trim().isNotEmpty) {
+                  partnerName = notes['sender_name'].toString().trim();
+                }
+              } catch (_) {}
+            }
+
+            if (partnerName == 'Someone' && senderId != null) {
+              try {
+                final senderRes = await Supabase.instance.client
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', senderId)
+                    .maybeSingle();
+                if (senderRes != null && senderRes['full_name'] != null && senderRes['full_name'].toString().trim().isNotEmpty) {
+                  partnerName = senderRes['full_name'].toString().trim();
+                }
+              } catch (_) {}
+            }
+
+            if (status == 'pending') {
+              showLocalNotification(
+                title: 'New Connection Request',
+                body: '$partnerName sent you a connection request.',
+              );
+            } else if (source == 'In-App Request' && status == 'connected') {
+              showLocalNotification(
+                title: 'Connection Accepted',
+                body: '$partnerName accepted your connection request.',
+              );
+            } else {
+              showLocalNotification(
+                title: 'New Connection!',
+                body: '$partnerName connected with you.',
+              );
+            }
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'connections',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: user.id,
+          ),
+          callback: (payload) {
+            final updatedConn = payload.newRecord;
+            final oldConn = payload.oldRecord;
+            if (oldConn['status'] == 'pending' && updatedConn['status'] == 'connected') {
+              final contactName = updatedConn['name'] ?? 'Attendee';
+              showLocalNotification(
+                title: 'Connection Request Accepted',
+                body: '$contactName accepted your connection request.',
+              );
+            }
+          },
+        )
+        .subscribe();
+
+    // 3. Listen for meeting requests & responses
+    _meetingsChannel = Supabase.instance.client
+        .channel('public:meetings:user:${user.id}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'meetings',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'attendee_id',
+            value: user.id,
+          ),
+          callback: (payload) async {
+            final meeting = payload.newRecord;
+            if (meeting['status'] == 'pending') {
+              String organizerName = 'Someone';
+              final organizerId = meeting['organizer_id']?.toString();
+              if (organizerId != null && organizerId.isNotEmpty) {
+                try {
+                  final profile = await Supabase.instance.client
+                      .from('profiles')
+                      .select('full_name')
+                      .eq('id', organizerId)
+                      .maybeSingle();
+                  if (profile != null && profile['full_name'] != null && profile['full_name'].toString().trim().isNotEmpty) {
+                    organizerName = profile['full_name'].toString().trim();
+                  }
+                } catch (_) {}
+              }
+
+              final title = meeting['title'] ?? 'Meeting';
+              final date = meeting['date'] ?? '';
+              final time = (meeting['start_time'] ?? '').toString();
+              final formattedTime = time.length >= 5 ? time.substring(0, 5) : time;
+              final dateStr = date.isNotEmpty ? ' on $date' : '';
+              final timeStr = formattedTime.isNotEmpty ? ' at $formattedTime' : '';
+
+              showLocalNotification(
+                title: 'New Meeting Request',
+                body: '$organizerName requested a meeting: "$title"$dateStr$timeStr.',
+              );
+            }
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'meetings',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'organizer_id',
+            value: user.id,
+          ),
+          callback: (payload) async {
+            final meeting = payload.newRecord;
+            final oldMeeting = payload.oldRecord;
+            if (oldMeeting['status'] != meeting['status']) {
+              String attendeeName = 'Attendee';
+              final attendeeId = meeting['attendee_id']?.toString();
+              if (attendeeId != null && attendeeId.isNotEmpty) {
+                try {
+                  final profile = await Supabase.instance.client
+                      .from('profiles')
+                      .select('full_name')
+                      .eq('id', attendeeId)
+                      .maybeSingle();
+                  if (profile != null && profile['full_name'] != null && profile['full_name'].toString().trim().isNotEmpty) {
+                    attendeeName = profile['full_name'].toString().trim();
+                  }
+                } catch (_) {}
+              }
+
+              final title = meeting['title'] ?? 'Meeting';
+              if (meeting['status'] == 'accepted') {
+                showLocalNotification(
+                  title: 'Meeting Accepted',
+                  body: '$attendeeName accepted your meeting request: "$title".',
+                );
+              } else if (meeting['status'] == 'declined') {
+                showLocalNotification(
+                  title: 'Meeting Declined',
+                  body: '$attendeeName declined your meeting request: "$title".',
+                );
+              }
+            }
           },
         )
         .subscribe();
@@ -193,11 +349,22 @@ class NotificationService {
     }
   }
 
+  final List<String> _recentNotifications = [];
+
   Future<void> showLocalNotification({
     required String title,
     required String body,
     String? payload,
   }) async {
+    final dedupeKey = '$title:$body';
+    if (_recentNotifications.contains(dedupeKey)) {
+      return;
+    }
+    _recentNotifications.add(dedupeKey);
+    Future.delayed(const Duration(seconds: 5), () {
+      _recentNotifications.remove(dedupeKey);
+    });
+
     AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
       'high_importance_channel', // id
